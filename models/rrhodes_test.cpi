@@ -1,11 +1,11 @@
 ---------------------
 -- BIOMD0000000079
 -- Goldbeter Weight Cycling, 2006
--- Model created by Ross Rhodes
+-- cPi model created by Ross Rhodes
 ---------------------
 
-species P(a) = a.0
-species Q(b) = b.0
-species R(b) = tau<1>
+species P(a,b) = tau<1.0>.0+b.Q(a,b);
+species Q(b,c) = b.Q(b,c)+c.R(b,c);
+species R(b,c) = c.R(b,c)+tau<1.0>.0;
 
-process Pi = [0.43]P() || [0.8]Q() || [0.55]R()
+process Pi = [0.43]P() || [0.8]Q() || [0.55]R():{};
