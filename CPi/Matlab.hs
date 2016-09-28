@@ -101,7 +101,7 @@ callOctave env p mts p' ts = let
   in do
     putStrLn $ "Octave Script: \n" ++ script
     OS.readProcess
-      "octave" ["--eval", script] []
+      "octave" ["-q", "--eval", script] []
 
 -- | Solver which calculates the symbolic Jacobian, writes MATLAB code, and executes it with GNU Octave. (General purpose, deals with stiff systems, uses LSODE.)
 solveODEoctave :: Solver
