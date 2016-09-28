@@ -1,6 +1,6 @@
 -- (C) Copyright Chris Banks 2011-2012
 
--- This file is part of The Continuous Pi-calculus Workbench (CPiWB). 
+-- This file is part of The Continuous Pi-calculus Workbench (CPiWB).
 
 --     CPiWB is free software: you can redistribute it and/or modify
 --     it under the terms of the GNU General Public License as published by
@@ -25,45 +25,49 @@ module CPi.Plot
 
 import Graphics.Rendering.Chart
 import Graphics.Rendering.Chart.Gtk
+import Graphics.Rendering.Chart.Backend.Cairo
 import Data.Colour.Names
 import Data.Colour.SRGB
 import Data.Colour
-import Data.Accessor
+-- import Data.Accessor
+import Data.Default.Class
+import Control.Lens
 import qualified Control.Exception as X
 import qualified Numeric.LinearAlgebra as LA
+import Control.Monad
 
 import CPi.Lib
 
 -- Takes data from the ODE solver and plots them
 plotTimeSeries :: LA.Vector Double -> LA.Matrix Double -> [Species] -> IO ()
 plotTimeSeries ts soln ss
-    = plot 
-      (LA.toList ts) 
+    = plot
+      (LA.toList ts)
       (zip (map pretty ss) (map LA.toList (LA.toColumns soln)))
 
 -- Plots the data to a PDF file
 plotTimeSeriesToFile :: LA.Vector Double -> LA.Matrix Double -> [Species] -> String -> IO ()
-plotTimeSeriesToFile ts soln ss file 
+plotTimeSeriesToFile ts soln ss file
     = plotToFile
-      (LA.toList ts) 
+      (LA.toList ts)
       (zip (map pretty ss) (map LA.toList (LA.toColumns soln)))
       file
 
 -- Only plots selected species
-plotTimeSeriesFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species] 
+plotTimeSeriesFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species]
                        -> IO ()
 plotTimeSeriesFiltered ts soln ss ss'
     = plot
       (LA.toList ts)
-      (filter (\(s,_)-> s `elem` (map specName ss')) 
+      (filter (\(s,_)-> s `elem` (map specName ss'))
        (zip (map specName ss) (map LA.toList (LA.toColumns soln))))
 
 -- Only plots selected species to a PDF file
-plotTimeSeriesToFileFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species] 
+plotTimeSeriesToFileFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species]
                              -> String -> IO ()
-plotTimeSeriesToFileFiltered ts soln ss ss' file 
+plotTimeSeriesToFileFiltered ts soln ss ss' file
     = plotToFile
-      (LA.toList ts) 
+      (LA.toList ts)
       (filter (\(s,_)-> s `elem` (map specName ss'))
        (zip (map pretty ss) (map LA.toList (LA.toColumns soln))))
       file
@@ -74,25 +78,27 @@ plot ts dims = renderableToWindow (toRenderable (layout ts dims)) 640 480
 
 -- Plots the time series to a file
 plotToFile :: [Double] -> [(String,[Double])] -> String -> IO ()
-plotToFile ts dims file = renderableToPDFFile (toRenderable (layout ts dims)) 842 595 file
+plotToFile ts dims file = void $ renderableToFile (FileOptions (842, 595) PDF) file (toRenderable (layout ts dims))
 
 -- gets a plot layout with plots for each dimension
-layout ts dims = layout1_plots ^= plots ts (colours (length dims)) dims $
+layout ts dims = layout_plots .~ plots ts (colours (length dims)) dims
+  $ def
                  -- layout1_legend ^= Nothing $ {-remove to add legend-}
-                 defaultLayout1
 
 -- gets the plots for each dimension
-plots :: [Double] -> [AlphaColour Double] -> [(String,[Double])] -> 
-         [Either (Plot Double Double) b]
+-- plots :: [Double] -> [AlphaColour Double] -> [(String,[Double])] ->
+--          [Either (Plot Double Double) b]
+plots :: [Double] -> [AlphaColour Double] -> [(String,[Double])] ->
+         [Plot Double Double]
 plots _ _ [] = []
-plots ts (colour:cs) ((lbl,pts):dims) 
-    = (Left $ toPlot $
-       plot_lines_style ^= solidLine 1 colour $
-       plot_lines_values ^= [zip ts pts] $
-       plot_lines_title ^= lbl $
-       defaultPlotLines
+plots ts (colour:cs) ((lbl,pts):dims)
+    = (toPlot
+      $ plot_lines_style .~ solidLine 1 colour
+      $ plot_lines_values .~ [zip ts pts]
+      $ plot_lines_title .~ lbl
+      $ def
       ) : plots ts cs dims
-plots _ [] _ = X.throw $ CpiException 
+plots _ [] _ = X.throw $ CpiException
                "CPi.Plot.plots: Run out of colours!"
 
 ---------------
@@ -100,10 +106,10 @@ plots _ [] _ = X.throw $ CpiException
 ---------------
 
 -- a plot of two dimensions:
-phasePlot2 :: LA.Vector Double 
-           -> LA.Matrix Double 
-           -> [Species] 
-           -> (Species,Species) 
+phasePlot2 :: LA.Vector Double
+           -> LA.Matrix Double
+           -> [Species]
+           -> (Species,Species)
            -> IO ()
 phasePlot2 ts soln ss ss'
     = plotPhase
@@ -113,19 +119,19 @@ phasePlot2 ts soln ss ss'
 
 plotPhase dims = renderableToWindow (toRenderable (layout2phase dims)) 640 480
 
-plotphase pts 
-    = Left $ toPlot
-      $ plot_lines_values ^= [pts]
-      $ plot_lines_style ^= solidLine 1 (opaque blue) 
-      $ defaultPlotLines
+plotphase pts
+    = toPlot
+      $ plot_lines_values .~ [pts]
+      $ plot_lines_style .~ solidLine 1 (opaque blue)
+      $ def
 
-layout2phase dims 
-    = layout1_plots ^= [plotphase $ zip (snd (dims!!0)) (snd (dims!!1))]
+layout2phase dims
+    = layout_plots .~ [plotphase $ zip (snd (dims!!0)) (snd (dims!!1))]
 --      $ layout1_bottom_axis ^: laxis_generate ^= autoScaledLogAxis defaultLogAxis
-      $ layout1_bottom_axis ^: laxis_title ^= "["++fst (dims!!0)++"]"
+      $ layout_x_axis . laxis_title .~ "["++fst (dims!!0)++"]"
 --      $ layout1_left_axis ^: laxis_generate ^= autoScaledLogAxis defaultLogAxis
-      $ layout1_left_axis ^: laxis_title ^= "["++fst (dims!!1)++"]"
-      $ defaultLayout1
+      $ layout_y_axis . laxis_title .~ "["++fst (dims!!1)++"]"
+      $ def
 
 
 -------------------
@@ -178,7 +184,7 @@ testPlot2 = plot_lines_style ^= solidLine 1 (opaque red)
             $ defaultPlotLines
 
 testLayout = layout1_title ^= "Test graph!"
-             $ layout1_plots ^= [Left (toPlot testPlot1), 
+             $ layout1_plots ^= [Left (toPlot testPlot1),
                                  Left (toPlot testPlot2)]
              $ defaultLayout1
 

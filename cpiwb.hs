@@ -1,6 +1,6 @@
 -- (C) Copyright Chris Banks 2011-2012
 
--- This file is part of The Continuous Pi-calculus Workbench (CPiWB). 
+-- This file is part of The Continuous Pi-calculus Workbench (CPiWB).
 
 --     CPiWB is free software: you can redistribute it and/or modify
 --     it under the terms of the GNU General Public License as published by
@@ -28,6 +28,8 @@ import System.Console.Haskeline
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
 
+import Graphics.Rendering.Chart.Renderable
+
 import qualified Data.List as L
 import qualified Control.Exception as X
 
@@ -48,7 +50,7 @@ type Formulae = [Formula]
 main :: IO ()
 main = do putStrLn welcome;
           evalStateT (runInputT defaultSettings loop) []
-              where 
+              where
                 loop :: Environment ()
                 loop = do input <- getInputLine prompt
                           case input of
@@ -107,6 +109,9 @@ commands = [("help",
             ("plot",
              CmdRec {cmdFn = plotCmd,
                      cmdHelp = helpTextPlot}),
+            ("plotmanual",
+             CmdRec {cmdFn = plotManualCmd,
+                     cmdHelp = helpTextPlot}),
             ("plotfile",
              CmdRec {cmdFn = plotFileCmd,
                      cmdHelp = helpTextPlotFile}),
@@ -136,7 +141,8 @@ commands = [("help",
                      cmdHelp = helpTextEvolve}),
             ("derivs",
              CmdRec {cmdFn = plotDerivsCmd,
-                     cmdHelp = helpTextDerivs})]
+                     cmdHelp = helpTextDerivs})
+                     ]
 
 -- TODO: * delete a specific defn cmd
 --       * network cmd (need to parameterise in syntax first)
@@ -148,8 +154,8 @@ commands = [("help",
 
 -- help Command
 helpCmd :: String -> Environment ()
-helpCmd x 
-    | not(null(param x)) 
+helpCmd x
+    | not(null(param x))
         = case (lookup (param x) commands) of
             Nothing -> say $ "Sorry no help on \""++x++"\"."
             Just r -> let (c,d) = cmdHelp r in
@@ -211,25 +217,26 @@ odesCmd x = do env <- getEnv
 -- plot Command
 plotCmd :: String -> Environment ()
 plotCmd = plotOctaveCmd
-{-plotCmd x = do env <- getEnv;
-               let args = words x
-               -- TODO: properly parse the command!
-               --       and have some defaults?
-               let res = read(args!!4)
-               let start = read(args!!2)
-               let end = read(args!!3)
-               case lookupProcName env (args!!1) of
-                 Nothing   -> say $ "Process \""++(args!!1)
-                              ++"\" is not in the Environment."
-                 Just proc -> do let mts = processMTS env proc
-                                 let dpdt = dPdt env mts proc
-                                 let ts = (res,(start,end))
-                                 let ts' = timePoints ts
-                                 let solns = solveODE env proc mts dpdt ts
-                                 let ss = speciesIn env dpdt
-                                 let ss' = speciesInProc proc
-                                 lift$lift$plotTimeSeriesFiltered ts' solns ss ss'
--}
+
+plotManualCmd :: String -> Environment ()
+plotManualCmd x = do env <- getEnv;
+		     let args = words x
+		     -- TODO: properly parse the command!
+	             --       and have some defaults?
+		     let res = read(args!!4)
+		     let start = read(args!!2)
+		     let end = read(args!!3)
+		     case lookupProcName env (args!!1) of
+		       Nothing   -> say $ "Process \""++(args!!1)
+		                    ++"\" is not in the Environment."
+		       Just proc -> do let mts = processMTS env proc
+		                       let dpdt = dPdt env mts proc
+		                       let ts = (res,(start,end))
+		                       let ts' = timePoints ts
+		                       let solns = solveODE env proc mts dpdt ts
+		                       let ss = speciesIn env dpdt
+		                       let ss' = speciesInProc proc
+		                       lift$lift$plotTimeSeriesFiltered ts' solns ss ss'
 
 -- phase2 command
 phase2Cmd :: String -> Environment ()
@@ -330,8 +337,8 @@ plotOnlyCmd x = do env <- getEnv;
                    let end = read(args!!3)
                    let err x = X.throw $ CpiException $
                                "Species \""++x++"\" is not in the Environment."
-                   let onlyss = map 
-                                (\x->maybe (err x) id (lookupSpecName env x)) 
+                   let onlyss = map
+                                (\x->maybe (err x) id (lookupSpecName env x))
                                 (drop 5 args)
                    case lookupProcName env (args!!1) of
                      Nothing   -> say $ "Process \""++(args!!1)
@@ -340,11 +347,11 @@ plotOnlyCmd x = do env <- getEnv;
                                      let dpdt = dPdt env mts proc
                                      let ts = (res,(start,end))
                                      let ts' = timePoints ts
-                                     let solns = solveODEoctave env proc 
+                                     let solns = solveODEoctave env proc
                                                                 mts dpdt ts
                                      let ss = speciesIn env dpdt
                                      lift$lift$
-                                         plotTimeSeriesFiltered ts' solns 
+                                         plotTimeSeriesFiltered ts' solns
                                                                 ss onlyss
 
 -- plot concentration derivatives command:
@@ -358,8 +365,8 @@ plotDerivsCmd x = do env <- getEnv;
                      let end = read(args!!3)
                      let err x = X.throw $ CpiException $
                                  "Species \""++x++"\" is not in the Environment."
-                     let onlyss = map 
-                                  (\x->maybe (err x) id (lookupSpecName env x)) 
+                     let onlyss = map
+                                  (\x->maybe (err x) id (lookupSpecName env x))
                                   (drop 5 args)
                      case lookupProcName env (args!!1) of
                        Nothing   -> say $ "Process \""++(args!!1)
@@ -368,7 +375,7 @@ plotDerivsCmd x = do env <- getEnv;
                                        let dpdt = dPdt env mts proc
                                        let ts = (res,(start,end))
                                        let ts' = timePoints ts
-                                       let solns = solveODEoctave env proc 
+                                       let solns = solveODEoctave env proc
                                                        mts dpdt ts
                                        let ds = derivs env dpdt ts solns
                                        let ss = speciesIn env dpdt
@@ -385,15 +392,15 @@ checkCmd x = do env <- getEnv
                   Nothing -> say $ "Process \""++(args!!1)
                              ++"\" is not in the Environment."
                   Just p  -> case parseFormula (unwords(drop 2 args)) of
-                               Left err -> say $ "Formula parse error:\n" 
+                               Left err -> say $ "Formula parse error:\n"
                                            ++ (show err)
                                Right f  -> let f' = reconcileSpecs env f
-                                           in say $ show $ 
-                                              modelCheck env 
-                                                         solveODE 
-                                                         Nothing 
-                                                         p 
-                                                         (500,(0,(simTime f'))) 
+                                           in say $ show $
+                                              modelCheck env
+                                                         solveODE
+                                                         Nothing
+                                                         p
+                                                         (500,(0,(simTime f')))
                                                          f'
 
 check2Cmd :: String -> Environment ()
@@ -403,14 +410,14 @@ check2Cmd x = do env <- getEnv
                    Nothing -> say $ "Process \""++(args!!1)
                               ++"\" is not in the Environment."
                    Just p  -> case parseFormula (unwords(drop 2 args)) of
-                                Left err -> say $ "Formula parse error:\n" 
+                                Left err -> say $ "Formula parse error:\n"
                                             ++ (show err)
                                 Right f  -> let f' = reconcileSpecs env f
                                             in say $ show $
-                                               modelCheckSig env 
-                                                            solveODEoctave 
-                                                            Nothing 
-                                                            p 
+                                               modelCheckSig env
+                                                            solveODEoctave
+                                                            Nothing
+                                                            p
                                                             (500,(0,(simTime f')))
                                                             f'
 -- MATLAB command - produce MATLAB script for ODEs.
@@ -442,10 +449,10 @@ evolveCmd x = do env <- getEnv
                    Just p -> let mts = processMTS env p
                                  p' = dPdt env mts p
                                  ts = (res,(start,end))
-                                 newP = (evolveProcess env p mts p' 
+                                 newP = (evolveProcess env p mts p'
                                                        ts solveODEoctave)
                              in do addEnv $ ProcessDef newPname newP
-                                   say $ newPname ++ " = " 
+                                   say $ newPname ++ " = "
                                            ++ (pretty newP)
 
 ----------------------
@@ -512,4 +519,3 @@ param cmdln = let ps = params cmdln in
               case ps of
                 []     -> []
                 (p:ps) -> p
-
