@@ -24,7 +24,7 @@ executable cpiwb
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3,
                        data-accessor >=0.2,
-                       hmatrix-gsl, hmatrix, haskeline,
+                       hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
                        Chart, Chart-gtk, gtk, Chart-cairo, lens, data-default-class
 
 -- The source code directly uses the following modules

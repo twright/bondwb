@@ -220,23 +220,23 @@ plotCmd = plotOctaveCmd
 
 plotManualCmd :: String -> Environment ()
 plotManualCmd x = do env <- getEnv;
-		     let args = words x
-		     -- TODO: properly parse the command!
-	             --       and have some defaults?
-		     let res = read(args!!4)
-		     let start = read(args!!2)
-		     let end = read(args!!3)
-		     case lookupProcName env (args!!1) of
-		       Nothing   -> say $ "Process \""++(args!!1)
-		                    ++"\" is not in the Environment."
-		       Just proc -> do let mts = processMTS env proc
-		                       let dpdt = dPdt env mts proc
-		                       let ts = (res,(start,end))
-		                       let ts' = timePoints ts
-		                       let solns = solveODE env proc mts dpdt ts
-		                       let ss = speciesIn env dpdt
-		                       let ss' = speciesInProc proc
-		                       lift$lift$plotTimeSeriesFiltered ts' solns ss ss'
+                     let args = words x
+                     -- TODO: properly parse the command!
+                     --       and have some defaults?
+                     let res = read(args!!4)
+                     let start = read(args!!2)
+                     let end = read(args!!3)
+                     case lookupProcName env (args!!1) of
+                       Nothing   -> say $ "Process \""++(args!!1)
+                                    ++"\" is not in the Environment."
+                       Just proc -> do let mts = processMTS env proc
+                                       let dpdt = dPdt env mts proc
+                                       let ts = (res,(start,end))
+                                       let ts' = timePoints ts
+                                       let solns = solveODE env proc mts dpdt ts
+                                       let ss = speciesIn env dpdt
+                                       let ss' = speciesInProc proc
+                                       lift$lift$plotTimeSeriesFiltered ts' solns ss ss'
 
 -- phase2 command
 phase2Cmd :: String -> Environment ()
