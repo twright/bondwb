@@ -1,0 +1,14 @@
+init = [1.0];
+t = linspace(0.0,10.0,10);
+function xdot = f(x,t) 
+
+xdot(1) = 0.0;
+endfunction;
+
+function jac = jj(x,t)
+
+jac(1,1) = 0.0;
+endfunction;
+
+x = lsode({@f,@jj}, init, t);
+save ("-ascii", "-", "x");
