@@ -1,13 +1,12 @@
 ---------------------
--- BIOMD0000000233
--- Wilhelm's Bistable Reaction, 2009
--- "Smallest chemical reaction system with bistability"
+-- BIOMD0000000363
+-- Lee's Thrombin Activation, 2010
 -- cPi model created by Ross Rhodes
 ---------------------
 
-species S;
-species P;
-species X(c) = c.P(c);
-species Y;
+species ll(a,c) = a.M(a) + c.P2(c);
+species M(b) = b.lla();
+species P2(d) = d.lla();
+species lla() = tau<0.0>.lla();
 
-process Pi = [1.0]S() || [1.0]P() || [1.0]X(c) || [1.0]Y() 
+process Pi = [1.0] ll(a,c) || [0.0] M(b) || [0.0] lla() || [0.0] P2(d): {a-b@1, a-c@1, b-c@1, a-d@1, b-d@1, c-d@1};
