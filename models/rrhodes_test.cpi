@@ -1,11 +1,13 @@
 ---------------------
--- BIOMD0000000079
--- Goldbeter Weight Cycling, 2006
+-- BIOMD0000000233
+-- Wilhelm's Bistable Reaction, 2009
+-- "Smallest chemical reaction system with bistability"
 -- cPi model created by Ross Rhodes
 ---------------------
 
-species P(a,b) = tau<1.0>.0+b.Q(a,b);
-species Q(b,c) = b.Q(b,c)+c.R(b,c);
-species R(b,c) = c.R(b,c)+tau<1.0>.0;
+species S;
+species P;
+species X(c) = c.P(c);
+species Y;
 
-process Pi = [0.43]P() || [0.8]Q() || [0.55]R():{};
+process Pi = [1.0]S() || [1.0]P() || [1.0]X(c) || [1.0]Y() 
