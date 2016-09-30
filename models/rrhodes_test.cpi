@@ -4,9 +4,9 @@
 -- cPi model created by Ross Rhodes
 ---------------------
 
-species P() = tau<0.0>.P();
-species S(a) = a.X(a);
-species X(c,d,e,g) = c.X(c,d,e,g) + d.Y(d) + e.P();
-species Y(b,f) = b.X(b) + f.Y(b,f);
+species II(a) = a.(M(a) | P2(a));
+species IIa() = tau<0.0>.0;
+species M(b) = b.IIa();
+species P2(c) = c.IIa();
 
-process Pi = [1.0] P() || [1.0]S() || [1.0]X() || [1.0]Y(): {};
+process Pi = [1.0] II(a) || [0.0] M(b) || [0.0] IIa() || [0.0] P2(c): {a-b@1, a-c@1};
