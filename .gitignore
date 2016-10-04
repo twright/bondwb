@@ -32,5 +32,6 @@ cabal.sandbox.config
 *.aux
 *.hp
 .stack-work/
+octave-workspace
 
 # End of file
