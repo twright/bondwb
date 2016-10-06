@@ -3,3 +3,9 @@
 -- Lee's Reduced Thrombin Activation, 2010
 -- cPi model created by Ross Rhodes
 ---------------------
+
+species E(a) = {u-r@1} a<u,r>.u.E(a);
+species P(b) = b(x,y).(x.P(b) + y.T());
+species T() = tau<0.0>.T();
+
+process Pi = [0.00015] E(a) || [1.0] P(b) || [0.0] T(): {a-b@1};
