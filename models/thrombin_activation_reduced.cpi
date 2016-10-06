@@ -5,7 +5,9 @@
 ---------------------
 
 species E(a) = {u-r@1} a<u,r>.u.E(a);
-species P(b) = b(x,y).(x.P(b) + y.T());
+species P(b) = b(x,y).(x.P(b) + y.M());
+species M(c) = c(x,y).(x.M(c) + y.T());
 species T() = tau<0.0>.T();
+species P2(d) = d(x,y).(x.P2(d) + y.T());
 
-process Pi = [0.00015] E(a) || [1.0] P(b) || [0.0] T(): {a-b@1};
+process Pi = [1.5E-4] E(a) || [1.0] P(b) || [0.0] M(c) || [0.0] T() || [0.0] P2(d): {a-b@1, a-c@1, a-d@1};
