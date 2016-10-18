@@ -4,8 +4,8 @@
 -- cPi model created by Ross Rhodes
 ---------------------
 
-species E(a) = {t-u@1, t-r@82.4} a<u,r>.t.E(a);
-species P(b,c) = (b(x,y).(x.P(b) + y.M(b)) + c(x,y).(x.P(c) + y.P2(c)));
+species E(a) = {t-u@4.7, t-r@82.4} a<u,r>.t.E(a);
+species P(b,c) = b(x,y).(x.P(b,c) + y.M(b)) + c(x,y).(x.P(b,c) + y.P2(c));
 species M(b) = b(x,y).(x.M(b) + y.T());
 species T() = tau<0.0>.T();
 species P2(c) = c(x,y).(x.P2(c) + y.T());
