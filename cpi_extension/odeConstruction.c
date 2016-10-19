@@ -1,42 +1,44 @@
 #include "mex.h"
-#include "unist.h"
+#include "unistd.h"
 
 /*
 source: http://uk.mathworks.com/help/matlab/matlab_external/standalone-example.html
 author: Ross Rhodes
 */
 
-void generate_odes(){
-  return;
+int generate_odes(){
+  return 0;
 }
 
-void validate_input(int nrhs, const mxArray *prhs[])
+int validate_input(int nrhs, const mxArray *prhs[])
 {
-  // make sure exactly one input argument is provided
+  char* fpath;
+  /* make sure exactly one input argument is provided */
   if (nrhs == 0) {
       mexErrMsgIdAndTxt("MyToolbox:cpi_extension:nrhs_zero",
                         "Please supply a CPi filepath as input.");
+      return 1;
   } else if (nrhs > 1) {
       mexErrMsgIdAndTxt("MyToolbox:cpi_extension:nrhs_large",
-                        "Please supply only one CPi filepath as input."); 
+                        "Please supply exactly one CPi filepath as input.");
+      return 1;
   }
 
-  // make sure prhs holds an existing CPi
-  if (prhs[0] == NULL){
-      mexErrMsgIdAndTxt("MyToolbox:cpi_extension:prhs_null",
-                        "Please supply a CPi filepath as input.");
-  }
+  fpath = (char*) prhs;
 
-  fpath = prhs[0];
+  printf("%s\n",*fpath);
 
+  /* make sure C is able to access and read the provided file */
   if (access(fpath, F_OK) != -1 && access(fpath, R_OK) == -1){
       mexErrMsgIdAndTxt("MyToolbox:cpi_extension:no_read_access",
                         "CPi file does not have read permissions.");
+      return 1;
   } else if (access(fpath, F_OK) == 1){
       mexErrMsgIdAndTxt("MyToolbox:cpi_extension:prhs_null",
-			"CPi does not exist along the path provided.");
+			                 "CPi does not exist along the path provided.");
+      return 1;
   }
-  return;
+  return 0;
 }
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -47,8 +49,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   param nrhs: Number of input arguments, or size of prhs array
   param prhs: Array of input arguments
   */
-  
-  validate_input(nrhs, prhs);
-  generate_odes();
+  int valid;
+
+  valid = validate_input(nrhs, prhs);
+
+  if (valid){
+      generate_odes();
+  }
+
   return;
 }
