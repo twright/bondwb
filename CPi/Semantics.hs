@@ -212,7 +212,8 @@ newPrimes env mts = newPrimes' (openMTS mts)
 newAppls :: Env -> AffNet -> MTS -> [Species]
 newAppls env net mts = newAppls' net (openMTS mts)
     where
-      newAppls' net trs = [s | s<-(L.nub(appls net mts)), not(inMTS mts s)]
+       newAppls' net trs = [s | s<-(L.nub(concatMap (primes env) (appls net mts))), not(inMTS mts s)]
+-- 2016-10-19 Ian Added in that concatMap (primes env) to break down things that look like complexes but are just parallel composition of species.  Not sure that solves all problems, but it may do some.
 
 -- Is the species in the MTS?
 inMTS :: MTS -> Species -> Bool
