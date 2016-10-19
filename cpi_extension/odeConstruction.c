@@ -12,7 +12,8 @@ int generate_odes(){
 
 int validate_input(int nrhs, const mxArray *prhs[])
 {
-  char* fpath;
+  const char* fpath;
+
   /* make sure exactly one input argument is provided */
   if (nrhs == 0) {
       mexErrMsgIdAndTxt("MyToolbox:cpi_extension:nrhs_zero",
@@ -24,16 +25,14 @@ int validate_input(int nrhs, const mxArray *prhs[])
       return 1;
   }
 
-  fpath = (char*) prhs;
-
-  printf("%s\n",*fpath);
+  fpath = mxArrayToString(prhs[0]);
 
   /* make sure C is able to access and read the provided file */
   if (access(fpath, F_OK) != -1 && access(fpath, R_OK) == -1){
       mexErrMsgIdAndTxt("MyToolbox:cpi_extension:no_read_access",
                         "CPi file does not have read permissions.");
       return 1;
-  } else if (access(fpath, F_OK) == 1){
+  } else if (access(fpath, F_OK) == -1){
       mexErrMsgIdAndTxt("MyToolbox:cpi_extension:prhs_null",
 			                 "CPi does not exist along the path provided.");
       return 1;
