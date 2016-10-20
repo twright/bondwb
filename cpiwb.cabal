@@ -25,7 +25,7 @@ executable cpiwb
                        process >=1.2, colour >=2.3,
                        data-accessor >=0.2,
                        hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
-                       Chart, Chart-gtk, gtk, Chart-cairo, lens, data-default-class
+                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class
 
 -- The source code directly uses the following modules
 -- Numeric.GSL                  from hmatrix-gsl
