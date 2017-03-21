@@ -1,0 +1,40 @@
+species LocationServer(sendLoc)
+  = {l-r@1} sendLoc<l,r>.LocationServer(sendLoc);
+
+species FiniteLocationServer(sendLoc,killOthers,die,l1,r1,l2,r2,l3,r3)
+  = sendLoc<l1,r1>.sendLoc<l2,r2>.sendLoc<l3,r3>.0
+  + die.0; 
+
+species A(receive)
+  = receive(ch).ch.A(receive);
+
+species Left(receiveLeft)
+  = receiveLeft(ch).LeftDone(ch);
+species LeftDone(ch) = ch.LeftDone(ch);
+species Right(receiveRight)
+  = receiveRight(ch).RightDone(ch);
+species RightDone(ch) = ch.RightDone(ch);
+
+species Splitter(getLoc, sendLeft, sendRight)
+  = getLoc(l, r).(
+        sendLeft<l>.0
+      | sendRight<r>.0
+    );
+
+process Pi
+  =  [1.0] Splitter(getLoc, sendLeft, sendRight)
+  || [1.0] Left(receiveLeft)
+  || [1.0] Right(receiveRight)
+  || [1.0] LocationServer(sendLoc)
+  : {getLoc-sendLoc@1, getLeft-sendLeft@1, getRight-sendRight@1};
+
+process PiFiniteLoc
+  =  [1.0] Splitter(getLoc, sendLeft, sendRight)
+  || [1.0] Left(receiveLeft)
+  || [0.0] RightDone(r1)
+  || [0.0] LeftDone(l1)
+  || [1.0] Right(receiveRight)
+  || [1.0] FiniteLocationServer(sendLoc,killOthers,die,l1,r1,l2,r2,l3,r3)
+  : {getLoc-sendLoc@1, getLeft-sendLeft@1, getRight-sendRight@1,
+     killOthers-die@10000,
+     l1-r1@1, l2-r2@1, l3-r3@1};

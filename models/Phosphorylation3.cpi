@@ -1,0 +1,34 @@
+species SiteXUnbound(molecule, x, release, corelease, xIsBound)
+  = x<release> . SiteXBound(molecule, x, release, corelease, xIsBound)
+  + molecule . SiteXUnbound(molecule, x, release, corelease, xIsBound);
+
+species SiteXBound(molecule, x, release, corelease, xIsBound)
+  = xIsBound . SiteXBound(molecule, x, release, corelease, xIsBound)
+  + corelease . SiteXUnbound(molecule, x, release, corelease, xIsBound)
+  + molecule . SiteXBound(molecule, x, release, corelease, xIsBound);
+
+species StateUnphosphorylated(molecule, u, p)
+  = u . StateUnphosphorylated(molecule, u, p)
+  + molecule . StateUnphosphorylated(molecule, u, p);
+
+species StatePhosphorylated(molecule, u, p)
+  = p . StateUnphosphorylated(molecule, u, p)
+  + molecule . StatePhosporylated(molecule, u, p);
+
+species Target(molecule, x, p)
+  = {u-xIsBound@10, molecule-partof@0, release-corelease@5}
+    StateUnphosphorylated(molecule, u, p)
+  | SiteXUnbound(molecule, x, release, corelease, xIsBound);
+
+species SiteAUnbound(a)
+  = a(release) . SiteABound(a, release);
+
+species SiteABound(a, release)
+  = release . SiteAUnbound(a);
+
+species Kinase(a)
+  = SiteAUnbound(a);
+
+process Pi
+  = [100.0] Target(x,p) || [10.0] Kinase(a)   
+  : {a-x@1, p-cop@0};

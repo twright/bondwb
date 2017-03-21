@@ -17,10 +17,14 @@
 
 module CPi.Plot
     (plotTimeSeries,
+     plotTimeSeriesD,
      plotTimeSeriesFiltered,
+     plotTimeSeriesFilteredD,
      plotTimeSeriesToFile,
      plotTimeSeriesToFileFiltered,
-     phasePlot2
+     phasePlot2,
+     phasePlot2ToFile,
+     phasePlot2D
     ) where
 
 import Graphics.Rendering.Chart
@@ -35,6 +39,8 @@ import Control.Lens
 import qualified Control.Exception as X
 import qualified Numeric.LinearAlgebra as LA
 import Control.Monad
+import Graphics.UI.Gtk.Misc.DrawingArea
+import Graphics.Rendering.Chart.Layout
 
 import CPi.Lib
 
@@ -42,6 +48,13 @@ import CPi.Lib
 plotTimeSeries :: LA.Vector Double -> LA.Matrix Double -> [Species] -> IO ()
 plotTimeSeries ts soln ss
     = plot
+      (LA.toList ts)
+      (zip (map pretty ss) (map LA.toList (LA.toColumns soln)))
+
+plotTimeSeriesD :: DrawingArea -> LA.Vector Double -> LA.Matrix Double -> [Species] -> IO ()
+plotTimeSeriesD da ts soln ss
+    = plotD
+      da
       (LA.toList ts)
       (zip (map pretty ss) (map LA.toList (LA.toColumns soln)))
 
@@ -62,6 +75,14 @@ plotTimeSeriesFiltered ts soln ss ss'
       (filter (\(s,_)-> s `elem` (map specName ss'))
        (zip (map specName ss) (map LA.toList (LA.toColumns soln))))
 
+plotTimeSeriesFilteredD :: DrawingArea -> LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species] -> IO ()
+plotTimeSeriesFilteredD drawingArea ts soln ss ss'
+    = plotD
+      drawingArea
+      (LA.toList ts)
+      (filter (\(s,_)-> s `elem` (map specName ss'))
+       (zip (map specName ss) (map LA.toList (LA.toColumns soln))))
+
 -- Only plots selected species to a PDF file
 plotTimeSeriesToFileFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species]
                              -> String -> IO ()
@@ -74,7 +95,12 @@ plotTimeSeriesToFileFiltered ts soln ss ss' file
 
 -- Plots the time series in a GTK window
 plot :: [Double] -> [(String,[Double])] -> IO ()
-plot ts dims = renderableToWindow (toRenderable (layout ts dims)) 640 480
+plot ts dims = renderableToWindow (toRenderable (layout ts dims)) 639 480
+
+plotD  :: DrawingArea -> [Double] -> [(String,[Double])] -> IO ()
+plotD da ts dims = do
+  updateCanvas (toRenderable (layout ts dims)) da
+  return ()
 
 -- Plots the time series to a file
 plotToFile :: [Double] -> [(String,[Double])] -> String -> IO ()
@@ -111,13 +137,48 @@ phasePlot2 :: LA.Vector Double
            -> [Species]
            -> (Species,Species)
            -> IO ()
-phasePlot2 ts soln ss ss'
-    = plotPhase
-      (filter (\(s,_)-> (s == (specName (fst ss'))) || s == (specName (snd ss')))
-       (zip (map specName ss) (map LA.toList (LA.toColumns soln))))
+phasePlot2 ts soln ss ss' = plotPhase $ filterPhasePlot ts soln ss ss'
 
+filterPhasePlot :: LA.Vector Double
+                -> LA.Matrix Double
+                -> [Species]
+                -> (Species,Species)
+                -> [(String, [Double])]
+filterPhasePlot ts soln ss ss'
+    = filter (\(s,_) -> s == specName (fst ss') || s == specName (snd ss'))
+             (zip (map specName ss) (map LA.toList $ LA.toColumns soln))
+
+phasePlot2ToFile :: LA.Vector Double
+                 -> LA.Matrix Double
+                 -> [Species]
+                 -> (Species, Species)
+                 -> String
+                 -> IO ()
+phasePlot2ToFile ts soln ss ss'
+    = plotPhaseToFile (filterPhasePlot ts soln ss ss')
+
+plotPhaseToFile :: [(String, [Double])] -> String -> IO ()
+plotPhaseToFile dims file = void $ renderableToFile
+                                   (FileOptions (842, 595) PDF) file
+                                   (toRenderable (layout2phase dims))
+
+-- getRender :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species] -> Int -> Int -> (Maybe (Render ()))
+-- getRender  ts soln ss ss' ww wh = (Just $ runBackend (defaultEnv bitmapAlignmentFns)
+-- 						( void $ render (getLayout ts soln ss ss') (fromIntegral ww, fromIntegral wh) )
+-- 					)
 
 plotPhase dims = renderableToWindow (toRenderable (layout2phase dims)) 640 480
+
+plotPhaseD  :: DrawingArea -> [(String,[Double])] -> IO ()
+plotPhaseD da dims = void $ updateCanvas (toRenderable (layout2phase dims)) da
+
+phasePlot2D :: DrawingArea
+            -> LA.Vector Double
+            -> LA.Matrix Double
+            -> [Species]
+            -> (Species,Species)
+            -> IO ()
+phasePlot2D da ts soln ss ss' = plotPhaseD da $ filterPhasePlot ts soln ss ss'
 
 plotphase pts
     = toPlot

@@ -1,0 +1,19 @@
+species Zombie(infect,getinfected)
+  = tau<0.1>.(Zombie(infect,getinfected) | Zombie(infect,getinfected))
+    + getinfected.LysogenicZombie(infect,getinfected);
+species Phage(infect,getinfected)
+  = tau<0.3>.0
+    + infect.0;
+species LysogenicZombie(infect,getinfected)
+  = tau<0.1>.(LysogenicZombie(infect,getinfected)
+    | LysogenicZombie(infect,getinfected))
+    + tau<0.01>.LyticZombie(infect,getinfected);
+species LyticZombie(infect,getinfected)
+  = tau<0.5>.(Phage(infect,getinfected) | Phage(infect,getinfected) | Phage(infect,getinfected) | Phage(infect,getinfected));
+
+process ZombiePlagueReducedLysis
+   = [100] Zombie(infect,getinfected)
+  || [1] Phage(infect,getinfected)
+  || [0] LysogenicZombie(infect,getinfected)
+  || [0] LyticZombie(infect,getinfected)
+  :{ infect - getinfected @ 1 };

@@ -1,0 +1,23 @@
+-- A model for testing the avoidance of name capture in substitution.
+
+-- A model of a site which symmetrically binds and unbinds
+species Site(bind) = {release-bereleased@0.1}
+                     bind<release>.
+                        (
+                           bereleased.Site(bind)
+                        );
+species CoSite(bind) = bind(release).
+                        (
+                            release.CoSite(bind)
+                        );
+
+species X(a,b) = Site(a) | Site(b);
+species Y(cod, coe, coc, cob) = CoSite(cod) | CoSite(coe) | CoSite(coc) | Site(cob);
+species Z(c, d) = Site(c) | Site(d);
+species W(coa, e) = CoSite(coa) | Site(e);
+
+process Pi = [1.0] X(a, b)
+          || [1.0] Y(cod, coe, coc, cob)
+          || [1.0] Z(c, d)
+          || [1.0] W(coa, e)
+          : {a-coa@1, b-cob@1, c-coc@1, d-cod@1, e-coe@1};

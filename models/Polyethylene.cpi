@@ -1,0 +1,12 @@
+species SitePair(partof,bind,cobind)
+  = {release-corelease@0.1}
+    bind<release>.(corelease.SitePair(partof,bind,cobind))
+  + cobind(release1).release1.SitePair(partof,bind,cobind)
+  + partof.SitePair(partof,bind,cobind);
+
+species CH2(a,coa,b,cob)
+  = {molecule-comolecule@0}
+    SitePair(molecule,a,coa) | SitePair(molecule,b,cob);
+
+process Pi = [1.0] CH2(a,coa,b,cob)
+          : {a-coa@1, b-cob@1};

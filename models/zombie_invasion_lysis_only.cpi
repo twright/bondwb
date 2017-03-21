@@ -1,0 +1,14 @@
+species Zombie(infect,getinfected)
+  = tau<0.1>.(Zombie(infect,getinfected) | Zombie(infect,getinfected))
+    + getinfected.LyticZombie(infect,getinfected);
+species Phage(infect,getinfected)
+  = tau<0.3>.0
+    + infect.0;
+species LyticZombie(infect,getinfected)
+  = tau<0.5>.(Phage(infect,getinfected) | Phage(infect,getinfected) | Phage(infect,getinfected) | Phage(infect,getinfected));
+
+process ZombiePlagueLysisOnly
+   = [100] Zombie(infect,getinfected)
+  || [1] Phage(infect,getinfected)
+  || [0] LyticZombie(infect,getinfected)
+  :{ infect - getinfected @ 1 };

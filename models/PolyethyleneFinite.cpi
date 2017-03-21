@@ -1,0 +1,18 @@
+species BindingLimiter(giveToken,reclaimToken)
+  = giveToken.reclaimToken.BindingLimiter(giveToken,reclaimToken);
+
+species SitePair(partof,getToken,releaseToken,bind,cobind)
+  = {release-corelease@0.1}
+    bind<release>.(corelease.SitePair(partof,bind,cobind))
+  + getToken.cobind(release1).release1.releaseToken.SitePair(partof,bind,cobind)
+  + partof.SitePair(partof,bind,cobind);
+
+species CH2(getTokena,releaseTokena,getTokenb,releaseTokenb,a,coa,b,cob)
+  = {molecule-comolecule@0}
+    SitePair(molecule,getTokena,a,coa)
+    | SitePair(molecule,getTokenb,releaseTokenb,b,cob);
+
+process Pi = [1.0] CH2(getTokena,getTokenb,a,coa,b,cob)
+          || [1.0] BindingLimiter(giveTokena,reclaimTokena)
+          || [1.0] BindingLimiter(giveTokenb,reclaimTokenb)
+          : {a-coa@1, b-cob@1};

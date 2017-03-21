@@ -1,0 +1,76 @@
+name:                cpilib
+version:             0.6.0.0
+synopsis:            The CPi Workbench: An interactive command-line tool for working with the Continuous pi-Calculus
+description:         The Continuous pi-Calculus is a process algebra for modelling continuous behaviour in biochemical systems.  The CPi Workbench is an interactive command-line tool for working with the calculus.  It provides facilities to read and parse .cpi files containing descriptions of CPi systems; to analyse their possible behaviour; and generate ODEs and numerical simulations of the systems they describe.
+license:             GPL-3
+license-file:        LICENSE
+author:              Chris Banks, Ian Stark, Thomas Wright
+maintainer:          C.Banks@ed.ac.uk, Ian.Stark@ed.ac.uk, t.d.wright@sms.ed.ac.uk
+copyright:           Chris Banks, Ian Stark, Thomas Wright
+category:            SystemsBiology
+build-type:          Simple
+extra-source-files:  README, build
+cabal-version:       >=1.18
+-- The version must be able 1.18 to use sandboxes.
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     CPi.Logic, CPi.ODE, CPi.Plot, CPi.Signals,
+                       CPi.Lib,  CPi.Matlab,  CPi.Parser,
+                       CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions
+  other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
+                       FlexibleInstances, PatternGuards
+  build-depends:       base >=4.7 && <=4.9, parsec >=3.1,
+                       containers >=0.5, transformers >=0.3,
+                       process >=1.2, colour >=2.3,
+                       data-accessor >=0.2,
+                       hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
+                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class
+  default-language:    Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs:
+      Tests
+  ghc-options: -Wall
+  build-depends:       base >=4.7 && <=4.9, hspec, cpilib
+  other-modules:
+      CPi.ASTSpec
+  default-language: Haskell2010
+
+executable cpiwb
+  main-is:             cpiwb.hs
+  other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
+                       FlexibleInstances, PatternGuards
+  build-depends:       base >=4.7 && <=4.9, parsec >=3.1,
+                       containers >=0.5, transformers >=0.3,
+                       process >=1.2, colour >=2.3,
+                       data-accessor >=0.2,
+                       hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
+                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens,
+                       data-default-class, cpilib
+  default-language:    Haskell2010
+
+executable cpiide
+  main-is:             cpiide.hs
+  other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
+                       FlexibleInstances, PatternGuards
+  ghc-options:         -fno-warn-tabs
+  build-depends:       base >=4.7 && <=4.9, parsec >=3.1,
+                       containers >=0.5, transformers >=0.3,
+                       process >=1.2, colour >=2.3, gtksourceview2,
+                       data-accessor >=0.2, text, glib, split, gio, hledger, MissingH,
+                       cairo, hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
+                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class,
+                       cpilib
+  default-language:    Haskell2010
+
+-- The source code directly uses the following modules
+-- Numeric.GSL                  from hmatrix-gsl
+-- Numeric.LinearAlgebra        from hmatrix
+-- Graphics.Rendering.Chart     from Chart
+-- Graphics.Rendering.Chart.Gtk from Chart-gtk
+-- System.Console.Haskeline     from haskeline
+
+  -- hs-source-dirs:

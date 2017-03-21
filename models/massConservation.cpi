@@ -1,0 +1,15 @@
+species A(a)
+  = a . A(a);
+
+species B(b)
+  = b . B(b);
+
+species A2(a)
+  = a(x) . x . A2(a);
+
+species B2(b)
+  = {x-y@0.0} b<x> . y . B2(b); 
+
+process Pi = [3.0] A(a) || [2.0] B(b) : {a-b@1}; 
+
+process Pi2 = [3.0] A2(a) || [2.0] B2(b) : {a-b@1}; 

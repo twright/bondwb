@@ -1,0 +1,11 @@
+species E(e,s)
+  = e.0;
+species S(e,s)
+  = s.(ES(e,s));
+species ES(e,s)
+  = tau<1>.(E(e,s)|P(e,s));
+species P(e,s) = tau<0>.0;
+
+process Reaction
+   = [100] S(e,s) || [10] E(e,s) || [0] P(e,s) || [0] ES(e,s)
+  :{ e-s @ 1 };
