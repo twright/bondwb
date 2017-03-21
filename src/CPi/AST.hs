@@ -36,16 +36,6 @@ type Rate = Double
 type RateLaw = [Conc] -> Rate
 type RateLawFamily = [Double] -> RateLaw
 
--- Affinity networks
--- data Aff = Aff ([[Name]], RateLaw)
---            deriving (Eq, Ord, Show)
--- data AffNet = AffNet [Aff]
---               deriving (Eq, Ord, Show)
-
--- Prefixes
-
--- type NLocation = String
-
 -- Pretty printing
 class (Show a) => Pretty a where
   pretty :: a -> String
@@ -88,7 +78,6 @@ data Species = Nil
              | Sum [PrefixSpecies]
              | Par [Species]
              | New [Location] Species
-             -- | Free Species
              -- | Def String
                deriving (Eq, Ord, Show)
 
@@ -97,8 +86,6 @@ data Species = Nil
 -- is finalized.
 data Abstraction
   = Abs Location Species
-  -- | AbsPar [Abstraction]
-  -- | AbsNew [Location] Abstraction
   | AbsBase Species
   deriving (Eq, Ord, Show)
 
@@ -202,8 +189,6 @@ instance Pretty Species where
 instance Syntax Abstraction where
   relocate l l' (AbsBase spec) = AbsBase $ relocate l l' spec
   relocate l l' (Abs m abst) = Abs m $ relocate l l' abst
-  -- relocate l l' (AbsNew locs abst) = AbsNew locs $ relocate l l' abst
-  -- relocate l l' (AbsPar xs) = AbsPar $ map (relocate l l') xs
 
   freeLocs (AbsBase spec) = freeLocs spec  
   freeLocs (Abs m abst) = filter (/=m) $ freeLocs abst 
@@ -212,10 +197,6 @@ instance Syntax Abstraction where
   simplify (Abs l x) = Abs l (simplify x)
 
 instance ProcessAlgebra Abstraction where
-  -- AbsPar xs <|> AbsPar ys = AbsPar (xs ++ ys)
-  -- x <|> AbsPar ys = AbsPar (x:ys)
-  -- AbsPar xs <|> y = AbsPar (xs ++ [y])
-  -- x <|> y = AbsPar [x, y]
   (<|>) = colocate
 
   new locs (AbsBase spec) = AbsBase $ new locs spec
@@ -223,29 +204,16 @@ instance ProcessAlgebra Abstraction where
 
   priority (AbsBase spec) = priority spec
   priority (Abs _ _) = 11
-  -- priority (AbsNew _ _) = 40
-  -- priority (AbsPar []) = 10
-  -- priority (AbsPar [x]) = succ $ priority x
-  -- priority (AbsPar _) = 30
 
 instance Nameless Abstraction where
   maxLoc (AbsBase spec) = maxLoc spec
   maxLoc (Abs loc _) = loc
-  -- maxLoc (AbsPar specs) = maximum (map maxLoc specs)
-  -- maxLoc (AbsNew locs _) = maximum locs
 
 instance Pretty Abstraction where
   pretty x@(Abs l spec)
     = "("++ show l ++ ")" ++ prettyParens spec x
   pretty (AbsBase spec)
     = pretty spec
-  -- pretty par@(AbsPar abss) = prettyPar abss
-  --   where prettyPar :: [Abstraction] -> String
-  --         prettyPar [] = "<Empty AbsPar>"
-  --         prettyPar [x] = prettyParens x par 
-  --         prettyPar (x:xs) = prettyParens x par ++ " | " ++ prettyPar xs
-  -- pretty (AbsNew locs spec) 
-  --   = "new " ++ prettyNames locs ++ " in " ++ pretty spec
 
 colocate :: Abstraction -> Abstraction -> Abstraction
 colocate (Abs l x) (Abs m y) = Abs o (x' <|> y')
@@ -269,47 +237,3 @@ type Env = [Definition]
 -- Pretty print a list of Names.
 prettyNames :: (Show a) => [a] -> String
 prettyNames ns = L.intercalate "," (map show ns)
-
--- Relocate unbound
-
-
--- Take two abstractions and colocate them
-
-
--- Application of abstractions
-
--- discharge :: Abstraction -> Location -> Species
--- discharge Abs spec
-
--- instance Pretty Prefix where
---     -- pretty (Tau r) = "tau<"++(show r)++">."
---     pretty (Comm n) = n++"."
-
--- data NPrefix
---   = NLocated (Name, NLocation)
---   | NUnlocated Name
--- type NPrefixSpecies = (NPrefix, NSpecies)
-
--- data NSpecies = NNil
---              | NSum [NPrefixSpecies]
---              | NPar [Species]
---              | New [NLocation] NSpecies
---              -- | Free Species
---              -- | Def String
---                deriving (Ord, Show)
-
--- toNameless :: NSpecies -> Species
--- toNameless NNil = Nil
--- toNameless NPar specs = Par (map toNameless specs)
--- toNameless NSum xs = case x of
---   NLocated (name, _)  -> Sum ((Located name n'):ys)
---   NUnlocated name     -> Sum ((Unlocated name):ys)
---   where ys = case toNameless (NSum xs) of
---     Sum yss -> yss
---     toNamelessL [] = []
---     toNamelessL (x:xs) = case x of
---       NLocated name _ -> Located name (n + 1)
---       NUnlocated name -> Unlocated name
---       where ys = toNamelessL xs
---             n = maxLoc (Sum ys)
---             n' = succ n
