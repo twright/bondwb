@@ -36,11 +36,11 @@ enzymeDefs = M.fromList [("E", enzymeE), ("S", enzymeS), ("P", enzymeP)]
 
 partialS :: D
 partialS = 3.0 |> Ket (Def "S" [] [])
-           *> Ket (new [0] enzymeSbound) *> Ket [Unlocated "s"]
+           *> Ket (Abs 0 enzymeSbound) *> Ket [Unlocated "s"]
 
 partialE :: D
 partialE = 2.0 |> Ket (Def "E" [] [])
-           *> Ket (new [0] enzymeEbound) *> Ket [Unlocated "e"]
+           *> Ket (Abs 0 enzymeEbound) *> Ket [Unlocated "e"]
 
 spec :: SpecWith ()
 spec = do
@@ -69,10 +69,10 @@ spec = do
   describe "direct" $ do
     it "finds the direction of E||S at site s" $
       direct [Unlocated "s"] (partialS +> partialE)
-        `shouldBe` Ket (Def "S" [] []) *> Ket (new [0] enzymeSbound)
+        `shouldBe` Ket (Def "S" [] []) *> Ket (Abs 0 enzymeSbound)
     it "finds the direction of E||S at site e" $
       direct [Unlocated "e"] (partialS +> partialE)
-        `shouldBe` Ket (Def "E" [] []) *> Ket (new [0] enzymeEbound)
+        `shouldBe` Ket (Def "E" [] []) *> Ket (Abs 0 enzymeEbound)
   describe "multilinear" $ do
     it "extends a simple function to a multilinear one" $
       let f :: [Ket Integer] -> Ket (Tuple Integer Integer)
@@ -106,7 +106,7 @@ spec = do
         `shouldBe` 3 |> Ket (7 :* 2) +> 4 |> Ket (7 :* 3) 
   describe "react" $ do
     it "can react an enzyme and a substrate" $
-      react [Ket (Def "S" [] []) *> Ket (new [0] enzymeSbound),
-             Ket (Def "E" [] []) *> Ket (new [0] enzymeEbound)]
-        `shouldBe` Ket ((new [0] enzymeSbound) <|> (new [0] enzymeEbound))
+      react [Ket (Def "S" [] []) *> Ket (Abs 0 enzymeSbound),
+             Ket (Def "E" [] []) *> Ket (Abs 0 enzymeEbound)]
+        `shouldBe` Ket (new [0] (enzymeSbound <|>  enzymeEbound))
           +> (-1.0) |> Ket (Def "S" [] []) +> (-1.0) |> Ket (Def "E" [] [])

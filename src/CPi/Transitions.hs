@@ -9,29 +9,32 @@ import qualified Data.List as L
 import Data.Map (Map)
 import qualified Data.Map as M
 
-data Transition = Trans Species [Prefix] Abstraction
-                | TransF Species [Prefix] Species
+data TransitionStatus = Final | Potential
+                        deriving (Show, Eq, Ord)
+
+data Transition = Trans TransitionStatus Species [Prefix] Abstraction
+                -- | TransF Species [Prefix] Species
                 deriving (Show, Eq, Ord)
 
 -- Implement fancy arrows for denoting transitions in multisets
 -- x --:locs--> y == Trans  x locs y
 -- x ==:locs==> y == TransF x locs y
 (--:) :: Species -> [Prefix] -> (Abstraction -> Transition)
-spec --: xs = Trans spec xs 
+spec --: xs = Trans Potential spec xs 
 (-->) :: (Abstraction -> Transition) -> Abstraction -> Transition
 f --> abst = f abst
-(==:) :: Species -> [Prefix] -> (Species -> Transition)
-spec ==: xs = TransF spec xs 
-(==>) :: (Species -> Transition) -> Species -> Transition
+(==:) :: Species -> [Prefix] -> (Abstraction -> Transition)
+spec ==: xs = Trans Final spec xs 
+(==>) :: (Abstraction -> Transition) -> Abstraction -> Transition
 f ==> abst = f abst
 infixr 2 --:, ==:
 infixr 1 -->, ==>
 
 instance Pretty Transition where
-  pretty (Trans x prefs y) = pretty x
+  pretty (Trans Potential x prefs y) = pretty x
     ++ " --{" ++ L.intercalate "," (map pretty prefs) ++ "}--> "
     ++ pretty y
-  pretty (TransF x prefs y) = pretty x
+  pretty (Trans Final x prefs y) = pretty x
     ++ " =={" ++ L.intercalate "," (map pretty prefs) ++ "}==> "
     ++ pretty y
 
@@ -40,23 +43,21 @@ delocate (Located x _) = Unlocated x
 delocate u@Unlocated{} = u
 
 finalize :: Transition -> Transition
-finalize t@TransF{} = t
-finalize (Trans x prefs y) = TransF x (map delocate prefs) (concretify y) 
+-- finalize t@Trans Final _ _ = t
+finalize (Trans status x prefs y) = Trans status x (map delocate prefs) (AbsBase $ concretify y) 
 
 instance Syntax Transition where
-  simplify (Trans x prefs y)  = simplify x --:L.sort prefs--> simplify y
-  simplify (TransF x prefs y) = simplify x ==:L.sort prefs==> simplify y
+  simplify (Trans status x prefs y)  = Trans status (simplify x) (L.sort prefs) (simplify y)
+  -- simplify (TransF x prefs y) = simplify x ==:L.sort prefs==> simplify y
 
-  relocate l l' (Trans x prefs y)  = relocate l l' x
+  relocate l l' (Trans Potential x prefs y)  = relocate l l' x
                                      --:map (relocate l l') prefs-->
                                      relocate l l' y
-  relocate l l' (TransF x prefs y) = relocate l l' x
+  relocate l l' (Trans Final x prefs y) = relocate l l' x
                                      ==:map (relocate l l') prefs==>
                                      relocate l l' y
 
-  freeLocs (Trans x prefs y)  = foldr ((++).freeLocs) [] prefs
-                                ++ freeLocs x ++ freeLocs y
-  freeLocs (TransF x prefs y) = foldr ((++).freeLocs) [] prefs
+  freeLocs (Trans _ x prefs y)  = foldr ((++).freeLocs) [] prefs
                                 ++ freeLocs x ++ freeLocs y
 
 instance Pretty MTS where
@@ -78,10 +79,10 @@ union :: MTS -> MTS -> MTS
 union = (++)
 
 potentialTrans :: MTS -> MTS
-potentialTrans ts = [ t | t@Trans{} <- ts ]
+potentialTrans ts = [ t | t@(Trans Potential _ _ _) <- ts ]
 
 finalTrans :: MTS -> MTS
-finalTrans ts = [ t | t@TransF{} <- ts ]
+finalTrans ts = [ t | t@(Trans Final _ _ _) <- ts ]
 
 -- instance {-# OVERLAPPING #-} Eq MTS where
 --   xs == ys = (simplify xs) (L.(==)) (simplify ys)
@@ -99,23 +100,15 @@ instance TransitionSemantics Species where
   trans (Par (t:ts)) env = [
       -- new reactions
       x <|> y --:(ls++ms)--> (x' <|> y')
-      | Trans x ls x' <- hd, Trans y ms y' <- tl
+      | Trans Potential x ls x' <- hd, Trans Potential y ms y' <- tl
     ] ++ [
-      -- combining potential reaction on the left
-      x <|> sTail --:ls--> x' <|> AbsBase sTail
-      | Trans x ls x' <- hd
+      -- combining reactions on the left
+      Trans status (x <|> sTail) ls (x' <|> AbsBase sTail)
+      | Trans status x ls x' <- hd
     ] ++ [
       -- combining potential reaction on the right
-      t <|> y --:ms--> AbsBase t <|> y'
-      | Trans y ms y' <- tl
-    ] ++ [
-      -- combining final reaction on the left
-      x <|> sTail ==:ls==> x' <|> sTail
-      | TransF x ls x' <- hd
-    ] ++ [
-      -- combining final reaction on the right
-      t <|> y ==:ms==> t <|> y'
-      | TransF y ms y' <- tl
+      Trans status (t <|> y) ms (AbsBase t <|> y')
+      | Trans status y ms y' <- tl
     ]
     where sTail = Par ts
           hd = potentialTrans $ trans t env
@@ -124,15 +117,14 @@ instance TransitionSemantics Species where
   trans (New newlocs spec) env = (++)
     [if null (newlocs `L.intersect` foldr ((++).freeLocs) [] locs)
         then new newlocs x --:locs--> new newlocs y
-        else new newlocs x ==:map delocate locs==> new newlocs (concretify y)
-      | Trans x locs y <- specMTS] 
-    [new newlocs x ==:locs==> new newlocs y | TransF x locs y <- specMTS]
+        else new newlocs x ==:map delocate locs==> AbsBase (new newlocs (concretify y))
+      | Trans Potential x locs y <- specMTS] 
+    [new newlocs x ==:locs==> new newlocs y | Trans Final x locs y <- specMTS]
     where specMTS = trans spec env
-  trans x@(Sum prefspecs) env = [Trans x [pref] y | (pref, y) <- prefspecs]
+  trans x@(Sum prefspecs) env = [x --:[pref]--> y | (pref, y) <- prefspecs]
   trans d@(Def name args locs) env = case M.lookup name env of
-    Just specdef -> (++)
-      [d--:locs-->y | Trans  _ locs y <- specMTS]
-      [d==:locs==>y | TransF _ locs y <- specMTS]
+    Just specdef ->
+      [Trans status d locs y | Trans status _ locs y <- specMTS]
       where specMTS = trans (instSpec specdef args locs) env
     Nothing      -> error $ "Species " ++ name ++ " not defined"
 

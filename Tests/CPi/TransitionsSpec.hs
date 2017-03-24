@@ -76,95 +76,95 @@ enzymeESPotential = simplify [
 enzymeESFinal :: MTS
 enzymeESFinal = simplify [
   enzymeES ==:[Unlocated "e"]==>
-    New [0] (Par [Sum [(Located "x" 0, AbsBase Nil)],
+    Abs 0 (Par [Sum [(Located "x" 0, AbsBase Nil)],
                   enzymeSnoPar]),
   enzymeES ==:[Unlocated "s"]==>
-    New [0] (Par [enzymeEnoPar,
+    Abs 0 (Par [enzymeEnoPar,
                   Sum [(Located "r" 0, AbsBase Nil),
                        (Located "p" 0, AbsBase Nil)]]),
-  enzymeES ==:[Unlocated "e", Unlocated "s"]==> enzymeCFinal]
+  enzymeES ==:[Unlocated "e", Unlocated "s"]==> AbsBase enzymeCFinal]
 
 enzymeESrec :: Species
 enzymeESrec = Def "E" [] [] <|> Def "S" [] []
 
 enzymeCrec :: Species
-enzymeCrec = new [0] $ enzymeEbound <|> enzymeSbound
+enzymeCrec = new [0] (enzymeEbound <|> enzymeSbound)
 
 enzymeESFinalDef :: MTS
 enzymeESFinalDef = simplify
-  [ enzymeESrec ==:[Unlocated "e"]==> new [0] (enzymeEbound <|> Def "S" [] [])
-  , enzymeESrec ==:[Unlocated "s"]==> new [0] (Def "E" [] [] <|> enzymeSbound)
-  , enzymeESrec ==:[Unlocated "e", Unlocated "s"]==> enzymeCrec ]
+  [ enzymeESrec ==:[Unlocated "e"]==> Abs 0 (enzymeEbound <|> Def "S" [] [])
+  , enzymeESrec ==:[Unlocated "s"]==> Abs 0 (Def "E" [] [] <|> enzymeSbound)
+  , enzymeESrec ==:[Unlocated "e", Unlocated "s"]==> AbsBase enzymeCrec]
 
 enzymeCTrans :: MTS
 enzymeCTrans = simplify
-  [enzymeCFinal ==:[Unlocated "x", Unlocated "r"]==> Nil,
-   enzymeCFinal ==:[Unlocated "x", Unlocated "p"]==> Nil,
+  [enzymeCFinal ==:[Unlocated "x", Unlocated "r"]==> AbsBase Nil,
+   enzymeCFinal ==:[Unlocated "x", Unlocated "p"]==> AbsBase Nil,
    enzymeCFinal ==:[Unlocated "x"]==>
-     new [0] (Sum [(Located "r" 0, AbsBase Nil),
-                   (Located "p" 0, AbsBase Nil)]),
+     AbsBase (new [0] (Sum [(Located "r" 0, AbsBase Nil),
+                       (Located "p" 0, AbsBase Nil)])),
    enzymeCFinal ==:[Unlocated "r"]==>
-     new [0] (Sum [(Located "x" 0, AbsBase Nil)]),
+     AbsBase (new [0] (Sum [(Located "x" 0, AbsBase Nil)])),
    enzymeCFinal ==:[Unlocated "p"]==>
-     new [0] (Sum [(Located "x" 0, AbsBase Nil)])]
+     AbsBase (new [0] (Sum [(Located "x" 0, AbsBase Nil)]))]
 
 enzymeCTransDef :: MTS
 enzymeCTransDef = simplify
-  [enzymeCrec ==:[Unlocated "x", Unlocated "r"]==> Def "E" [] [] <|> Def "S" [] [],
-   enzymeCrec ==:[Unlocated "x", Unlocated "p"]==> Def "E" [] [] <|> Def "P" [] [],
-   enzymeCrec ==:[Unlocated "x"]==> new [0] (Def "E" [] [] <|> enzymeSbound),
-   enzymeCrec ==:[Unlocated "r"]==> new [0] (enzymeEbound <|> Def "S" [] []),
-   enzymeCrec ==:[Unlocated "p"]==> new [0] (enzymeEbound <|> Def "P" [] [])]
+  [enzymeCrec ==:[Unlocated "x", Unlocated "r"]==> AbsBase (Def "E" [] [] <|> Def "S" [] []),
+   enzymeCrec ==:[Unlocated "x", Unlocated "p"]==> AbsBase (Def "E" [] [] <|> Def "P" [] []),
+   enzymeCrec ==:[Unlocated "x"]==> AbsBase (new [0] (Def "E" [] [] <|> enzymeSbound)),
+   enzymeCrec ==:[Unlocated "r"]==> AbsBase (new [0] (enzymeEbound <|> Def "S" [] [])),
+   enzymeCrec ==:[Unlocated "p"]==> AbsBase (new [0] (enzymeEbound <|> Def "P" [] []))]
 
 spec :: SpecWith ()
 spec = do
   describe "pretty" $ do
     it "pretty prints potential transitions" $
-      pretty (Trans enzymeE [Unlocated "e"] absE)
+      pretty (enzymeE --:[Unlocated "e"]--> absE)
         `shouldBe` "e->(0)x@0->0 --{e}--> (0)x@0->0"
     it "pretty prints committed transitions" $
-      pretty (TransF enzymeE [Unlocated "e"] newE)
+      pretty (enzymeE ==:[Unlocated "e"]==> AbsBase newE)
         `shouldBe` "e->(0)x@0->0 =={e}==> new 0 in x@0->0"
     it "pretty prints singleton lists of transitions" $
-      (pretty [Trans enzymeE [Unlocated "e"] absE])
+      (pretty [enzymeE --:[Unlocated "e"]--> absE])
         `shouldBe` "{| e->(0)x@0->0 --{e}--> (0)x@0->0 |}"
     it "pretty prints longer lists of transitions" $
-      (pretty [Trans enzymeE [Unlocated "e"] absE,
-               TransF enzymeE [Unlocated "e"] newE])
+      (pretty [enzymeE --:[Unlocated "e"]--> absE,
+               enzymeE ==:[Unlocated "e"]==> AbsBase newE])
         `shouldBe` "{| e->(0)x@0->0 --{e}--> (0)x@0->0,\n"
                 ++ "   e->(0)x@0->0 =={e}==> new 0 in x@0->0 |}"
   describe "simplify" $ do
     it "allows us to compares two multisets of the same transitions in a different order" $
       shouldBe
         (simplify [enzymeE --:[Unlocated "e"]--> absE,
-                   enzymeE ==:[Unlocated "e"]==> newE])
-        (simplify [enzymeE ==:[Unlocated "e"]==> newE,
+                   enzymeE ==:[Unlocated "e"]==> AbsBase newE])
+        (simplify [enzymeE ==:[Unlocated "e"]==> AbsBase newE,
                    enzymeE --:[Unlocated "e"]--> absE])
     it "allows us to compare two multisets of the same transitions with repeated transitions" $
       shouldBe
         (simplify [enzymeE --:[Unlocated "e"]--> absE,
                    enzymeE --:[Unlocated "e"]--> absE,
-                   enzymeE ==:[Unlocated "e"]==> newE])
-        (simplify [enzymeE ==:[Unlocated "e"]==> newE,
+                   enzymeE ==:[Unlocated "e"]==> AbsBase newE])
+        (simplify [enzymeE ==:[Unlocated "e"]==> AbsBase newE,
                    enzymeE --:[Unlocated "e"]--> absE,
                    enzymeE --:[Unlocated "e"]--> absE])
     it "allows us to can tell multisets with different multiplicities are not equal" $
       shouldNotBe
         (simplify [enzymeE --:[Unlocated "e"]--> absE,
                    enzymeE --:[Unlocated "e"]--> absE,
-                   enzymeE ==:[Unlocated "e"]==> newE])
+                   enzymeE ==:[Unlocated "e"]==> AbsBase newE])
         (simplify [enzymeE --:[Unlocated "e"]--> absE,
-                   enzymeE ==:[Unlocated "e"]==> newE])
+                   enzymeE ==:[Unlocated "e"]==> AbsBase newE])
   describe "union" $ do
     it "takes the union of two mts" $
       shouldBe
         (simplify $ (++)
           ([enzymeE --:[Unlocated "e"]--> absE,
-            enzymeE ==:[Unlocated "e"]==> newE])
+            enzymeE ==:[Unlocated "e"]==> AbsBase newE])
           ([enzymeE --:[Unlocated "e"]--> absE]))
         (simplify $ [enzymeE --:[Unlocated "e"]--> absE,
                      enzymeE --:[Unlocated "e"]--> absE,
-                     enzymeE ==:[Unlocated "e"]==> newE])
+                     enzymeE ==:[Unlocated "e"]==> AbsBase newE])
   describe "trans" $ do
     it "finds E potential transitions" $
       shouldBe
@@ -204,12 +204,13 @@ spec = do
       shouldBe
         (pretty $ simplify $ potentialTrans $ trans enzymeES M.empty)
         (pretty $ simplify $ enzymeESPotential)
-    it "finds E|S final transitions without par" $
-      (simplify $ transF enzymeES M.empty) `shouldBe` enzymeESFinal
-    it "finds E|S final transitions without par, upto pretty printing" $
-        (pretty $ simplify $ transF enzymeES M.empty) `shouldBe` pretty enzymeESFinal
-    it "finds E|S final transitions when calling by name" $
-      simplify (transF enzymeESrec enzymeDefs) `shouldBe` enzymeESFinalDef
+    -- should transF even exist any more?
+    -- it "finds E|S final transitions without par" $
+    --   (simplify $ transF enzymeES M.empty) `shouldBe` enzymeESFinal
+    -- it "finds E|S final transitions without par, upto pretty printing" $
+    --     (pretty $ simplify $ transF enzymeES M.empty) `shouldBe` pretty enzymeESFinal
+    -- it "finds E|S final transitions when calling by name" $
+    --   simplify (transF enzymeESrec enzymeDefs) `shouldBe` enzymeESFinalDef
     it "finds C final transitions, upto pretty printing" $
       (pretty $ simplify $ transF enzymeCFinal M.empty) `shouldBe` pretty enzymeCTrans
     it "finds C final transitions" $
