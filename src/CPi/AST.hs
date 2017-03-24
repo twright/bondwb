@@ -26,7 +26,7 @@ module CPi.AST
 
 import qualified Data.List as L
 import Data.Map (Map)
-import qualified Data.Map as M
+-- import qualified Data.Map as M
 
 
 -- Core concepts
@@ -63,7 +63,7 @@ class (Syntax a) => Nameless a where
 
 -- Parenthesisation
 prettyParens :: (ProcessAlgebra a, ProcessAlgebra b) => a -> b -> String
-prettyParens x x' 
+prettyParens x x'
   | priority x < priority x' = pretty x
   | otherwise                = "(" ++ pretty x ++ ")"
 
@@ -93,7 +93,7 @@ instSpec :: Definition -> [Name] -> [Location] -> Species
 instSpec (SpeciesDef (n:ns) (l:ls) body) (n':ns') (l':ls') = rename n n' $ relocate l l'
   $ instSpec (SpeciesDef ns ls body) ns' ls'
 instSpec (SpeciesDef [] [] body) [] [] = body
-instSpec (SpeciesDef _ _ _) _ _ = error "Applying definition with wrong number of args"
+instSpec SpeciesDef{} _ _ = error "Applying definition with wrong number of args"
 
 
 -- Abstractions are formed form species but allow abstracting over
@@ -125,7 +125,7 @@ instance Pretty Prefix where
   pretty (Unlocated x) = x
 
 instance Nameless Prefix where
-  maxLoc _ = 0 
+  maxLoc _ = 0
 
 
 instance Syntax Species where
@@ -141,9 +141,11 @@ instance Syntax Species where
 
   rename _ _ Nil = Nil
   rename x x' (Sum prefspecs) = Sum [(rename x x' pre, rename x x' spec)
-                                    | (pre, spec) <- prefspecs] 
+                                    | (pre, spec) <- prefspecs]
   rename x x' (Par specs) = Par $ map (rename x x') specs
   rename x x' (New ls spec) = New ls $ rename x x' spec
+  rename x x' (Def name args locs) = Def name [if y == x then x'
+                                               else y | y <- args] locs
 
   simplify Nil = Nil
   simplify (Sum []) = Nil
@@ -156,7 +158,7 @@ instance Syntax Species where
     | otherwise = New locs' s'
     where s' = simplify s
           locs' = L.sort $ L.nub $ L.intersect locs $ freeLocs s'
-  simplify d@(Def{}) = d
+  simplify d@Def{} = d
 
   freeLocs Nil = []
   freeLocs (Sum ss) = L.concat [freeLocs pref ++ freeLocs abst
@@ -164,7 +166,7 @@ instance Syntax Species where
   freeLocs (Par ss) = foldr ((++) . freeLocs) [] ss
   freeLocs (New locs s) = filter (`notElem` locs) $ freeLocs s
   freeLocs (Def _ _ locs) = locs
- 
+
 instance ProcessAlgebra Species where
   Nil <|> Nil = Nil
   x <|> Nil = x
@@ -193,7 +195,7 @@ instance Nameless Species where
   maxLoc Nil = 0
   maxLoc (Par xs@(_:_)) = maximum $ map maxLoc xs
   maxLoc (Par []) = 0
-  maxLoc (Sum (x:xs)) = let 
+  maxLoc (Sum (x:xs)) = let
       maxRest = maxLoc (Sum xs)
     in case x of
       (Located _ loc, spec) -> loc `max` maxRest `max` maxLoc spec
@@ -206,16 +208,16 @@ instance Nameless Species where
 instance Pretty Species where
   pretty Nil = "0"
   -- pretty (Def i) = i
-  pretty (Sum x@((p,s):pss)) 
-    | length x == 1 
+  pretty (Sum x@((p,s):pss))
+    | length x == 1
       = pretty p ++ "->" ++ pretty s
-    | otherwise 
+    | otherwise
       = pretty (Sum [(p, s)]) ++ " + " ++ pretty (Sum pss)
   pretty (Sum []) = "<Empty Sum>"
   pretty par@(Par specs) = prettyPar specs
     where prettyPar :: [Species] -> String
           prettyPar [] = "<Empty Par>"
-          prettyPar [x] = prettyParens x par 
+          prettyPar [x] = prettyParens x par
           prettyPar (x:xs) = prettyParens x par ++ " | " ++ prettyPar xs
   pretty (New locs spec)
     = "new " ++ prettyNames locs ++ " in " ++ pretty spec
@@ -228,8 +230,8 @@ instance Syntax Abstraction where
   rename x x' (AbsBase spec) = AbsBase $ rename x x' spec
   rename x x' (Abs m abst) = Abs m $ rename x x' abst
 
-  freeLocs (AbsBase spec) = freeLocs spec  
-  freeLocs (Abs m abst) = filter (/=m) $ freeLocs abst 
+  freeLocs (AbsBase spec) = freeLocs spec
+  freeLocs (Abs m abst) = filter (/=m) $ freeLocs abst
 
   simplify (AbsBase x) = AbsBase (simplify x)
   simplify (Abs l x) = Abs l (simplify x)

@@ -6,7 +6,7 @@ module CPi.Transitions
 
 import CPi.AST
 import qualified Data.List as L
-import Data.Map (Map)
+-- import Data.Map (Map)
 import qualified Data.Map as M
 
 data TransitionStatus = Final | Potential
@@ -14,17 +14,17 @@ data TransitionStatus = Final | Potential
 
 data Transition = Trans TransitionStatus Species [Prefix] Abstraction
                 -- | TransF Species [Prefix] Species
-                deriving (Show, Eq, Ord)
+                  deriving (Show, Eq, Ord)
 
 -- Implement fancy arrows for denoting transitions in multisets
 -- x --:locs--> y == Trans  x locs y
 -- x ==:locs==> y == TransF x locs y
 (--:) :: Species -> [Prefix] -> (Abstraction -> Transition)
-spec --: xs = Trans Potential spec xs 
+spec --: xs = Trans Potential spec xs
 (-->) :: (Abstraction -> Transition) -> Abstraction -> Transition
 f --> abst = f abst
 (==:) :: Species -> [Prefix] -> (Abstraction -> Transition)
-spec ==: xs = Trans Final spec xs 
+spec ==: xs = Trans Final spec xs
 (==>) :: (Abstraction -> Transition) -> Abstraction -> Transition
 f ==> abst = f abst
 infixr 2 --:, ==:
@@ -44,18 +44,19 @@ delocate u@Unlocated{} = u
 
 finalize :: Transition -> Transition
 -- finalize t@Trans Final _ _ = t
-finalize (Trans status x prefs y) = Trans status x (map delocate prefs) (AbsBase $ concretify y) 
+finalize (Trans status x prefs y) = Trans status x (map delocate prefs) (AbsBase $ concretify y)
 
 instance Syntax Transition where
   simplify (Trans status x prefs y)  = Trans status (simplify x) (L.sort prefs) (simplify y)
   -- simplify (TransF x prefs y) = simplify x ==:L.sort prefs==> simplify y
 
-  relocate l l' (Trans Potential x prefs y)  = relocate l l' x
-                                     --:map (relocate l l') prefs-->
-                                     relocate l l' y
-  relocate l l' (Trans Final x prefs y) = relocate l l' x
-                                     ==:map (relocate l l') prefs==>
-                                     relocate l l' y
+  relocate l l' (Trans status x prefs y) = Trans status (relocate l l' x)
+                                           (map (relocate l l') prefs)
+                                           (relocate l l' y)
+
+  rename n n' (Trans status x prefs y) = Trans status (rename n n' x)
+                                           (map (rename n n') prefs)
+                                           (rename n n' y)
 
   freeLocs (Trans _ x prefs y)  = foldr ((++).freeLocs) [] prefs
                                 ++ freeLocs x ++ freeLocs y
@@ -63,12 +64,14 @@ instance Syntax Transition where
 instance Pretty MTS where
   pretty xs = "{| "
     ++ L.intercalate ",\n   " (L.sort $ map pretty xs)
-    ++ " |}" 
+    ++ " |}"
 
 instance Syntax MTS where
   simplify = L.sort . map simplify
 
   relocate l l' = fmap (relocate l l')
+
+  rename n n' = fmap (rename n n')
 
   freeLocs = concatMap freeLocs
 
@@ -86,7 +89,7 @@ finalTrans ts = [ t | t@(Trans Final _ _ _) <- ts ]
 
 -- instance {-# OVERLAPPING #-} Eq MTS where
 --   xs == ys = (simplify xs) (L.(==)) (simplify ys)
-    -- where MTS xs = simplify x 
+    -- where MTS xs = simplify x
     --       MTS ys = simplify y
 
 
@@ -118,7 +121,7 @@ instance TransitionSemantics Species where
     [if null (newlocs `L.intersect` foldr ((++).freeLocs) [] locs)
         then new newlocs x --:locs--> new newlocs y
         else new newlocs x ==:map delocate locs==> AbsBase (new newlocs (concretify y))
-      | Trans Potential x locs y <- specMTS] 
+      | Trans Potential x locs y <- specMTS]
     [new newlocs x ==:locs==> new newlocs y | Trans Final x locs y <- specMTS]
     where specMTS = trans spec env
   trans x@(Sum prefspecs) env = [x --:[pref]--> y | (pref, y) <- prefspecs]
@@ -130,13 +133,13 @@ instance TransitionSemantics Species where
 
 -- instance TransitionSemantics Abstraction where
 --   trans (AbsBase spec) = trans spec
---   trans (AbsPar abss) = foldl union (MTS []) (map trans abss) 
+--   trans (AbsPar abss) = foldl union (MTS []) (map trans abss)
 --   trans (AbsNew newlocs abstr) = MTS $ (++)
 --     [Trans (AbsNew newlocs x) locs (AbsNew newlocs y)
---       | Trans x locs y <- absMTS] 
+--       | Trans x locs y <- absMTS]
 --     [TransF (AbsNew newlocs y) locs (AbsNew newlocs y)
 --       | TransF x locs y <- absMTS]
 --     where
 --       absMTS = MTS abstr
 --   trans (Abs _ _) = MTS[]
-  -- trans AbsPar  
+  -- trans AbsPar
