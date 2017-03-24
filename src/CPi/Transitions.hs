@@ -6,6 +6,8 @@ module CPi.Transitions
 
 import CPi.AST
 import qualified Data.List as L
+import Data.Map (Map)
+import qualified Data.Map as M
 
 data Transition = Trans Species [Prefix] Abstraction
                 | TransF Species [Prefix] Species
@@ -88,13 +90,13 @@ finalTrans ts = [ t | t@TransF{} <- ts ]
 
 
 class (Pretty a) => TransitionSemantics a where
-  trans :: a -> MTS
-  transF :: a -> MTS
-  transF = fmap finalize . trans
+  trans :: a -> Env -> MTS
+  transF :: a -> Env -> MTS
+  transF x env = fmap finalize $ trans x env
 
 instance TransitionSemantics Species where
-  trans Nil = []
-  trans (Par (t:ts)) = [
+  trans Nil _ = []
+  trans (Par (t:ts)) env = [
       -- new reactions
       x <|> y --:(ls++ms)--> (x' <|> y')
       | Trans x ls x' <- hd, Trans y ms y' <- tl
@@ -116,17 +118,23 @@ instance TransitionSemantics Species where
       | TransF y ms y' <- tl
     ]
     where sTail = Par ts
-          hd = potentialTrans $ trans t
-          tl = potentialTrans $ trans sTail
-  trans (Par []) = []
-  trans (New newlocs spec) = (++)
+          hd = potentialTrans $ trans t env
+          tl = potentialTrans $ trans sTail env
+  trans (Par []) _ = []
+  trans (New newlocs spec) env = (++)
     [if null (newlocs `L.intersect` foldr ((++).freeLocs) [] locs)
         then new newlocs x --:locs--> new newlocs y
         else new newlocs x ==:map delocate locs==> new newlocs (concretify y)
       | Trans x locs y <- specMTS] 
     [new newlocs x ==:locs==> new newlocs y | TransF x locs y <- specMTS]
-    where specMTS = trans spec
-  trans x@(Sum prefspecs) = [Trans x [pref] y | (pref, y) <- prefspecs]
+    where specMTS = trans spec env
+  trans x@(Sum prefspecs) env = [Trans x [pref] y | (pref, y) <- prefspecs]
+  trans d@(Def name args locs) env = case M.lookup name env of
+    Just specdef -> (++)
+      [d--:locs-->y | Trans  _ locs y <- specMTS]
+      [d==:locs==>y | TransF _ locs y <- specMTS]
+      where specMTS = trans (instSpec specdef args locs) env
+    Nothing      -> error $ "Species " ++ name ++ " not defined"
 
 -- instance TransitionSemantics Abstraction where
 --   trans (AbsBase spec) = trans spec

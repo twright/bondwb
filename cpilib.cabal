@@ -17,13 +17,14 @@ library
   hs-source-dirs:      src
   exposed-modules:     CPi.Logic, CPi.ODE, CPi.Plot, CPi.Signals,
                        CPi.Lib,  CPi.Matlab,  CPi.Parser,
-                       CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions
+                       CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions,
+                       CPi.Processes
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
   build-depends:       base >=4.7 && <=4.9, parsec >=3.1,
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3,
-                       data-accessor >=0.2,
+                       data-accessor >=0.2, numeric-quest,
                        hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
                        Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class
   default-language:    Haskell2010
@@ -34,7 +35,7 @@ test-suite spec
   hs-source-dirs:
       Tests
   ghc-options: -Wall
-  build-depends:       base >=4.7 && <=4.9, hspec, cpilib
+  build-depends:       base >=4.7 && <=4.9, hspec, containers>=0.5, cpilib, numeric-quest
   other-modules:
       CPi.ASTSpec
   default-language: Haskell2010

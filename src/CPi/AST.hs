@@ -1,8 +1,5 @@
 module CPi.AST
   (
-  -- MTS(..),
-  -- Trans(..),
-  -- TTauAff(..),
   Abstraction(..),
   Species(..),
   Name,
@@ -17,15 +14,20 @@ module CPi.AST
   RateLawFamily,
   Env,
   Pretty,
+  Definition(..),
   concretify,
   pretty,
   maxLoc,
   prettyNames,
   prettyParens,
   colocate,
+  instSpec
   ) where
 
 import qualified Data.List as L
+import Data.Map (Map)
+import qualified Data.Map as M
+
 
 -- Core concepts
 type Name = String
@@ -43,6 +45,7 @@ class (Show a) => Pretty a where
 
 class (Pretty a) => Syntax a where
   relocate :: Location -> Location -> a -> a
+  rename :: Name -> Name -> a -> a
   freeLocs :: a -> [Location]
   simplify :: a -> a
   simplify = id
@@ -58,9 +61,6 @@ type Location = Integer
 class (Syntax a) => Nameless a where
   maxLoc :: a -> Location
 
-data Definition = SpeciesDef Name Species
-                  deriving (Show)
-
 -- Parenthesisation
 prettyParens :: (ProcessAlgebra a, ProcessAlgebra b) => a -> b -> String
 prettyParens x x' 
@@ -74,12 +74,27 @@ data Prefix
 
 type PrefixSpecies = (Prefix, Abstraction)
 
+data Definition = SpeciesDef
+  { defArgs  :: [Name]
+  , defLocs  :: [Location]
+  , specBody :: Species }
+  deriving (Eq, Ord, Show)
+
+type Env = Map String Definition
+
 data Species = Nil
              | Sum [PrefixSpecies]
              | Par [Species]
              | New [Location] Species
-             -- | Def String
+             | Def String [Name] [Location]
                deriving (Eq, Ord, Show)
+
+instSpec :: Definition -> [Name] -> [Location] -> Species
+instSpec (SpeciesDef (n:ns) (l:ls) body) (n':ns') (l':ls') = rename n n' $ relocate l l'
+  $ instSpec (SpeciesDef ns ls body) ns' ls'
+instSpec (SpeciesDef [] [] body) [] [] = body
+instSpec (SpeciesDef _ _ _) _ _ = error "Applying definition with wrong number of args"
+
 
 -- Abstractions are formed form species but allow abstracting over
 -- variable name to allow for application (when a potential interaction)
@@ -94,6 +109,13 @@ instance Syntax Prefix where
     | l == m = Located x l'
     | otherwise = p
   relocate _ _ p@(Unlocated _) = p
+
+  rename x x' p@(Located y m)
+    | x == y = Located x' m
+    | otherwise = p
+  rename x x' p@(Unlocated y)
+    | x == y = Unlocated x'
+    | otherwise = p
 
   freeLocs (Located _ l) = [l]
   freeLocs (Unlocated _) = []
@@ -113,6 +135,15 @@ instance Syntax Species where
           | (pre, x) <- xs]
   relocate l l' (Par xs) = Par $ map (relocate l l') xs
   relocate l l' (New ls spec) = New ls $ relocate l l' spec
+  relocate l l' (Def name args locs) = Def name args [if loc == l
+                                                      then l' else loc
+                                                     | loc <- locs]
+
+  rename _ _ Nil = Nil
+  rename x x' (Sum prefspecs) = Sum [(rename x x' pre, rename x x' spec)
+                                    | (pre, spec) <- prefspecs] 
+  rename x x' (Par specs) = Par $ map (rename x x') specs
+  rename x x' (New ls spec) = New ls $ rename x x' spec
 
   simplify Nil = Nil
   simplify (Sum []) = Nil
@@ -125,13 +156,15 @@ instance Syntax Species where
     | otherwise = New locs' s'
     where s' = simplify s
           locs' = L.sort $ L.nub $ L.intersect locs $ freeLocs s'
+  simplify d@(Def{}) = d
 
   freeLocs Nil = []
   freeLocs (Sum ss) = L.concat [freeLocs pref ++ freeLocs abst
     | (pref, abst) <- ss]
   freeLocs (Par ss) = foldr ((++) . freeLocs) [] ss
   freeLocs (New locs s) = filter (`notElem` locs) $ freeLocs s
-
+  freeLocs (Def _ _ locs) = locs
+ 
 instance ProcessAlgebra Species where
   Nil <|> Nil = Nil
   x <|> Nil = x
@@ -167,6 +200,8 @@ instance Nameless Species where
       (Unlocated _, spec) -> maxRest `max` maxLoc spec
   maxLoc (Sum []) = 0
   maxLoc (New locs spec) = maximum (maxLoc spec : locs)
+  maxLoc (Def _ _ []) = 0
+  maxLoc (Def _ _ locs) = maximum locs
 
 instance Pretty Species where
   pretty Nil = "0"
@@ -189,6 +224,9 @@ instance Pretty Species where
 instance Syntax Abstraction where
   relocate l l' (AbsBase spec) = AbsBase $ relocate l l' spec
   relocate l l' (Abs m abst) = Abs m $ relocate l l' abst
+
+  rename x x' (AbsBase spec) = AbsBase $ rename x x' spec
+  rename x x' (Abs m abst) = Abs m $ rename x x' abst
 
   freeLocs (AbsBase spec) = freeLocs spec  
   freeLocs (Abs m abst) = filter (/=m) $ freeLocs abst 
@@ -231,8 +269,6 @@ colocate (AbsBase x) (AbsBase y) = AbsBase (x <|> y)
 concretify :: Abstraction -> Species
 concretify (AbsBase spec) = spec
 concretify (Abs l spec) = new [l] spec
-
-type Env = [Definition]
 
 -- Pretty print a list of Names.
 prettyNames :: (Show a) => [a] -> String
