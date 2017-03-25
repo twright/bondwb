@@ -49,6 +49,8 @@ class (Pretty a) => Syntax a where
   freeLocs :: a -> [Location]
   simplify :: a -> a
   simplify = id
+  normalForm :: a -> a
+  normalForm = simplify
 
 class (Syntax a) => ProcessAlgebra a where
   (<|>) :: a -> a -> a
@@ -147,18 +149,38 @@ instance Syntax Species where
   rename x x' (Def name args locs) = Def name [if y == x then x'
                                                else y | y <- args] locs
 
-  simplify Nil = Nil
-  simplify (Sum []) = Nil
-  simplify (Sum ss) = Sum $ L.sort [(pref, simplify s) | (pref, s) <- ss]
-  simplify (Par []) = Nil
-  simplify (Par [x]) = simplify x
-  simplify (Par xs) = Par $ L.sort $ filter (/=Nil) $ map simplify xs
-  simplify (New locs s)
-    | null locs' = s'
-    | otherwise = New locs' s'
-    where s' = simplify s
-          locs' = L.sort $ L.nub $ L.intersect locs $ freeLocs s'
-  simplify d@Def{} = d
+  simplify = normalForm
+
+  normalForm spec
+    | res == spec = res
+    | otherwise   = nf res
+    where res = nf spec
+          nf Nil = Nil
+          nf d@Def{} = d
+          nf (Sum []) = Nil
+          nf (Sum ss) = Sum $ L.sort [(pref, normalForm s) | (pref, s) <- ss]
+          nf (Par []) = Nil
+          nf (Par [s]) = normalForm s
+          nf (Par ss) = Par $ L.sort $ filter (/=Nil) $ flatten $ map normalForm ss
+            where flatten    = L.concatMap f
+                  f (Par ss) = ss
+                  f s        = [s]
+          nf (New locs1 (New locs2 s)) = New (locs1 ++ locs2) $ normalForm s
+          nf (New locs s)
+            | null locs' = s'
+            | otherwise = s''
+            where s'  = normalForm s
+                  locs' = L.sort $ L.nub $ L.intersect locs $ freeLocs s'
+                  s'' = case s' of
+                    Par ss -> inexp <|> outexp
+                      where ins    = filter (not . null . L.intersect locs' . freeLocs) ss
+                            outs   = filter (null . L.intersect locs' . freeLocs) ss
+                            inexp  = New locs' (Par ins)
+                            outexp = case outs of
+                              []  -> Nil
+                              [w] -> w
+                              ws  -> Par ws
+                    _ -> new locs' s'
 
   freeLocs Nil = []
   freeLocs (Sum ss) = L.concat [freeLocs pref ++ freeLocs abst
@@ -233,8 +255,10 @@ instance Syntax Abstraction where
   freeLocs (AbsBase spec) = freeLocs spec
   freeLocs (Abs m abst) = filter (/=m) $ freeLocs abst
 
-  simplify (AbsBase x) = AbsBase (simplify x)
-  simplify (Abs l x) = Abs l (simplify x)
+  simplify = normalForm
+
+  normalForm (AbsBase x) = AbsBase (normalForm x)
+  normalForm (Abs l x) = Abs l (normalForm x)
 
 instance ProcessAlgebra Abstraction where
   (<|>) = colocate

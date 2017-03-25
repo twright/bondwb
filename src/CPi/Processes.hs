@@ -65,9 +65,16 @@ multilinear f = multilinear' f []
                 terms  = [alpha |> multilinear' f (e:ys) xs
                          | (alpha, e) <- zip alphas es]
 
+primes :: Species -> [Species]
+primes (Par ss) = L.concatMap primes ss
+primes s = [s]
+
+embed :: Species -> Ket Species
+embed spec = foldl (+>) KetZero $ map Ket $ primes $ normalForm spec
+
 react :: [Ket (Tuple Species Abstraction)] -> P
 react = multilinear react'
-  where react' xs = Ket (simplify $ concretify $
+  where react' xs = embed (concretify $
                     foldl (<|>) (AbsBase Nil) (map target xs)) +>
                     (-1.0) |> foldl (+>) KetZero (map ((Ket).source) xs)
         source (Ket (spec :* spec')) = spec

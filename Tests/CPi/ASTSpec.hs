@@ -107,3 +107,12 @@ spec = do
       shouldBe
         (simplify $ New [0] $ Sum [(Located "x" 0, AbsBase Nil)])
         (New [0] $ Sum [(Located "x" 0, AbsBase Nil)])
+  describe "normalForm" $ do
+    it "removes unused binders" $ do
+      shouldBe
+        (normalForm $ New [1] $ Sum [(Located "x" 0, AbsBase Nil)])
+        (Sum [(Located "x" 0, AbsBase Nil)])
+    it "keeps used binders" $ do
+      shouldBe
+        (normalForm $ New [0] $ Sum [(Located "x" 0, AbsBase Nil)])
+        (New [0] $ Sum [(Located "x" 0, AbsBase Nil)])
