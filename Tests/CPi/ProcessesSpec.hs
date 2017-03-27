@@ -3,7 +3,7 @@ module CPi.ProcessesSpec (spec) where
 import Prelude hiding ((*>))
 
 import Test.Hspec
--- import Test.QuickCheck
+import Test.QuickCheck
 import CPi.AST
 import CPi.Processes
 -- import Data.Map (Map)
@@ -99,7 +99,7 @@ spec = do
     it "finds the partial interaction for an enzyme" $
       partial enzymeDefs (Mixture [(4.0, enzymeC)]) `shouldBe` (4 |> partialC)
     -- it "should only be zero for Nil" $
-    --   property $ \x -> x == Nil || partial enzymeDefs (Mixture [(4.0, x)]) /= KetZero
+    --   property $ \x -> normalForm x == Nil || partial enzymeDefs (Mixture [(4.0, x)]) /= KetZero
   describe "norm1" $ do
     it "finds the l1 norm of 2.0<1| -3.0<2| + 1.5<3|" $
       norm1 (2.0 |> Ket (1::Integer) +> (-3.0) |> Ket 2 +> 1.5 |> Ket 3) `shouldBe` 6.5

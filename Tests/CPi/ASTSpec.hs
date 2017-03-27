@@ -3,7 +3,6 @@ module CPi.ASTSpec (spec) where
 import Test.Hspec
 import Test.QuickCheck
 import CPi.AST
-import Data.Ix
 import qualified Data.List as L
 
 enzymeE :: Species
@@ -116,7 +115,7 @@ spec = do
         `shouldBe` (Abs 5 (Par [Def "" [] [4], Def "" [] [0,3]]))
     it "releases colocated in normal form" $
       property $ \x y -> let newloc = maximum (0:map (+1) (freeLocs y ++ boundLocs x))
-                         in normalForm (concretify $ normalForm $ Abs newloc x <|> AbsBase y)
+                         in normalForm (concretify $ normalForm (Abs newloc x <|> AbsBase y))
                             ===
                             normalForm (new [newloc] x <|> y)
     it "handles another case with overlapping names" $
@@ -126,9 +125,9 @@ spec = do
       normalForm (Abs 11 (Def "" [] [10]) <|> AbsBase (Def "" [] [0,9]))
         `shouldBe` AbsBase (Def "" [] [0,9] <|> Def "" [] [10])
     it "does not care about bound variable name when merging" $
-      property $ \x y -> normalForm (Abs 2 (relocate (maxLoc x + 1) (maxLoc x + 2) x) <|> AbsBase y)
-                         === normalForm (Abs 1 (relocate (maxLoc x + 2) (maxLoc x + 1) x) <|> AbsBase y)
-    it "should colocate concretions to give abstracted parallel composition" $
+      property $ \x y -> normalForm (Abs (maxLoc x + 2) (relocate (maxLoc x + 1) (maxLoc x + 2) x) <|> AbsBase y)
+                         === normalForm (Abs (maxLoc x + 1) (relocate (maxLoc x + 2) (maxLoc x + 1) x) <|> AbsBase y)
+    it "should colocate abstractions to give abstracted parallel composition" $
       property $ \x y -> let l = maxLoc x
                              m = maxLoc y
                              p = max l m
@@ -146,36 +145,27 @@ spec = do
           Sum [(Unlocated "s", Abs 1 $ Sum [(Located "z" 1,
                 Abs 0 $ Sum [(Located "z" 0, AbsBase Nil)])])]])
         [0, 1]
-    it "should give a contiguous list of locations on normalized species with no freeLocs" $
-      property $ \x -> case boundLocs $ normalForm (x :: Species) of
-                         [] -> property True
-                         xs@(_:_) -> filter (>=mNotFree) xs === range(mNotFree, maximum xs)
-                          where flocs = freeLocs x
-                                mNotFree = if null flocs
-                                           then 0 else maximum flocs + 1
-    it "should give a contiguous list of locations on normalized abstractions" $
-      property $ \x -> case boundLocs $ normalForm (x :: Abstraction) of
-                         [] -> property True
-                         xs@(_:_) -> filter (>=mNotFree) xs === range(mNotFree, maximum xs)
-                          where flocs = freeLocs x
-                                mNotFree = if null flocs
-                                           then 0 else maximum flocs + 1
-  describe "simplify" $ do
+    -- it "should give a contiguous list of locations on normalized species with no freeLocs" $
+    --   property $ \x -> case boundLocs $ normalForm (x :: Species) of
+    --                      [] -> property True
+    --                      xs@(_:_) -> filter (>=mNotFree) xs === range(mNotFree, maximum xs)
+    --                       where flocs = freeLocs x
+    --                             mNotFree = if null flocs
+    --                                        then 0 else maximum flocs + 1
+    -- it "should give a contiguous list of locations on normalized abstractions" $
+    --   property $ \x -> case boundLocs $ normalForm (x :: Abstraction) of
+    --                      [] -> property True
+    --                      xs@(_:_) -> filter (>=mNotFree) xs === range(mNotFree, maximum xs)
+    --                       where flocs = freeLocs x
+    --                             mNotFree = if null flocs
+    --                                        then 0 else maximum flocs + 1
+  describe "normalForm" $ do
     it "is idempotent on species" $
       property $ \x -> normalForm (normalForm x) === normalForm (x :: Species)
     it "is idempotent on abstractions" $
       property $ \x -> normalForm (normalForm x) === normalForm (x :: Abstraction)
     it "lowers the maximum index in a complex expression" $
        simplify (Abs 1 (Par [Sum [(Located "x" 1,AbsBase Nil)],Sum [(Unlocated "s",AbsBase (Sum [(Located "p" 1,AbsBase Nil),(Located "r" 1,AbsBase Nil)]))]])) `shouldBe` (Abs 0 (Par [Sum [(Located "x" 0,AbsBase Nil)],Sum [(Unlocated "s",AbsBase (Sum [(Located "p" 0,AbsBase Nil),(Located "r" 0,AbsBase Nil)]))]]))
-    it "removes unused binders" $
-      shouldBe
-        (simplify $ New [1] $ Sum [(Located "x" 0, AbsBase Nil)])
-        (Sum [(Located "x" 0, AbsBase Nil)])
-    it "keeps used binders" $
-      shouldBe
-        (simplify $ New [0] $ Sum [(Located "x" 0, AbsBase Nil)])
-        (New [0] $ Sum [(Located "x" 0, AbsBase Nil)])
-  describe "normalForm" $ do
     it "removes unused binders" $
       shouldBe
         (normalForm $ New [1] $ Sum [(Located "x" 0, AbsBase Nil)])
@@ -206,12 +196,18 @@ spec = do
                                    (AbsBase _) -> property(l `notElem` freeLocs sp)
           prop abst@(AbsBase sp) = normalForm abst === AbsBase (normalForm sp)
       in property prop
-    it "has binder as maxLoc" $
-      let prop abst@(Abs l sp) = case normalForm abst of
-                                   (Abs l' sp') -> property((maxLoc sp' == 0 && l' == 0) || l' == maxLoc sp' + 1)
-                                   (AbsBase _) -> property(l `notElem` freeLocs sp)
-          prop abst@(AbsBase sp) = normalForm abst === AbsBase (normalForm sp)
-      in property prop
+    -- commented out as now duplicates code pretty heavily
+    -- it "has binder as next free location" $
+    --   let prop abst@(Abs l sp) = case normalForm abst of
+    --                                (Abs l' _) -> property(l' === nextFree)
+    --                                (AbsBase _) -> property(l `notElem` freeLocs sp)
+    --         where sp'
+    --               bLocs = boundLocs sp
+    --               fLocs = filter (/=l) $ freeLocs sp
+    --               nextLocs = filter (\x -> (x `notElem` fLocs) && (x `notElem` bLocs)) [0..]
+    --               nextFree = head nextLocs
+    --       prop abst@(AbsBase sp) = normalForm abst === AbsBase (normalForm sp)
+    --   in property prop
     it "does not change freeLocs" $
       property $ \x -> (L.sort $ L.nub $ freeLocs $ normalForm x) === (L.sort $ L.nub $ freeLocs (x::Species))
     it "gives correct normal form in case with similar locs" $
@@ -219,6 +215,9 @@ spec = do
         `shouldBe`
         (Par [Sum [(Located "z" 0,AbsBase Nil)],New [0] (Sum [(Located "z" 0,AbsBase Nil)])])
     it "gives correct normal for in case with many overlapping locs" $
-        normalForm (New [2] (Par [Sum [(Located "z" 0,Abs 0 Nil)],Sum [(Located "z" 1,AbsBase Nil)],Sum [(Located "y" 2,Abs 0 Nil)]]))
-          `shouldBe`
-          Par [Sum [(Located "z" 0,AbsBase Nil)],Sum [(Located "z" 1,AbsBase Nil)],New [0] (Sum [(Located "y" 0,AbsBase Nil)])]
+      normalForm (New [2] (Par [Sum [(Located "z" 0,Abs 0 Nil)],Sum [(Located "z" 1,AbsBase Nil)],Sum [(Located "y" 2,Abs 0 Nil)]]))
+        `shouldBe`
+        Par [Sum [(Located "z" 0,AbsBase Nil)],Sum [(Located "z" 1,AbsBase Nil)],New [0] (Sum [(Located "y" 0,AbsBase Nil)])]
+    it "correctly simplifies nested news" $
+      normalForm(New [10] (New [3] (Def "" [] [3,10])))
+        `shouldBe` New [0,1] (Def "" [] [0,1])

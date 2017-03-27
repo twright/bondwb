@@ -31,6 +31,7 @@ import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Control.Monad
 import GHC.Generics
+import Data.Ix
 -- import qualified Data.Map as M
 
 
@@ -210,46 +211,55 @@ instance Syntax Species where
 
   simplify = normalForm
 
-  normalForm spec
-    | res == spec = res
-    | otherwise   = normalForm res
-    where res = nf spec
-          nf Nil = Nil
-          nf d@Def{} = d
-          nf (Sum []) = Nil
-          nf (Sum ss) = Sum $ L.sort [(pref, normalForm s) | (pref, s) <- ss]
-          nf (Par []) = Nil
-          nf (Par [s]) = normalForm s
-          nf (Par ss) = Par $ L.sort $ filter (/=Nil) $ flatten $ map normalForm ss
-            where flatten    = L.concatMap f
-                  f (Par ps) = ps
-                  f s        = [s]
-          nf (New [] s) = s
-          nf (New locs1 (New locs2 s)) = New (locs1 ++ locs2) $ normalForm s
-          nf (New locs s)
-            | null locs' = s'
-            | otherwise = s'''
-            where s'  = normalForm s
-                  locs' = L.sort $ L.nub $ L.intersect locs $ freeLocs s'
-                  s'' = case highers of
-                    [] -> s'
-                    (h:_) -> relocate h nextLoc s'
-                  locs'' = case highers of
-                    [] -> locs'
-                    h:_ -> [if l == h then nextLoc else l | l <- locs']
-                  s''' = case s'' of
-                    Par ss -> inexp <|> outexp
-                      where ins    = filter (not . null . L.intersect locs'' . freeLocs) ss
-                            outs   = filter (null . L.intersect locs'' . freeLocs) ss
-                            inexp  = New locs'' (Par ins)
-                            outexp = case outs of
-                              []  -> Nil
-                              [w] -> w
-                              ws  -> Par ws
-                    _ -> new locs'' s''
-                  highers = filter (> nextLoc) locs'
-                  nextLocs = map (+1) (boundLocs s' ++ filter (`notElem` locs') (freeLocs s'))
-                  nextLoc = if null nextLocs then 0 else maximum nextLocs
+  normalForm Nil = Nil
+  normalForm d@Def{} = d
+  normalForm (Sum []) = Nil
+  normalForm (Sum ss) = Sum $ L.sort [(pref, normalForm s) | (pref, s) <- ss]
+  normalForm (Par ss) = case ss' of
+                          [] -> Nil
+                          [s] -> s
+                          _ -> Par ss'
+    where flatten    = L.concatMap f
+          f (Par ps) = ps
+          f s        = [s]
+          ss' = L.sort $ filter (/=Nil) $ flatten $ map normalForm ss
+  normalForm (New [] s) = normalForm s
+  -- normalForm (New locs1 (New locs2 s)) = normalForm $ New (locs1 ++ locs2) s
+  normalForm spec@(New locs s)
+    | null locs' = s'
+    | otherwise = if spec == s''' then spec else normalForm s'''
+    where s'  = normalForm s
+          locs' = L.sort $ L.nub $ L.intersect locs (freeLocs s')
+          (locs'', s'') = reduceLocs locs' s'
+          s''' = splitFree locs'' s''
+          reduceLocs :: [Location] -> Species -> ([Location], Species)
+          reduceLocs olocs m = (nLocs, if olocs == nLocs then m
+                                       else normalForm m')
+            where fLocs = filter (`notElem` olocs) (freeLocs m)
+                  bLocs = boundLocs m
+                  nextLocs = filter (\x -> (x `notElem` fLocs) && (x `notElem` bLocs)) [0..]
+                  locLen = length olocs
+                  nLocs = take locLen nextLocs
+                  safeLocs = filter (\x -> (x `notElem` nLocs) && (x `notElem` bLocs) && (x `notElem` freeLocs m)) [0..]
+                  middleLocs = take locLen safeLocs
+                  relocateAll ls ls' = foldl (.) id [relocate l l'
+                                     | (l,l') <- zip ls ls']
+                  m' = relocateAll middleLocs nLocs
+                     $ relocateAll olocs middleLocs m
+          splitFree :: [Location] -> Species -> Species
+          splitFree locs (Par ss) = if null outs then inexp
+                                    else normalForm (inexp
+                                         <|> outexp)
+            where inexp  = new locs (par ins)
+                  outexp = par outs
+                          -- we cannot rely on normalForm to simplify trivial
+                          -- pars as this may lead to infinite loops
+                  par [] = Nil
+                  par [w] = w
+                  par ws = Par ws
+                  ins    = filter (not . null . L.intersect locs . freeLocs) ss
+                  outs   = filter (null . L.intersect locs . freeLocs) ss
+          splitFree locs x = new locs x
 
   freeLocs Nil = []
   freeLocs (Sum ss) = L.concat [freeLocs pref ++ freeLocs abst
@@ -329,18 +339,15 @@ instance Syntax Abstraction where
 
   simplify = normalForm
 
-  normalForm abst
-    | abst == res = res
-    | otherwise = normalForm res
-    where res = nf abst
-          nf (AbsBase x) = AbsBase (normalForm x)
-          nf (Abs l x) = if l `notElem` freeLocs x' then AbsBase x'
-                         else Abs l' (if l == l' then x'
-                                      else normalForm $ relocate l l' x')
-            where x' = normalForm x
-                  l' = if null (boundLocs x')
-                       then 0
-                       else maxLoc x + 1
+  normalForm (AbsBase x) = AbsBase (normalForm x)
+  normalForm (Abs l x) = if l `notElem` freeLocs x' then AbsBase x'
+                 else Abs l' (if l == l' then x'
+                              else normalForm $ relocate l l' x')
+    where x' = normalForm x
+          bLocs = boundLocs x'
+          fLocs = filter (/=l) $ freeLocs x'
+          nextLocs = filter (\y -> (y `notElem` fLocs) && (y `notElem` bLocs)) [0..]
+          l' = head nextLocs
 
 instance ProcessAlgebra Abstraction where
   (<|>) = colocate
