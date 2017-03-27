@@ -13,7 +13,6 @@ data TransitionStatus = Final | Potential
                         deriving (Show, Eq, Ord)
 
 data Transition = Trans TransitionStatus Species [Prefix] Abstraction
-                -- | TransF Species [Prefix] Species
                   deriving (Show, Eq, Ord)
 
 -- Implement fancy arrows for denoting transitions in multisets
@@ -43,12 +42,10 @@ delocate (Located x _) = Unlocated x
 delocate u@Unlocated{} = u
 
 finalize :: Transition -> Transition
--- finalize t@Trans Final _ _ = t
 finalize (Trans status x prefs y) = Trans status x (map delocate prefs) (AbsBase $ concretify y)
 
 instance Syntax Transition where
   simplify (Trans status x prefs y)  = Trans status (simplify x) (L.sort prefs) (simplify y)
-  -- simplify (TransF x prefs y) = simplify x ==:L.sort prefs==> simplify y
 
   relocate l l' (Trans status x prefs y) = Trans status (relocate l l' x)
                                            (map (relocate l l') prefs)
@@ -75,7 +72,6 @@ instance Syntax MTS where
 
   freeLocs = concatMap freeLocs
 
-
 type MTS = [Transition]
 
 union :: MTS -> MTS -> MTS
@@ -87,16 +83,10 @@ potentialTrans ts = [ t | t@(Trans Potential _ _ _) <- ts ]
 finalTrans :: MTS -> MTS
 finalTrans ts = [ t | t@(Trans Final _ _ _) <- ts ]
 
--- instance {-# OVERLAPPING #-} Eq MTS where
---   xs == ys = (simplify xs) (L.(==)) (simplify ys)
-    -- where MTS xs = simplify x
-    --       MTS ys = simplify y
-
-
 class (Pretty a) => TransitionSemantics a where
   trans :: a -> Env -> MTS
   transF :: a -> Env -> MTS
-  transF x env = fmap finalize $ trans x env
+  transF x env = finalize <$> trans x env
 
 instance TransitionSemantics Species where
   trans Nil _ = []
@@ -124,22 +114,9 @@ instance TransitionSemantics Species where
       | Trans Potential x locs y <- specMTS]
     [new newlocs x ==:locs==> new newlocs y | Trans Final x locs y <- specMTS]
     where specMTS = trans spec env
-  trans x@(Sum prefspecs) env = [x --:[pref]--> y | (pref, y) <- prefspecs]
+  trans x@(Sum prefspecs) _ = [x --:[pref]--> y | (pref, y) <- prefspecs]
   trans d@(Def name args locs) env = case M.lookup name env of
     Just specdef ->
-      [Trans status d locs y | Trans status _ locs y <- specMTS]
+      [Trans status d locs' y | Trans status _ locs' y <- specMTS]
       where specMTS = trans (instSpec specdef args locs) env
     Nothing      -> error $ "Species " ++ name ++ " not defined"
-
--- instance TransitionSemantics Abstraction where
---   trans (AbsBase spec) = trans spec
---   trans (AbsPar abss) = foldl union (MTS []) (map trans abss)
---   trans (AbsNew newlocs abstr) = MTS $ (++)
---     [Trans (AbsNew newlocs x) locs (AbsNew newlocs y)
---       | Trans x locs y <- absMTS]
---     [TransF (AbsNew newlocs y) locs (AbsNew newlocs y)
---       | TransF x locs y <- absMTS]
---     where
---       absMTS = MTS abstr
---   trans (Abs _ _) = MTS[]
-  -- trans AbsPar

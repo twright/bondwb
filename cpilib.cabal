@@ -21,12 +21,12 @@ library
                        CPi.Processes
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
-  build-depends:       base >=4.7 && <=4.9, parsec >=3.1,
+  build-depends:       base >=4.7, parsec >=3.1,
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3,
                        data-accessor >=0.2, numeric-quest,
                        hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
-                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class
+                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class, QuickCheck
   default-language:    Haskell2010
 
 test-suite spec
@@ -34,8 +34,8 @@ test-suite spec
   main-is: Spec.hs
   hs-source-dirs:
       Tests
-  ghc-options: -Wall 
-  build-depends:       base >=4.7 && <=4.9, hspec, containers>=0.5, cpilib, numeric-quest
+  ghc-options: -Wall
+  build-depends:       base >=4.7, hspec, containers>=0.5, cpilib, numeric-quest, QuickCheck
   other-modules:
       CPi.ASTSpec
   default-language: Haskell2010
@@ -44,7 +44,7 @@ executable cpiwb
   main-is:             cpiwb.hs
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
-  build-depends:       base >=4.7 && <=4.9, parsec >=3.1,
+  build-depends:       base >=4.7, parsec >=3.1,
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3,
                        data-accessor >=0.2,
@@ -58,7 +58,7 @@ executable cpiide
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
   ghc-options:         -fno-warn-tabs
-  build-depends:       base >=4.7 && <=4.9, parsec >=3.1,
+  build-depends:       base >=4.7, parsec >=3.1,
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3, gtksourceview2,
                        data-accessor >=0.2, text, glib, split, gio, hledger, MissingH,

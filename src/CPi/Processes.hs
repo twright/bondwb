@@ -1,3 +1,5 @@
+{-# LANGUAGE  FlexibleInstances #-}
+
 module CPi.Processes (Process(..), Affinity(..), AffinityNetwork(..),
   P, D, norm1, partial, conc, direct, multilinear, react, hide,
   networkSites, actions, dPdt) where
@@ -27,6 +29,12 @@ data Process = Mixture [(Conc, Species)]
 norm1 :: (DiracVector a) => a -> Double
 norm1 x = sum $ map magnitude $ components x
 
+instance {-# OVERLAPS #-} Eq P where
+  x == y = norm1 (x +> (-1.0) |> y) == 0.0
+
+instance {-# OVERLAPS #-} Eq D where
+  x == y = norm1 (x +> (-1.0) |> y) == 0.0
+
 normalize1 :: (DiracVector a) => a -> a
 normalize1 x | n == 0 = x
              | otherwise = scale (1/n :+ 0.0) x
@@ -49,9 +57,9 @@ hide toHide = (hide' ><)
                                          | otherwise              = KetZero
 
 partial :: Env -> Process -> D
-partial env (Mixture ((c,spec):xs)) = (c :+ 0.0) |> foldr (+>) KetZero
+partial env (Mixture ((c,spec):xs)) = (c :+ 0.0) |> foldl (+>) KetZero
                                       [Ket s *> Ket s' *> Ket a
-                                      | Trans _ s a s' <- simplify $ trans spec env]
+                                      | Trans _ s a s' <- simplify $ trans spec env] +> partial env (Mixture xs)
 partial env (React network p) = hide (networkSites network) $ partial env p
 partial _ (Mixture []) = KetZero
 
@@ -76,14 +84,15 @@ react :: [Ket (Tuple Species Abstraction)] -> P
 react = multilinear react'
   where react' xs = embed (concretify $
                     foldl (<|>) (AbsBase Nil) (map target xs)) +>
-                    (-1.0) |> foldl (+>) KetZero (map ((Ket).source) xs)
+                    (-1.0) |> foldl (+>) KetZero (map (embed.source) xs)
         source (Ket (spec :* spec')) = spec
         target (Ket (spec :* spec')) = spec'
 
 actions :: AffinityNetwork -> D -> P
 actions network potential = foldl (+>) KetZero [
-  let concs   = map (`conc` potential) sites
-      directs = map (`direct` potential) sites
+  let concs   = map (`conc` potential) sites'
+      directs = map (`direct` potential) sites'
+      sites'  = map L.sort sites
   in (law concs :+ 0.0) |> react directs
   | Affinity law sites <- network ]
 

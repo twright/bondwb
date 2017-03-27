@@ -3,6 +3,7 @@ module CPi.ProcessesSpec (spec) where
 import Prelude hiding ((*>))
 
 import Test.Hspec
+-- import Test.QuickCheck
 import CPi.AST
 import CPi.Processes
 -- import Data.Map (Map)
@@ -41,8 +42,8 @@ enzymeDefs = M.fromList [("E", enzymeE), ("S", enzymeS), ("P", enzymeP)]
 -- enzymeES :: Species
 -- enzymeES = Def "E" [] [] <|> Def "S" [] []
 
--- enzymeC :: Species
--- enzymeC = new [0] $ enzymeEbound <|> enzymeSbound
+enzymeC :: Species
+enzymeC = new [0] $ enzymeEbound <|> enzymeSbound
 
 partialS :: D
 partialS = 3.0 |> Ket (Def "S" [] [])
@@ -51,6 +52,26 @@ partialS = 3.0 |> Ket (Def "S" [] [])
 partialE :: D
 partialE = 2.0 |> Ket (Def "E" [] [])
            *> Ket (simplify $ Abs 0 enzymeEbound) *> Ket [Unlocated "e"]
+
+partialC :: D
+partialC = Ket (normalForm enzymeC
+                :* normalForm (AbsBase (Def "E" [] [] <|> Def "S" [] []))
+                :* [Unlocated "r", Unlocated "x"]) +>
+             Ket (normalForm enzymeC
+                  :* normalForm (AbsBase (Def "E" [] [] <|> Def "P" [] []))
+                  :* [Unlocated "p", Unlocated "x"]) +>
+             Ket (normalForm enzymeC
+                  :* normalForm (AbsBase (Def "E" [] []
+                                          <|> new [0] enzymeSbound))
+                  :* [Unlocated "x"]) +>
+             Ket (normalForm enzymeC
+                  :* normalForm (AbsBase (new [0] enzymeEbound
+                                          <|> Def "S" [] []))
+                  :* [Unlocated "r"]) +>
+             Ket (normalForm enzymeC
+                  :* normalForm (AbsBase (new [0] enzymeEbound
+                                          <|> Def "P" [] []))
+                  :* [Unlocated "p"])
 
 spec :: SpecWith ()
 spec = do
@@ -66,15 +87,19 @@ spec = do
       partial enzymeDefs (Mixture [(3.0, Def "S" [] [])])
         `shouldBe` partialS
     it "finds the partial interactions for a mixture of E and S" $
-      partial enzymeDefs (Mixture [(2.0, Def "E" [] []),
-                                   (3.0, Def "S" [] [])])
-        `shouldBe` partialS +> partialE
+        (partial enzymeDefs (Mixture [(2.0, Def "E" [] []),
+                                      (3.0, Def "S" [] [])]))
+           `shouldBe`(partialS +> partialE)
     it "should return no interactions after hiding" $
       partial enzymeDefs
               (React enzymeAffinityNetwork
                     (Mixture [(2.0, Def "E" [] []),
                               (3.0, Def "S" [] [])]))
         `shouldBe` KetZero
+    it "finds the partial interaction for an enzyme" $
+      partial enzymeDefs (Mixture [(4.0, enzymeC)]) `shouldBe` (4 |> partialC)
+    -- it "should only be zero for Nil" $
+    --   property $ \x -> x == Nil || partial enzymeDefs (Mixture [(4.0, x)]) /= KetZero
   describe "norm1" $ do
     it "finds the l1 norm of 2.0<1| -3.0<2| + 1.5<3|" $
       norm1 (2.0 |> Ket (1::Integer) +> (-3.0) |> Ket 2 +> 1.5 |> Ket 3) `shouldBe` 6.5
@@ -132,12 +157,18 @@ spec = do
           +> (-1.0) |> Ket (Def "S" [] []) +> (-1.0) |> Ket (Def "E" [] [])
   describe "actions" $ do
     it "finds the actions when reacting substrate and enzyme" $
-      actions enzymeAffinityNetwork (partialS +> partialE)
-        `shouldBe` 6.0 |> Ket (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
-          +> (-6.0) |> Ket (Def "S" [] []) +> (-6.0) |> Ket (Def "E" [] [])
-  describe "dP/dt" $ do
-    it "gives correct actions for reacting substrate and enzyme" $
-      dPdt enzymeDefs (React enzymeAffinityNetwork
-        (Mixture [(3.0, Def "S" [] []), (2.0, Def "E" [] [])]))
-        `shouldBe` 6.0 |> Ket (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
-          +> (-6.0) |> Ket (Def "S" [] []) +> (-6.0) |> Ket (Def "E" [] [])
+      shouldBe
+        (6.0 |> Ket (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
+          +> (-6.0) |> Ket (Def "S" [] []) +> (-6.0) |> Ket (Def "E" [] []))
+        (actions enzymeAffinityNetwork (partialS +> partialE))
+  describe "dPdt" $ do
+    it "gives correct dPdt for reacting substrate and enzyme" $
+      shouldBe
+        (6.0 |> Ket (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
+          +> (-6.0) |> Ket (Def "S" [] []) +> (-6.0) |> Ket (Def "E" [] []))
+        (dPdt enzymeDefs (React enzymeAffinityNetwork
+          (Mixture [(3.0, Def "S" [] []), (2.0, Def "E" [] [])])))
+    it "gives correct dPdt for enzyme substrate complex" $
+      shouldBe
+        (12 |> Ket (Def "P" [] []) +> 8 |> Ket (Def "S" [] []) +> 20 |> Ket (Def "E" [] []) +> (-20.0) |> Ket (simplify enzymeC))
+        (dPdt enzymeDefs (React enzymeAffinityNetwork (Mixture [(4.0, enzymeC)])))

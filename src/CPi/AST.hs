@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module CPi.AST
   (
   Abstraction(..),
@@ -26,6 +27,10 @@ module CPi.AST
 
 import qualified Data.List as L
 import Data.Map (Map)
+import Test.QuickCheck.Arbitrary
+import Test.QuickCheck.Gen
+import Control.Monad
+import GHC.Generics
 -- import qualified Data.Map as M
 
 
@@ -57,6 +62,7 @@ class (Syntax a) => ProcessAlgebra a where
   -- Priority for adding parenthesis in pretty printing
   priority :: a -> Integer
   new :: [Location] -> a -> a
+  boundLocs :: a -> [Location]
 
 type Location = Integer
 
@@ -89,7 +95,49 @@ data Species = Nil
              | Par [Species]
              | New [Location] Species
              | Def String [Name] [Location]
-               deriving (Eq, Ord, Show)
+               deriving (Eq, Ord, Show, Generic)
+
+instance Arbitrary Prefix where
+  arbitrary = oneof [fmap Unlocated (elements ["x", "y", "z"]),
+                     liftM2 Located (elements ["x", "y", "z"])
+                                    (choose (0,3))]
+
+instance Arbitrary Species where
+  shrink = genericShrink
+  arbitrary = sized genSpec
+    where
+      genSpec n
+        | n > 0 = oneof [
+          do
+            m <- choose (0, n)
+            specs <- vectorOf m $ genSpec (n `div` 4)
+            return (Par specs)
+        , do
+            spec <- genSpec (n `div` 2)
+            let mloc = maxLoc spec
+            m <- choose (0, 3)
+            locs <- vectorOf m (choose (mloc+1,mloc+5))
+            return (New locs spec)
+        , do
+            m <- choose (0, n)
+            let prefspec = do pref <- arbitrary
+                              spec <- genSpec (n `div` 4)
+                              let mloc = maxLoc spec
+                              abst <- oneof [return (AbsBase spec),
+                                             liftM2 Abs (choose (mloc+1,mloc+5)) (return spec)]
+                              return (pref::Prefix, abst)
+            prefspecs <- vectorOf m prefspec
+            return (Sum prefspecs)
+        , return Nil
+        , do
+            name <- elements ["E", "S", "P"]
+            margs <- choose (0, 3)
+            args <- vectorOf margs (elements ["x", "y", "z"])
+            mlocs <- choose (0, 3)
+            locs <- vectorOf mlocs (choose (0, 10))
+            return (Def name args locs)
+        ]
+        | otherwise = return Nil
 
 instSpec :: Definition -> [Name] -> [Location] -> Species
 instSpec (SpeciesDef (n:ns) (l:ls) body) (n':ns') (l':ls') = rename n n' $ relocate l l'
@@ -104,7 +152,16 @@ instSpec SpeciesDef{} _ _ = error "Applying definition with wrong number of args
 data Abstraction
   = Abs Location Species
   | AbsBase Species
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
+
+instance Arbitrary Abstraction where
+  arbitrary = oneof [ do
+                        spec <- arbitrary
+                        let mloc = maxLoc spec
+                        l <- choose(mloc + 1, mloc + 5)
+                        return (Abs l spec)
+                    , fmap AbsBase arbitrary ]
+  shrink = genericShrink
 
 instance Syntax Prefix where
   relocate l l' p@(Located x m)
@@ -136,7 +193,9 @@ instance Syntax Species where
     = Sum [(relocate l l' pre, relocate l l' x)
           | (pre, x) <- xs]
   relocate l l' (Par xs) = Par $ map (relocate l l') xs
-  relocate l l' (New ls spec) = New ls $ relocate l l' spec
+  -- should never be used to capture variables!
+  relocate l l' (New ls spec) = New ls $ if (l `elem` ls) || (l' `elem` ls) then spec
+                                         else relocate l l' spec
   relocate l l' (Def name args locs) = Def name args [if loc == l
                                                       then l' else loc
                                                      | loc <- locs]
@@ -153,7 +212,7 @@ instance Syntax Species where
 
   normalForm spec
     | res == spec = res
-    | otherwise   = nf res
+    | otherwise   = normalForm res
     where res = nf spec
           nf Nil = Nil
           nf d@Def{} = d
@@ -163,24 +222,34 @@ instance Syntax Species where
           nf (Par [s]) = normalForm s
           nf (Par ss) = Par $ L.sort $ filter (/=Nil) $ flatten $ map normalForm ss
             where flatten    = L.concatMap f
-                  f (Par ss) = ss
+                  f (Par ps) = ps
                   f s        = [s]
+          nf (New [] s) = s
           nf (New locs1 (New locs2 s)) = New (locs1 ++ locs2) $ normalForm s
           nf (New locs s)
             | null locs' = s'
-            | otherwise = s''
+            | otherwise = s'''
             where s'  = normalForm s
                   locs' = L.sort $ L.nub $ L.intersect locs $ freeLocs s'
-                  s'' = case s' of
+                  s'' = case highers of
+                    [] -> s'
+                    (h:_) -> relocate h nextLoc s'
+                  locs'' = case highers of
+                    [] -> locs'
+                    h:_ -> [if l == h then nextLoc else l | l <- locs']
+                  s''' = case s'' of
                     Par ss -> inexp <|> outexp
-                      where ins    = filter (not . null . L.intersect locs' . freeLocs) ss
-                            outs   = filter (null . L.intersect locs' . freeLocs) ss
-                            inexp  = New locs' (Par ins)
+                      where ins    = filter (not . null . L.intersect locs'' . freeLocs) ss
+                            outs   = filter (null . L.intersect locs'' . freeLocs) ss
+                            inexp  = New locs'' (Par ins)
                             outexp = case outs of
                               []  -> Nil
                               [w] -> w
                               ws  -> Par ws
-                    _ -> new locs' s'
+                    _ -> new locs'' s''
+                  highers = filter (> nextLoc) locs'
+                  nextLocs = map (+1) (boundLocs s' ++ filter (`notElem` locs') (freeLocs s'))
+                  nextLoc = if null nextLocs then 0 else maximum nextLocs
 
   freeLocs Nil = []
   freeLocs (Sum ss) = L.concat [freeLocs pref ++ freeLocs abst
@@ -198,13 +267,22 @@ instance ProcessAlgebra Species where
   Par xs <|> y = Par (xs ++ [y])
   x <|> y = Par [x, y]
 
+  new [] spec = spec
   new newlocs (New locs spec) = new (newlocs ++ locs) spec
   new newlocs spec
     | null newlocs' = spec
     | otherwise = New newlocs' spec
     where newlocs' = L.nub $ L.intersect newlocs (freeLocs spec)
 
+  boundLocs Nil = []
+  boundLocs (Sum ss) = L.nub $ L.sort $ L.concat [boundLocs abst
+    | (_, abst) <- ss]
+  boundLocs (Par ss) = L.nub $ L.sort $ foldr ((++) . boundLocs) [] ss
+  boundLocs (New locs s) = L.nub $ L.sort $ locs ++ boundLocs s
+  boundLocs Def{} = []
+
   priority Nil = 5
+  priority Def{} = 5
   priority (Sum ss)
     | length ss == 1 = 10
     | otherwise = 30
@@ -214,22 +292,11 @@ instance ProcessAlgebra Species where
   priority (New _ _) = 40
 
 instance Nameless Species where
-  maxLoc Nil = 0
-  maxLoc (Par xs@(_:_)) = maximum $ map maxLoc xs
-  maxLoc (Par []) = 0
-  maxLoc (Sum (x:xs)) = let
-      maxRest = maxLoc (Sum xs)
-    in case x of
-      (Located _ loc, spec) -> loc `max` maxRest `max` maxLoc spec
-      (Unlocated _, spec) -> maxRest `max` maxLoc spec
-  maxLoc (Sum []) = 0
-  maxLoc (New locs spec) = maximum (maxLoc spec : locs)
-  maxLoc (Def _ _ []) = 0
-  maxLoc (Def _ _ locs) = maximum locs
+  maxLoc xs = if null locs then 0 else maximum locs
+    where locs = boundLocs xs
 
 instance Pretty Species where
   pretty Nil = "0"
-  -- pretty (Def i) = i
   pretty (Sum x@((p,s):pss))
     | length x == 1
       = pretty p ++ "->" ++ pretty s
@@ -243,11 +310,16 @@ instance Pretty Species where
           prettyPar (x:xs) = prettyParens x par ++ " | " ++ prettyPar xs
   pretty (New locs spec)
     = "new " ++ prettyNames locs ++ " in " ++ pretty spec
-
+  pretty (Def name args locs)
+    | null args && null locs = name
+    | otherwise = name ++ "(" ++ L.intercalate "," args ++ ";"
+                    ++ L.intercalate "," (map show locs) ++ ")"
 
 instance Syntax Abstraction where
   relocate l l' (AbsBase spec) = AbsBase $ relocate l l' spec
-  relocate l l' (Abs m abst) = Abs m $ relocate l l' abst
+  -- should never be used to capture variables!
+  relocate l l' (Abs m abst) = Abs m $ if l == m || l' == m then abst
+                                       else relocate l l' abst
 
   rename x x' (AbsBase spec) = AbsBase $ rename x x' spec
   rename x x' (Abs m abst) = Abs m $ rename x x' abst
@@ -257,8 +329,18 @@ instance Syntax Abstraction where
 
   simplify = normalForm
 
-  normalForm (AbsBase x) = AbsBase (normalForm x)
-  normalForm (Abs l x) = Abs l (normalForm x)
+  normalForm abst
+    | abst == res = res
+    | otherwise = normalForm res
+    where res = nf abst
+          nf (AbsBase x) = AbsBase (normalForm x)
+          nf (Abs l x) = if l `notElem` freeLocs x' then AbsBase x'
+                         else Abs l' (if l == l' then x'
+                                      else normalForm $ relocate l l' x')
+            where x' = normalForm x
+                  l' = if null (boundLocs x')
+                       then 0
+                       else maxLoc x + 1
 
 instance ProcessAlgebra Abstraction where
   (<|>) = colocate
@@ -269,9 +351,12 @@ instance ProcessAlgebra Abstraction where
   priority (AbsBase spec) = priority spec
   priority (Abs _ _) = 11
 
+  boundLocs (Abs l spec) = L.nub $ L.sort $ l:boundLocs spec
+  boundLocs (AbsBase spec) = L.nub $ L.sort $ boundLocs spec
+
 instance Nameless Abstraction where
-  maxLoc (AbsBase spec) = maxLoc spec
-  maxLoc (Abs loc _) = loc
+  maxLoc xs = if null locs then 0 else maximum locs
+    where locs = boundLocs xs
 
 instance Pretty Abstraction where
   pretty x@(Abs l spec)
@@ -285,10 +370,10 @@ colocate (Abs l x) (Abs m y) = Abs o (x' <|> y')
         x' = relocate l o x
         y' = relocate m o y
 colocate (Abs l x) (AbsBase y) = Abs o (x' <|> y)
-  where o = max l (maxLoc y)
+  where o = maximum (l:map (+1) (freeLocs y ++ boundLocs y ++ filter (/=l) (freeLocs x)))
         x' = relocate l o x
 colocate (AbsBase x) (Abs l y) = Abs o (x <|> y')
-  where o = max (maxLoc x) l
+  where o = maximum (l:map (+1) (freeLocs x ++ boundLocs x ++ filter (/=l) (freeLocs y)))
         y' = relocate l o y
 colocate (AbsBase x) (AbsBase y) = AbsBase (x <|> y)
 
