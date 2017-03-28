@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 
 module CPi.Transitions
-  (Transition(..), MTS, TransitionSemantics(..), union, potentialTrans, finalTrans,
+  (Transition(..), MTS, TransitionSemantics(..), TransitionSemanticsFiltered(..), TransitionStatus(..), union, potentialTrans, finalTrans, PrefixFilter,
     (--:), (-->), (==:), (==>)) where
 
 import CPi.AST
@@ -87,6 +87,52 @@ class (Pretty a) => TransitionSemantics a where
   trans :: a -> Env -> MTS
   transF :: a -> Env -> MTS
   transF x env = finalize <$> trans x env
+
+type PrefixFilter = TransitionStatus -> [String] -> Bool
+
+class (Pretty a) => TransitionSemanticsFiltered a where
+  transFiltered ::  PrefixFilter -> a -> Env -> MTS
+
+filterTransitions :: PrefixFilter -> MTS -> MTS
+filterTransitions validPref = filter validTrans
+  where validTrans (Trans s _ ls _) = validPref s (L.sort $ map prefName ls)
+
+instance TransitionSemanticsFiltered Species where
+  transFiltered validTrans spec env = filterTransitions validTrans $ tr spec env
+    where
+      trans = transFiltered validTrans
+      tr :: Species -> Env -> MTS
+      tr Nil _ = []
+      tr (Par (t:ts)) env = [
+          -- new reactions
+          x <|> y --:(ls++ms)--> (x' <|> y')
+          | Trans Potential x ls x' <- hd, Trans Potential y ms y' <- tl
+        ] ++ [
+          -- combining reactions on the left
+          Trans status (x <|> sTail) ls (x' <|> AbsBase sTail)
+          | Trans status x ls x' <- hd
+        ] ++ [
+          -- combining potential reaction on the right
+          Trans status (t <|> y) ms (AbsBase t <|> y')
+          | Trans status y ms y' <- tl
+        ]
+        where sTail = Par ts
+              hd = trans t env
+              tl = trans sTail env
+      tr (Par []) _ = []
+      tr (New newlocs spec) env = (++)
+        [if null (newlocs `L.intersect` foldr ((++).freeLocs) [] locs)
+            then new newlocs x --:locs--> new newlocs y
+            else new newlocs x ==:map delocate locs==> AbsBase (new newlocs (concretify y))
+          | Trans Potential x locs y <- specMTS]
+        [new newlocs x ==:locs==> new newlocs y | Trans Final x locs y <- specMTS]
+        where specMTS = trans spec env
+      tr x@(Sum prefspecs) _ = [x --:[pref]--> y | (pref, y) <- prefspecs]
+      tr d@(Def name args locs) env = case M.lookup name env of
+        Just specdef ->
+          [Trans status d locs' y | Trans status _ locs' y <- specMTS]
+          where specMTS = trans (instSpec specdef args locs) env
+        Nothing      -> error $ "Species " ++ name ++ " not defined"
 
 instance TransitionSemantics Species where
   trans Nil _ = []

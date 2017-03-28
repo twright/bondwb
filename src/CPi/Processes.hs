@@ -63,6 +63,22 @@ partial env (Mixture ((c,spec):xs)) = (c :+ 0.0) |> foldl (+>) KetZero
 partial env (React network p) = hide (networkSites network) $ partial env p
 partial _ (Mixture []) = KetZero
 
+powerset :: [a] -> [[a]]
+powerset []     = [[]]
+powerset (x:xs) = powerset xs ++ map (x:) (powerset xs)
+
+partialFiltered :: PrefixFilter -> Env -> Process -> D
+partialFiltered validPref env (Mixture ((c,spec):xs)) = (c :+ 0.0) |> foldl (+>) KetZero
+                                      [Ket s *> Ket s' *> Ket a
+                                      | Trans _ s a s' <- simplify $ transFiltered validPref spec env] +> partialFiltered validPref env (Mixture xs)
+partialFiltered _ env (React network p) = partialFiltered validPref env p
+  where prefLists = L.nub $ L.sort $ map (map prefName) $ L.concatMap affSites network
+        prefListSubsets = L.nub $ L.sort $ L.concatMap powerset prefLists
+        validPref :: PrefixFilter
+        validPref Potential = prefListSubsets `seq` (`elem` prefListSubsets)
+        validPref Final = prefLists `seq` (`elem` prefLists)
+partialFiltered _ _ (Mixture []) = KetZero
+
 -- multilinear extension of a function
 multilinear :: (Ord a, Ord b) => ([Ket a] -> Ket b) -> [Ket a] -> Ket b
 multilinear f = multilinear' f []
@@ -78,7 +94,7 @@ primes (Par ss) = L.concatMap primes ss
 primes s = [s]
 
 embed :: Species -> Ket Species
-embed spec = foldl (+>) KetZero $ map Ket $ primes $ normalForm spec
+embed spec = foldl (+>) KetZero $ map Ket $ filter (/=Nil) $ primes $ normalForm spec
 
 react :: [Ket (Tuple Species Abstraction)] -> P
 react = multilinear react'
@@ -98,7 +114,7 @@ actions network potential = foldl (+>) KetZero [
 
 dPdt :: Env -> Process -> P
 dPdt env (Mixture ps) = KetZero
-dPdt env (React network p) = actions network $ partial env p
+dPdt env l@(React network p) = actions network $ partialFiltered (\_ _ -> False) env l
 -- TODO: nested Mixtures inside Reacts
 -- foldl1 (+>) KetZero [()] (map (dPdt env) ps)
 

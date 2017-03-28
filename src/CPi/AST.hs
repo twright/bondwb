@@ -22,7 +22,8 @@ module CPi.AST
   prettyNames,
   prettyParens,
   colocate,
-  instSpec
+  instSpec,
+  prefName
   ) where
 
 import qualified Data.List as L
@@ -80,6 +81,10 @@ data Prefix
   = Located Name Location
   | Unlocated Name
   deriving (Eq, Ord, Show)
+
+prefName :: Prefix -> Name
+prefName (Located n _) = n
+prefName (Unlocated n) = n
 
 type PrefixSpecies = (Prefix, Abstraction)
 
@@ -141,10 +146,12 @@ instance Arbitrary Species where
         | otherwise = return Nil
 
 instSpec :: Definition -> [Name] -> [Location] -> Species
-instSpec (SpeciesDef (n:ns) (l:ls) body) (n':ns') (l':ls') = rename n n' $ relocate l l'
+instSpec (SpeciesDef (n:ns) ls body) (n':ns') ls' = rename n n'
+  $ instSpec (SpeciesDef ns ls body) ns' ls'
+instSpec (SpeciesDef ns (l:ls) body) ns' (l':ls') = relocate l l'
   $ instSpec (SpeciesDef ns ls body) ns' ls'
 instSpec (SpeciesDef [] [] body) [] [] = body
-instSpec SpeciesDef{} _ _ = error "Applying definition with wrong number of args"
+instSpec spec@SpeciesDef{} ns ls = error $ "Applying definition with wrong number of args for " ++ show spec ++ ": args = " ++ show ns ++ ", locs = " ++ show ls
 
 
 -- Abstractions are formed form species but allow abstracting over

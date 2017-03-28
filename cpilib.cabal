@@ -15,10 +15,11 @@ cabal-version:       >=1.18
 
 library
   hs-source-dirs:      src
+  ghc-options: -Wall -O2
   exposed-modules:     CPi.Logic, CPi.ODE, CPi.Plot, CPi.Signals,
                        CPi.Lib,  CPi.Matlab,  CPi.Parser,
                        CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions,
-                       CPi.Processes
+                       CPi.Processes, CPi.Simulation, CPi.Examples
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
   build-depends:       base >=4.7, parsec >=3.1,
@@ -38,6 +39,15 @@ test-suite spec
   build-depends:       base >=4.7, hspec, containers>=0.5, cpilib, numeric-quest, QuickCheck
   other-modules:
       CPi.ASTSpec
+  default-language: Haskell2010
+
+benchmark signal-bench
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   bench
+    main-is:          Benchmark.hs
+    build-depends:    base, criterion, cpilib, numeric-quest
+    ghc-options:      -Wall
+                      -O2
   default-language: Haskell2010
 
 executable cpiwb
