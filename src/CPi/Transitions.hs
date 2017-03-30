@@ -8,12 +8,15 @@ import CPi.AST
 import qualified Data.List as L
 -- import Data.Map (Map)
 import qualified Data.Map as M
+import Data.Function(fix)
 
 data TransitionStatus = Final | Potential
                         deriving (Show, Eq, Ord)
+-- deriveMemoizable ''TransitionStatus
 
 data Transition = Trans TransitionStatus Species [Prefix] Abstraction
                   deriving (Show, Eq, Ord)
+-- deriveMemoizable ''Transition
 
 -- Implement fancy arrows for denoting transitions in multisets
 -- x --:locs--> y == Trans  x locs y
@@ -91,19 +94,20 @@ class (Pretty a) => TransitionSemantics a where
 type PrefixFilter = TransitionStatus -> [String] -> Bool
 
 class (Pretty a) => TransitionSemanticsFiltered a where
-  transFiltered ::  PrefixFilter -> a -> Env -> MTS
+  transFiltered ::  PrefixFilter -> Env -> a -> MTS
 
 filterTransitions :: PrefixFilter -> MTS -> MTS
 filterTransitions validPref = filter validTrans
   where validTrans (Trans s _ ls _) = validPref s (L.sort $ map prefName ls)
 
 instance TransitionSemanticsFiltered Species where
-  transFiltered validTrans spec env = filterTransitions validTrans $ tr spec env
+  transFiltered validTrans env = trF `seq` fix trF
     where
-      trans = transFiltered validTrans
-      tr :: Species -> Env -> MTS
-      tr Nil _ = []
-      tr (Par (t:ts)) env = [
+      trF :: (Species -> MTS) -> Species -> MTS
+      trF s s' = filterTransitions validTrans $ tr s s'
+      tr :: (Species -> MTS) -> Species -> MTS
+      tr trans Nil = []
+      tr trans (Par (t:ts)) = [
           -- new reactions
           x <|> y --:(ls++ms)--> (x' <|> y')
           | Trans Potential x ls x' <- hd, Trans Potential y ms y' <- tl
@@ -117,21 +121,21 @@ instance TransitionSemanticsFiltered Species where
           | Trans status y ms y' <- tl
         ]
         where sTail = Par ts
-              hd = trans t env
-              tl = trans sTail env
-      tr (Par []) _ = []
-      tr (New newlocs spec) env = (++)
+              hd = trans t
+              tl = trans sTail
+      tr _ (Par []) = []
+      tr trans (New newlocs spec) = (++)
         [if null (newlocs `L.intersect` foldr ((++).freeLocs) [] locs)
             then new newlocs x --:locs--> new newlocs y
             else new newlocs x ==:map delocate locs==> AbsBase (new newlocs (concretify y))
           | Trans Potential x locs y <- specMTS]
         [new newlocs x ==:locs==> new newlocs y | Trans Final x locs y <- specMTS]
-        where specMTS = trans spec env
-      tr x@(Sum prefspecs) _ = [x --:[pref]--> y | (pref, y) <- prefspecs]
-      tr d@(Def name args locs) env = case M.lookup name env of
+        where specMTS = trans spec
+      tr _ x@(Sum prefspecs) = [x --:[pref]--> y | (pref, y) <- prefspecs]
+      tr trans d@(Def name args locs) = case M.lookup name env of
         Just specdef ->
           [Trans status d locs' y | Trans status _ locs' y <- specMTS]
-          where specMTS = trans (instSpec specdef args locs) env
+          where specMTS = trans (instSpec specdef args locs)
         Nothing      -> error $ "Species " ++ name ++ " not defined"
 
 instance TransitionSemantics Species where

@@ -32,7 +32,7 @@ import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Control.Monad
 import GHC.Generics
-import Data.Ix
+import Data.Hashable
 -- import qualified Data.Map as M
 
 
@@ -80,7 +80,7 @@ prettyParens x x'
 data Prefix
   = Located Name Location
   | Unlocated Name
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 prefName :: Prefix -> Name
 prefName (Located n _) = n
@@ -102,6 +102,9 @@ data Species = Nil
              | New [Location] Species
              | Def String [Name] [Location]
                deriving (Eq, Ord, Show, Generic)
+
+instance Hashable Prefix
+instance Hashable Species
 
 instance Arbitrary Prefix where
   arbitrary = oneof [fmap Unlocated (elements ["x", "y", "z"]),
@@ -161,6 +164,8 @@ data Abstraction
   = Abs Location Species
   | AbsBase Species
   deriving (Eq, Ord, Show, Generic)
+
+instance Hashable Abstraction
 
 instance Arbitrary Abstraction where
   arbitrary = oneof [ do

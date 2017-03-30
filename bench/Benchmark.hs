@@ -1,7 +1,7 @@
 import Criterion.Main
 
 import CPi.AST
-import QuantumVector
+import CPi.Vector
 import CPi.Simulation
 import CPi.Examples
 
@@ -9,7 +9,7 @@ benchUptoEpsilon :: Int -> Double -> [(Double, [(String, Conc)])]
 benchUptoEpsilon n epsilon = take n $ formatTrace
   $ simulateUptoEpsilon epsilon polymerDefs
     affinityNetworkPolymer 0.01 0
-    (1.0 |> Ket (Def "B" [] []))
+    (1.0 |> vect (Def "B" [] []))
 
 main :: IO ()
 main = defaultMain
