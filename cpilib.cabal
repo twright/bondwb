@@ -36,7 +36,7 @@ test-suite spec
   hs-source-dirs:
       Tests
   ghc-options: -Wall -O2 -fprof-auto -rtsopts
-  build-depends:       base >=4.7, hspec, containers>=0.5, cpilib, numeric-quest, QuickCheck
+  build-depends:       base >=4.7, hspec, containers>=0.5, cpilib, numeric-quest, QuickCheck, hashable
   other-modules:
       CPi.ASTSpec
   default-language: Haskell2010

@@ -56,7 +56,7 @@ instance (Eq k, Num k, Fractional k, Eq i, Hashable i) => Vector k (Vect i k) wh
   components (Vect u) = elems u
   dimension (Vect u) = size u
   -- compose ks vs = L.foldl' (+>) (Vect H.empty) $ zipWith (|>) ks vs
-  norm (Vect v) = H.foldl' ((+).abs) 0 v
+  norm v = sum (L.map abs (components v))
   normalize v@(Vect m)
     | normv == 0 = v
     | otherwise  = Vect (H.map (/normv) m)

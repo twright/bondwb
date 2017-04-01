@@ -45,7 +45,7 @@ delocate (Located x _) = Unlocated x
 delocate u@Unlocated{} = u
 
 finalize :: Transition -> Transition
-finalize (Trans status x prefs y) = Trans status x (map delocate prefs) (AbsBase $ concretify y)
+finalize (Trans status x prefs y) = Trans status x (map delocate prefs) (mkAbsBase $ concretify y)
 
 instance Syntax Transition where
   simplify (Trans status x prefs y)  = Trans status (simplify x) (L.sort prefs) (simplify y)
@@ -107,31 +107,31 @@ instance TransitionSemanticsFiltered Species where
       trF s s' = filterTransitions validTrans $ tr s s'
       tr :: (Species -> MTS) -> Species -> MTS
       tr trans Nil = []
-      tr trans (Par (t:ts)) = [
+      tr trans (Par _ _ (t:ts)) = [
           -- new reactions
           x <|> y --:(ls++ms)--> (x' <|> y')
           | Trans Potential x ls x' <- hd, Trans Potential y ms y' <- tl
         ] ++ [
           -- combining reactions on the left
-          Trans status (x <|> sTail) ls (x' <|> AbsBase sTail)
+          Trans status (x <|> sTail) ls (x' <|> mkAbsBase sTail)
           | Trans status x ls x' <- hd
         ] ++ [
           -- combining potential reaction on the right
-          Trans status (t <|> y) ms (AbsBase t <|> y')
+          Trans status (t <|> y) ms (mkAbsBase t <|> y')
           | Trans status y ms y' <- tl
         ]
-        where sTail = Par ts
+        where sTail = mkPar ts
               hd = trans t
               tl = trans sTail
-      tr _ (Par []) = []
-      tr trans (New newlocs spec) = (++)
+      tr _ (Par _ _ []) = []
+      tr trans (New _ _ newlocs spec) = (++)
         [if null (newlocs `L.intersect` foldr ((++).freeLocs) [] locs)
             then new newlocs x --:locs--> new newlocs y
-            else new newlocs x ==:map delocate locs==> AbsBase (new newlocs (concretify y))
+            else new newlocs x ==:map delocate locs==> mkAbsBase (new newlocs (concretify y))
           | Trans Potential x locs y <- specMTS]
         [new newlocs x ==:locs==> new newlocs y | Trans Final x locs y <- specMTS]
         where specMTS = trans spec
-      tr _ x@(Sum prefspecs) = [x --:[pref]--> y | (pref, y) <- prefspecs]
+      tr _ x@(Sum _ _ prefspecs) = [x --:[pref]--> y | (pref, y) <- prefspecs]
       tr trans d@(Def name args locs) = case M.lookup name env of
         Just specdef ->
           [Trans status d locs' y | Trans status _ locs' y <- specMTS]
@@ -140,31 +140,31 @@ instance TransitionSemanticsFiltered Species where
 
 instance TransitionSemantics Species where
   trans Nil _ = []
-  trans (Par (t:ts)) env = [
+  trans (Par _ _ (t:ts)) env = [
       -- new reactions
       x <|> y --:(ls++ms)--> (x' <|> y')
       | Trans Potential x ls x' <- hd, Trans Potential y ms y' <- tl
     ] ++ [
       -- combining reactions on the left
-      Trans status (x <|> sTail) ls (x' <|> AbsBase sTail)
+      Trans status (x <|> sTail) ls (x' <|> mkAbsBase sTail)
       | Trans status x ls x' <- hd
     ] ++ [
       -- combining potential reaction on the right
-      Trans status (t <|> y) ms (AbsBase t <|> y')
+      Trans status (t <|> y) ms (mkAbsBase t <|> y')
       | Trans status y ms y' <- tl
     ]
-    where sTail = Par ts
+    where sTail = mkPar ts
           hd = potentialTrans $ trans t env
           tl = potentialTrans $ trans sTail env
-  trans (Par []) _ = []
-  trans (New newlocs spec) env = (++)
+  trans (Par _ _ []) _ = []
+  trans (New _ _ newlocs spec) env = (++)
     [if null (newlocs `L.intersect` foldr ((++).freeLocs) [] locs)
         then new newlocs x --:locs--> new newlocs y
-        else new newlocs x ==:map delocate locs==> AbsBase (new newlocs (concretify y))
+        else new newlocs x ==:map delocate locs==> mkAbsBase (new newlocs (concretify y))
       | Trans Potential x locs y <- specMTS]
     [new newlocs x ==:locs==> new newlocs y | Trans Final x locs y <- specMTS]
     where specMTS = trans spec env
-  trans x@(Sum prefspecs) _ = [x --:[pref]--> y | (pref, y) <- prefspecs]
+  trans x@(Sum _ _ prefspecs) _ = [x --:[pref]--> y | (pref, y) <- prefspecs]
   trans d@(Def name args locs) env = case M.lookup name env of
     Just specdef ->
       [Trans status d locs' y | Trans status _ locs' y <- specMTS]

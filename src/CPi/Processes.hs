@@ -1,20 +1,17 @@
 {-# LANGUAGE  FlexibleInstances, BangPatterns #-}
 
-module CPi.Processes (Process(..), Affinity(..), AffinityNetwork(..),
+module CPi.Processes (Process(..), Affinity(..), AffinityNetwork,
   P, D, partial, conc, direct, react, hide,
-  networkSites, actions, dPdt, partial', partialFiltered, dPdt') where
+  networkSites, actions, dPdt, partial', dPdt', tracesGivenNetwork) where
 
 import Prelude hiding ((*>), (<*))
 import CPi.AST
 import CPi.Transitions
- -- Yes, we are using bra-ket notation to represent vectors
- -- in an index free manner
--- import QuantumVector-- hiding ((><))
 import qualified Data.List as L
 import qualified Data.HashMap.Strict as H
 import CPi.Vector
-
--- f >< x = L.foldl' (+>) KetZero $ zipWith (|>) (components x) (map f (basis x))
+-- import Debug.Trace
+trace a b = b
 
 -- Process space
 type P = Vect Species Conc
@@ -28,20 +25,6 @@ type AffinityNetwork = [Affinity]
 
 data Process = Mixture [(Conc, Species)]
              | React AffinityNetwork Process
-
--- norm1 :: (DiracVector a) => a -> Double
--- norm1 x = sum $ map magnitude $ components x
-
--- instance {-# OVERLAPS #-} Eq P where
---   x == y = norm1 (x +> (-1.0) |> y) == 0.0
---
--- instance {-# OVERLAPS #-} Eq D where
---   x == y = norm1 (x +> (-1.0) |> y) == 0.0
-
--- normalize1 :: (DiracVector a) => a -> a
--- normalize1 x | n == 0 = x
---              | otherwise = scale (1/n :+ 0.0) x
---   where n = norm1 x
 
 conc :: [Prefix] -> D -> Conc
 conc s (Vect v) = norm $ Vect $ H.filterWithKey atS v
@@ -70,30 +53,17 @@ powerset :: [a] -> [[a]]
 powerset []     = [[]]
 powerset (x:xs) = powerset xs ++ map (x:) (powerset xs)
 
-partialFiltered :: PrefixFilter -> Env -> Process -> D
-partialFiltered validPref env (Mixture ((c,spec):xs))
-  = fromList [(c, s :* s' :* a) | Trans _ s a s' <- simplify $ transFiltered validPref env spec]
-    +> partialFiltered validPref env (Mixture xs)
-partialFiltered _ env (React network p) = partialFiltered validPref env p
-  where prefLists = L.nub $ L.sort $ map (map prefName) $ L.concatMap affSites network
-        prefListSubsets = L.nub $ L.sort $ L.concatMap powerset prefLists
-        validPref :: PrefixFilter
-        validPref Potential = prefListSubsets `seq` (`elem` prefListSubsets)
-        validPref Final = prefLists `seq` (`elem` prefLists)
-partialFiltered _ _ (Mixture []) = vectZero
-
--- multilinear extension of a function
--- multilinear :: (Ord a, Ord b) => ([Ket a] -> Ket b) -> [Ket a] -> Ket b
--- multilinear f = multilinear' f []
---   where multilinear' f !ys [] = f (reverse ys)
---         multilinear' f !ys (x:xs) = L.foldl' (+>) KetZero terms
---           where es     = basis x
---                 alphas = components x
---                 terms  = [alpha |> multilinear' f (e:ys) xs
---                          | (alpha, e) <- zip alphas es]
+tracesGivenNetwork :: AffinityNetwork -> Env -> Species -> MTS
+tracesGivenNetwork network = trace ("prefLists = " ++ show prefLists) (transFiltered validPref)
+  where
+    prefLists = L.nub $ L.sort $ map (L.sort . map prefName) $ L.concatMap affSites network
+    prefListSubsets = L.nub $ L.sort $ L.concatMap powerset prefLists
+    validPref :: PrefixFilter
+    validPref Potential x = trace ("testing potential " ++ show x) (L.sort x `elem` prefListSubsets)
+    validPref Final x = trace ("testing final " ++ show x) (L.sort x `elem` prefLists)
 
 primes :: Species -> [Species]
-primes (Par ss) = L.concatMap primes ss
+primes (Par _ _ ss) = L.concatMap primes ss
 primes s = [s]
 
 embed :: Species -> P
@@ -102,11 +72,10 @@ embed spec = fromList $ map (\s -> (1, s)) $ filter (/=Nil) $ primes $ normalFor
 react :: [Vect (Tensor Species Abstraction) Conc] -> P
 react = multilinear react'
   where react' xs = embed (concretify $
-                    foldl (<|>) (AbsBase Nil) (map target xs)) +>
-                    -- fromList [(-1, source x) | x <- xs]
+                    foldl (<|>) (mkAbsBase Nil) (map target xs)) +>
                     (-1.0) |> foldl (+>) vectZero (map (embed.source) xs)
-        source (spec :* spec') = spec
-        target (spec :* spec') = spec'
+        source (spec :* _) = spec
+        target (_ :* spec') = spec'
 
 actions :: AffinityNetwork -> D -> P
 actions network !potential = L.foldl' (+>) vectZero [
@@ -116,21 +85,23 @@ actions network !potential = L.foldl' (+>) vectZero [
   in concs `seq` directs `seq` law concs |> react directs
   | Affinity law sites <- network ]
 
--- fromList [(c, s :* s' :* a) | Trans _ s a s' <- simplify $ transFiltered validPref env spec]
-
 partial' :: (Species -> MTS) -> P -> D
 partial' tr = (partial'' ><)
   where partial'' spec = fromList [(1, s :* s' :* a)
                            | Trans _ s a s' <- simplify $ tr spec]
 
 dPdt' :: (Species -> MTS) -> AffinityNetwork -> P -> P
-dPdt' tr network p = actions network $ partial' tr p
+dPdt' tr network p = trace ("part = " ++ show part ++ ", acts = " ++ show acts)
+                           acts
+  where acts = actions network part
+        part = partial' tr p
+
+embedProcess :: Process -> P
+embedProcess (Mixture ps) = fromList ps
 
 dPdt :: Env -> Process -> P
-dPdt env (Mixture ps) = vectZero
-dPdt env l@(React network p) = actions network $ partialFiltered (\_ _ -> False) env l
+dPdt _ (Mixture _) = vectZero
+dPdt env (React network p) = dPdt' tr network pro
+  where pro = embedProcess p
+        tr  = tracesGivenNetwork network env
 -- TODO: nested Mixtures inside Reacts
--- foldl1 (+>) KetZero [()] (map (dPdt env) ps)
-
--- react' :: [(Species, Species)] -> P
--- react' specs = Ket

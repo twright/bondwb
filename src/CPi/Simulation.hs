@@ -67,12 +67,7 @@ sim tr network epsilon h !t !p0 = (t, p0) : sim tr network epsilon h t' p'
 
 simulateUptoEpsilon :: Double -> Env -> AffinityNetwork -> Double -> Double -> P -> Trace
 simulateUptoEpsilon epsilon env network = tr `seq` sim tr network epsilon
-  where tr = validPref `seq` transFiltered validPref env
-        prefLists = L.nub $ L.sort $ map (map prefName) $ L.concatMap affSites network
-        prefListSubsets = L.nub $ L.sort $ L.concatMap powerset prefLists
-        validPref :: PrefixFilter
-        validPref Potential = prefListSubsets `seq` (`elem` prefListSubsets)
-        validPref Final = prefLists `seq` (`elem` prefLists)
+  where tr = tracesGivenNetwork network env
 
 formatTrace :: Trace -> [(Double, [(String, Conc)])]
 formatTrace tr = [(t, [(pretty v, conc) | (v, conc)

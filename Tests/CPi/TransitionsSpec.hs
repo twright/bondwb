@@ -7,82 +7,82 @@ import CPi.Transitions
 import qualified Data.Map as M
 
 absE :: Abstraction
-absE = Abs 0 (Sum [(Located "x" 0, AbsBase Nil)])
+absE = mkAbs 0 (mkSum [(Located "x" 0, mkAbsBase Nil)])
 
 newE :: Species
-newE = New [0] (Sum [(Located "x" 0, AbsBase Nil)])
+newE = new [0] (mkSum [(Located "x" 0, mkAbsBase Nil)])
 
 enzymeE :: Species
-enzymeE = Par [Sum [(Unlocated "e", absE)]]
+enzymeE = mkPar [mkSum [(Unlocated "e", absE)]]
 
 enzymeEnoPar :: Species
-enzymeEnoPar = Sum [(Unlocated "e", absE)]
+enzymeEnoPar = mkSum [(Unlocated "e", absE)]
 
 enzymeEbound :: Species
-enzymeEbound = Sum [(Located "x" 0, AbsBase (Def "E" [] []))]
+enzymeEbound = mkSum [(Located "x" 0, mkAbsBase (Def "E" [] []))]
 
 enzymeEdef :: Definition
-enzymeEdef = SpeciesDef [] [] $ Sum [(Unlocated "e", Abs 0 enzymeEbound)]
+enzymeEdef = SpeciesDef [] [] $ mkSum [(Unlocated "e", mkAbs 0 enzymeEbound)]
 
 enzymePdef :: Definition
-enzymePdef = SpeciesDef [] [] $ Sum [(Unlocated "d", AbsBase (Def "P" [] []))]
+enzymePdef = SpeciesDef [] [] $ mkSum [(Unlocated "d", mkAbsBase (Def "P" [] []))]
 
 enzymeSbound :: Species
-enzymeSbound = (Sum [(Located "r" 0, AbsBase (Def "S" [] [])),
-                     (Located "p" 0, AbsBase (Def "P" [] []))])
+enzymeSbound = (mkSum [(Located "r" 0, mkAbsBase (Def "S" [] [])),
+                     (Located "p" 0, mkAbsBase (Def "P" [] []))])
 
 enzymeSdef :: Definition
-enzymeSdef = SpeciesDef [] [] $ Sum [(Unlocated "s", Abs 0 enzymeSbound)]
+enzymeSdef = SpeciesDef [] [] $ mkSum [(Unlocated "s", mkAbs 0 enzymeSbound)]
 
 enzymeDefs :: Env
 enzymeDefs = M.fromList [("E", enzymeEdef), ("S", enzymeSdef), ("P", enzymePdef)]
 
 absS :: Abstraction
-absS = Abs 0 (Sum [(Located "r" 0, AbsBase Nil),
-                   (Located "p" 0, AbsBase Nil)])
+absS = mkAbs 0 (mkSum [(Located "r" 0, mkAbsBase Nil),
+                   (Located "p" 0, mkAbsBase Nil)])
 
 enzymeS :: Species
-enzymeS = Par [Sum [(Unlocated "s", absS)]]
+enzymeS = mkPar [mkSum [(Unlocated "s", absS)]]
 
 enzymeSnoPar :: Species
-enzymeSnoPar = Sum [(Unlocated "s", absS)]
+enzymeSnoPar = mkSum [(Unlocated "s", absS)]
 
 enzymeCPotential :: Abstraction
-enzymeCPotential = Abs 0 (Par [Sum [(Located "x" 0, AbsBase Nil)],
-                               Sum [(Located "r" 0, AbsBase Nil),
-                                    (Located "p" 0, AbsBase Nil)]])
+enzymeCPotential = mkAbs 0 (mkPar [mkSum [(Located "x" 0, mkAbsBase Nil)],
+                               mkSum [(Located "r" 0, mkAbsBase Nil),
+                                    (Located "p" 0, mkAbsBase Nil)]])
 
 enzymeCFinal :: Species
-enzymeCFinal = New [0] (Par [Sum [(Located "x" 0, AbsBase Nil)],
-                             Sum [(Located "r" 0, AbsBase Nil),
-                                  (Located "p" 0, AbsBase Nil)]])
+enzymeCFinal = new [0] (mkPar [mkSum [(Located "x" 0, mkAbsBase Nil)],
+                             mkSum [(Located "r" 0, mkAbsBase Nil),
+                                  (Located "p" 0, mkAbsBase Nil)]])
 -- enzymeEC :: Abstraction
--- enzymeEC = AbsPar [AbsBase enzymeE, enzymeC]
+-- enzymeEC = mkAbsPar [mkAbsBase enzymeE, enzymeC]
 
 enzymeES :: Species
-enzymeES = Par [enzymeEnoPar, enzymeSnoPar]
+enzymeES = mkPar [enzymeEnoPar, enzymeSnoPar]
 
 enzymeESPotential :: MTS
 enzymeESPotential = simplify [
   enzymeES --:[Unlocated "e"]-->
-           Abs 1 (Par [Sum [(Located "x" 1, AbsBase Nil)],
+           mkAbs 1 (mkPar [mkSum [(Located "x" 1, mkAbsBase Nil)],
                        enzymeSnoPar]),
   enzymeES --:[Unlocated "s"]-->
-           Abs 1 (Par [enzymeEnoPar,
-                       Sum [(Located "r" 1, AbsBase Nil),
-                            (Located "p" 1, AbsBase Nil)]]),
+           mkAbs 1 (mkPar [enzymeEnoPar,
+                       mkSum [(Located "r" 1, mkAbsBase Nil),
+                            (Located "p" 1, mkAbsBase Nil)]]),
   enzymeES --:[Unlocated "e", Unlocated "s"]--> enzymeCPotential]
 
 -- enzymeESFinal :: MTS
 -- enzymeESFinal = simplify [
 --   enzymeES ==:[Unlocated "e"]==>
---     Abs 0 (Par [Sum [(Located "x" 0, AbsBase Nil)],
+--     mkAbs 0 (Par [mkSum [(Located "x" 0, mkAbsBase Nil)],
 --                   enzymeSnoPar]),
 --   enzymeES ==:[Unlocated "s"]==>
---     Abs 0 (Par [enzymeEnoPar,
---                   Sum [(Located "r" 0, AbsBase Nil),
---                        (Located "p" 0, AbsBase Nil)]]),
---   enzymeES ==:[Unlocated "e", Unlocated "s"]==> AbsBase enzymeCFinal]
+--     mkAbs 0 (Par [enzymeEnoPar,
+--                   mkSum [(Located "r" 0, mkAbsBase Nil),
+--                        (Located "p" 0, mkAbsBase Nil)]]),
+--   enzymeES ==:[Unlocated "e", Unlocated "s"]==> mkAbsBase enzymeCFinal]
 --
 -- enzymeESrec :: Species
 -- enzymeESrec = Def "E" [] [] <|> Def "S" [] []
@@ -92,29 +92,29 @@ enzymeCrec = new [0] (enzymeEbound <|> enzymeSbound)
 
 -- enzymeESFinalDef :: MTS
 -- enzymeESFinalDef = simplify
---   [ enzymeESrec ==:[Unlocated "e"]==> Abs 0 (enzymeEbound <|> Def "S" [] [])
---   , enzymeESrec ==:[Unlocated "s"]==> Abs 0 (Def "E" [] [] <|> enzymeSbound)
---   , enzymeESrec ==:[Unlocated "e", Unlocated "s"]==> AbsBase enzymeCrec]
+--   [ enzymeESrec ==:[Unlocated "e"]==> mkAbs 0 (enzymeEbound <|> Def "S" [] [])
+--   , enzymeESrec ==:[Unlocated "s"]==> mkAbs 0 (Def "E" [] [] <|> enzymeSbound)
+--   , enzymeESrec ==:[Unlocated "e", Unlocated "s"]==> mkAbsBase enzymeCrec]
 
 enzymeCTrans :: MTS
 enzymeCTrans = simplify
-  [enzymeCFinal ==:[Unlocated "x", Unlocated "r"]==> AbsBase Nil,
-   enzymeCFinal ==:[Unlocated "x", Unlocated "p"]==> AbsBase Nil,
+  [enzymeCFinal ==:[Unlocated "x", Unlocated "r"]==> mkAbsBase Nil,
+   enzymeCFinal ==:[Unlocated "x", Unlocated "p"]==> mkAbsBase Nil,
    enzymeCFinal ==:[Unlocated "x"]==>
-     AbsBase (new [0] (Sum [(Located "r" 0, AbsBase Nil),
-                       (Located "p" 0, AbsBase Nil)])),
+     mkAbsBase (new [0] (mkSum [(Located "r" 0, mkAbsBase Nil),
+                       (Located "p" 0, mkAbsBase Nil)])),
    enzymeCFinal ==:[Unlocated "r"]==>
-     AbsBase (new [0] (Sum [(Located "x" 0, AbsBase Nil)])),
+     mkAbsBase (new [0] (mkSum [(Located "x" 0, mkAbsBase Nil)])),
    enzymeCFinal ==:[Unlocated "p"]==>
-     AbsBase (new [0] (Sum [(Located "x" 0, AbsBase Nil)]))]
+     mkAbsBase (new [0] (mkSum [(Located "x" 0, mkAbsBase Nil)]))]
 
 enzymeCTransDef :: MTS
 enzymeCTransDef = simplify
-  [enzymeCrec ==:[Unlocated "x", Unlocated "r"]==> AbsBase (Def "E" [] [] <|> Def "S" [] []),
-   enzymeCrec ==:[Unlocated "x", Unlocated "p"]==> AbsBase (Def "E" [] [] <|> Def "P" [] []),
-   enzymeCrec ==:[Unlocated "x"]==> AbsBase (new [0] (Def "E" [] [] <|> enzymeSbound)),
-   enzymeCrec ==:[Unlocated "r"]==> AbsBase (new [0] (enzymeEbound <|> Def "S" [] [])),
-   enzymeCrec ==:[Unlocated "p"]==> AbsBase (new [0] (enzymeEbound <|> Def "P" [] []))]
+  [enzymeCrec ==:[Unlocated "x", Unlocated "r"]==> mkAbsBase (Def "E" [] [] <|> Def "S" [] []),
+   enzymeCrec ==:[Unlocated "x", Unlocated "p"]==> mkAbsBase (Def "E" [] [] <|> Def "P" [] []),
+   enzymeCrec ==:[Unlocated "x"]==> mkAbsBase (new [0] (Def "E" [] [] <|> enzymeSbound)),
+   enzymeCrec ==:[Unlocated "r"]==> mkAbsBase (new [0] (enzymeEbound <|> Def "S" [] [])),
+   enzymeCrec ==:[Unlocated "p"]==> mkAbsBase (new [0] (enzymeEbound <|> Def "P" [] []))]
 
 spec :: SpecWith ()
 spec = do
@@ -123,48 +123,48 @@ spec = do
       pretty (enzymeE --:[Unlocated "e"]--> absE)
         `shouldBe` "e->(0)x@0->0 --{e}--> (0)x@0->0"
     it "pretty prints committed transitions" $
-      pretty (enzymeE ==:[Unlocated "e"]==> AbsBase newE)
+      pretty (enzymeE ==:[Unlocated "e"]==> mkAbsBase newE)
         `shouldBe` "e->(0)x@0->0 =={e}==> new 0 in x@0->0"
     it "pretty prints singleton lists of transitions" $
       (pretty [enzymeE --:[Unlocated "e"]--> absE])
         `shouldBe` "{| e->(0)x@0->0 --{e}--> (0)x@0->0 |}"
     it "pretty prints longer lists of transitions" $
       (pretty [enzymeE --:[Unlocated "e"]--> absE,
-               enzymeE ==:[Unlocated "e"]==> AbsBase newE])
+               enzymeE ==:[Unlocated "e"]==> mkAbsBase newE])
         `shouldBe` "{| e->(0)x@0->0 --{e}--> (0)x@0->0,\n"
                 ++ "   e->(0)x@0->0 =={e}==> new 0 in x@0->0 |}"
   describe "simplify" $ do
     it "allows us to compares two multisets of the same transitions in a different order" $
       shouldBe
         (simplify [enzymeE --:[Unlocated "e"]--> absE,
-                   enzymeE ==:[Unlocated "e"]==> AbsBase newE])
-        (simplify [enzymeE ==:[Unlocated "e"]==> AbsBase newE,
+                   enzymeE ==:[Unlocated "e"]==> mkAbsBase newE])
+        (simplify [enzymeE ==:[Unlocated "e"]==> mkAbsBase newE,
                    enzymeE --:[Unlocated "e"]--> absE])
     it "allows us to compare two multisets of the same transitions with repeated transitions" $
       shouldBe
         (simplify [enzymeE --:[Unlocated "e"]--> absE,
                    enzymeE --:[Unlocated "e"]--> absE,
-                   enzymeE ==:[Unlocated "e"]==> AbsBase newE])
-        (simplify [enzymeE ==:[Unlocated "e"]==> AbsBase newE,
+                   enzymeE ==:[Unlocated "e"]==> mkAbsBase newE])
+        (simplify [enzymeE ==:[Unlocated "e"]==> mkAbsBase newE,
                    enzymeE --:[Unlocated "e"]--> absE,
                    enzymeE --:[Unlocated "e"]--> absE])
     it "allows us to can tell multisets with different multiplicities are not equal" $
       shouldNotBe
         (simplify [enzymeE --:[Unlocated "e"]--> absE,
                    enzymeE --:[Unlocated "e"]--> absE,
-                   enzymeE ==:[Unlocated "e"]==> AbsBase newE])
+                   enzymeE ==:[Unlocated "e"]==> mkAbsBase newE])
         (simplify [enzymeE --:[Unlocated "e"]--> absE,
-                   enzymeE ==:[Unlocated "e"]==> AbsBase newE])
+                   enzymeE ==:[Unlocated "e"]==> mkAbsBase newE])
   describe "union" $ do
     it "takes the union of two mts" $
       shouldBe
         (simplify $ (++)
           ([enzymeE --:[Unlocated "e"]--> absE,
-            enzymeE ==:[Unlocated "e"]==> AbsBase newE])
+            enzymeE ==:[Unlocated "e"]==> mkAbsBase newE])
           ([enzymeE --:[Unlocated "e"]--> absE]))
         (simplify $ [enzymeE --:[Unlocated "e"]--> absE,
                      enzymeE --:[Unlocated "e"]--> absE,
-                     enzymeE ==:[Unlocated "e"]==> AbsBase newE])
+                     enzymeE ==:[Unlocated "e"]==> mkAbsBase newE])
   describe "trans" $ do
     it "finds E potential transitions" $
       shouldBe
@@ -177,11 +177,11 @@ spec = do
     it "finds E potential transitions recursive" $
       shouldBe
         (simplify $ potentialTrans $ trans (specBody enzymeEdef) enzymeDefs)
-        (simplify [specBody enzymeEdef --:[Unlocated "e"]--> Abs 0 (enzymeEbound)])
+        (simplify [specBody enzymeEdef --:[Unlocated "e"]--> mkAbs 0 (enzymeEbound)])
     it "finds E potential transitions from def" $
       shouldBe
         (simplify $ potentialTrans $ trans (Def "E" [] []) enzymeDefs)
-        (simplify [(Def "E" [] []) --:[Unlocated "e"]--> Abs 0 (enzymeEbound)])
+        (simplify [(Def "E" [] []) --:[Unlocated "e"]--> mkAbs 0 (enzymeEbound)])
     it "finds S potential transitions" $
       shouldBe
         (simplify $ potentialTrans $ trans enzymeS M.empty)
@@ -193,11 +193,11 @@ spec = do
     it "finds S potential transitions recursive" $
       shouldBe
         (simplify $ potentialTrans $ trans (specBody enzymeSdef) enzymeDefs)
-        (simplify [specBody enzymeSdef --:[Unlocated "s"]--> Abs 0 (enzymeSbound)])
+        (simplify [specBody enzymeSdef --:[Unlocated "s"]--> mkAbs 0 (enzymeSbound)])
     it "finds S potential transitions from def" $
       shouldBe
         (simplify $ potentialTrans $ trans (Def "S" [] []) enzymeDefs)
-        (simplify [(Def "S" [] []) --:[Unlocated "s"]--> Abs 0 (enzymeSbound)])
+        (simplify [(Def "S" [] []) --:[Unlocated "s"]--> mkAbs 0 (enzymeSbound)])
     it "finds E|S potential transitions without par" $
       (simplify $ potentialTrans $ trans enzymeES M.empty)
         `shouldBe` simplify enzymeESPotential

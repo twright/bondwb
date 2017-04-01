@@ -25,10 +25,10 @@ massAction [k] xs = k * product xs
 
 defsCH2 = M.fromList [
             ("CH2", SpeciesDef [] [] $ new [1] (Def "Left" [] [1] <|> Def "Right" [] [1])),
-            ("Left", SpeciesDef [] [1] $ Sum [(Unlocated "joinL", Abs 0 $ Def "LeftBound" [] [0,1])]),
-            ("LeftBound", SpeciesDef [] [0,1] $ Sum [(Located "unjoinL" 0, AbsBase $ Def "Left" [] [1])]),
-            ("Right", SpeciesDef [] [1] $ Sum [(Unlocated "joinR", Abs 0 $ Def "RightBound" [] [0,1])]),
-            ("RightBound", SpeciesDef [] [0,1] $ Sum [(Located "unjoinR" 0, AbsBase $ Def "Right" [] [1])])
+            ("Left", SpeciesDef [] [1] $ mkSum [(Unlocated "joinL", mkAbs 0 $ Def "LeftBound" [] [0,1])]),
+            ("LeftBound", SpeciesDef [] [0,1] $ mkSum [(Located "unjoinL" 0, mkAbsBase $ Def "Left" [] [1])]),
+            ("Right", SpeciesDef [] [1] $ mkSum [(Unlocated "joinR", mkAbs 0 $ Def "RightBound" [] [0,1])]),
+            ("RightBound", SpeciesDef [] [0,1] $ mkSum [(Located "unjoinR" 0, mkAbsBase $ Def "Right" [] [1])])
           ]
 affinityNetworkCH2 = [ Affinity (massAction [2]) [[Unlocated "joinL"], [Unlocated "joinR"]], Affinity (massAction [1]) [[Unlocated "unjoinL", Unlocated "unjoinR"]] ]
 
@@ -39,13 +39,13 @@ logistic [b, k] [r] = b * r * (1 - r/k)
 functional [beta, h] [f, r] = beta * f * r / (1 + beta * h * r)
 
 rabbitDefs = M.fromList
-  [ ("Fox", SpeciesDef [] [] $ Sum [ (Unlocated "eat",
-                                      AbsBase $ Def "Fox" [] [] <|> Def "Fox" [] [])
-                                   , (Unlocated "die", AbsBase Nil) ])
-  , ("Red", SpeciesDef [] [] $ Sum [ (Unlocated "reproduceRed", AbsBase $ Def "Red" [] [] <|> Def "Red" [] [])
-                                   , (Unlocated "beEaten", AbsBase Nil)])
-  , ("Blue", SpeciesDef [] [] $ Sum [ (Unlocated "reproduceBlue", AbsBase $ Def "Blue" [] [] <|> Def "Blue" [] [])
-                                   , (Unlocated "beEaten", AbsBase Nil)]) ]
+  [ ("Fox", SpeciesDef [] [] $ mkSum [ (Unlocated "eat",
+                                      mkAbsBase $ Def "Fox" [] [] <|> Def "Fox" [] [])
+                                   , (Unlocated "die", mkAbsBase Nil) ])
+  , ("Red", SpeciesDef [] [] $ mkSum [ (Unlocated "reproduceRed", mkAbsBase $ Def "Red" [] [] <|> Def "Red" [] [])
+                                   , (Unlocated "beEaten", mkAbsBase Nil)])
+  , ("Blue", SpeciesDef [] [] $ mkSum [ (Unlocated "reproduceBlue", mkAbsBase $ Def "Blue" [] [] <|> Def "Blue" [] [])
+                                   , (Unlocated "beEaten", mkAbsBase Nil)]) ]
 
 affinityNetworkRabbits =
   [ Affinity (massAction [2]) [[Unlocated "reproduceRed"]]
@@ -68,24 +68,24 @@ affinityNetworkEnzyme =
   , Affinity (massAction [2]) [[Unlocated "x", Unlocated "r"]]
   , Affinity (massAction [3]) [[Unlocated "x", Unlocated "p"]] ]
 
-enzymeSbound = Sum [ (Located "r" 0, AbsBase (Def "S" [] []))
-                   , (Located "p" 0, AbsBase (Def "P" [] [])) ]
+enzymeSbound = mkSum [ (Located "r" 0, mkAbsBase (Def "S" [] []))
+                   , (Located "p" 0, mkAbsBase (Def "P" [] [])) ]
 
-enzymeEbound = Sum [(Located "x" 0, AbsBase (Def "E" [] []))]
+enzymeEbound = mkSum [(Located "x" 0, mkAbsBase (Def "E" [] []))]
 
-enzymeE = SpeciesDef [] [] $ Sum [(Unlocated "e", Abs 0 enzymeEbound)]
+enzymeE = SpeciesDef [] [] $ mkSum [(Unlocated "e", mkAbs 0 enzymeEbound)]
 
-enzymeS = SpeciesDef [] [] $ Sum [(Unlocated "s", Abs 0 enzymeSbound)]
+enzymeS = SpeciesDef [] [] $ mkSum [(Unlocated "s", mkAbs 0 enzymeSbound)]
 
-enzymeP = SpeciesDef [] [] $ Sum [(Unlocated "d", AbsBase (Def "P" [] []))]
+enzymeP = SpeciesDef [] [] $ mkSum [(Unlocated "d", mkAbsBase (Def "P" [] []))]
 
 enzymeDefs = M.fromList [("E", enzymeE), ("S", enzymeS), ("P", enzymeP)]
 
 simEnzyme = simulate enzymeDefs affinityNetworkEnzyme 0.01 0 (3.0 |> vect (Def "S" [] []) +> 2.0 |> vect (Def "E" [] []))
 
 polymerDefs = M.fromList
-  [ ("A", SpeciesDef [] [0] $ Sum[(Unlocated "grow", AbsBase (Def "A" [] [0] <|> Def "A" [] [0])),
-                                  (Unlocated "shrink", AbsBase Nil)])
+  [ ("A", SpeciesDef [] [0] $ mkSum[(Unlocated "grow", mkAbsBase (Def "A" [] [0] <|> Def "A" [] [0])),
+                                  (Unlocated "shrink", mkAbsBase Nil)])
   , ("B", SpeciesDef [] [] $ new [0] $ Def "A" [] [0]) ]
 
 affinityNetworkPolymer =
