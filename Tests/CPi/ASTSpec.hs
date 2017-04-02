@@ -114,28 +114,28 @@ spec = do
     it "can colocate with overlapping names" $
       (mkAbs 0 (Def "" [] [4]) <|> mkAbsBase (mkPar [Def "" [] [0,3]]))
         `shouldBe` (mkAbs 5 (mkPar [Def "" [] [4], Def "" [] [0,3]]))
-    -- it "releases colocated in normal form" $
-    --   property $ \x y -> let newloc = maximum (0:map (+1) (freeLocs y ++ boundLocs x))
-    --                      in normalForm (concretify $ normalForm (mkAbs newloc x <|> mkAbsBase y))
-    --                         ===
-    --                         normalForm (new [newloc] x <|> y)
+    it "releases colocated in normal form" $
+      property $ \x y -> let newloc = maximum (0:map (+1) (freeLocs y ++ boundLocs x))
+                         in normalForm (concretify $ normalForm (mkAbs newloc x <|> mkAbsBase y))
+                            ===
+                            normalForm (new [newloc] x <|> y)
     it "handles another case with overlapping names" $
       mkAbs 11 (Def "" [] [10]) <|> mkAbsBase (Def "" [] [0,9])
         `shouldBe` mkAbs 11 (Def "" [] [10] <|> Def "" [] [0,9])
     it "still handles another case with overlapping names after normal forms" $
       normalForm (mkAbs 11 (Def "" [] [10]) <|> mkAbsBase (Def "" [] [0,9]))
         `shouldBe` mkAbsBase (Def "" [] [10] <|> Def "" [] [0,9])
-    -- it "does not care about bound variable name when merging" $
-    --   property $ \x y -> normalForm (mkAbs (maxLoc x + 2) (relocate (maxLoc x + 1) (maxLoc x + 2) x) <|> mkAbsBase y)
-    --                      === normalForm (mkAbs (maxLoc x + 1) (relocate (maxLoc x + 2) (maxLoc x + 1) x) <|> mkAbsBase y)
-    -- it "should colocate abstractions to give abstracted parallel composition" $
-    --   property $ \x y -> let l = maxLoc x
-    --                          m = maxLoc y
-    --                          p = max l m
-    --                      in normalForm (mkAbs l x <|> mkAbs m y)
-    --                           ===
-    --                           normalForm (mkAbs p (relocate l p x
-    --                                          <|> relocate m p y))
+    it "does not care about bound variable name when merging" $
+      property $ \x y -> normalForm (mkAbs (maxLoc x + 2) (relocate (maxLoc x + 1) (maxLoc x + 2) x) <|> mkAbsBase y)
+                         === normalForm (mkAbs (maxLoc x + 1) (relocate (maxLoc x + 2) (maxLoc x + 1) x) <|> mkAbsBase y)
+    it "should colocate abstractions to give abstracted parallel composition" $
+      property $ \x y -> let l = maxLoc x
+                             m = maxLoc y
+                             p = max l m
+                         in normalForm (mkAbs l x <|> mkAbs m y)
+                              ===
+                              normalForm (mkAbs p (relocate l p x
+                                             <|> relocate m p y))
   describe "boundLocs" $ do
     it "gives the bound locations in a par with abs" $
       shouldBe
@@ -175,14 +175,23 @@ spec = do
       shouldBe
         (normalForm $ new [0] $ mkSum [(Located "x" 0, mkAbsBase Nil)])
         (new [0] $ mkSum [(Located "x" 0, mkAbsBase Nil)])
-    -- it "recognises commutativity" $
-    --   property $ \x y -> normalForm ((x::Species) <|> (y::Species)) === normalForm ((y::Species) <|> (x::Species))
-    -- it "releases E" $
-    --   property $ \x -> normalForm (new [0] (x <|> Def "E" [] []))
-    --     === normalForm (new [0] (normalForm x) <|> Def "E" [] [])
-    -- it "gives associativity" $
-    --   property $ \x y z -> normalForm ((x <|> y) <|> z :: Species)
-    --                    === normalForm (x <|> (y <|> z) :: Species)
+    it "recognises commutativity" $
+      property $ \x y -> normalForm ((x::Species) <|> (y::Species)) === normalForm ((y::Species) <|> (x::Species))
+    it "relocates restricted names into canonical order" $
+      normalForm(mkPar [mkNew [4,5] (mkSum [(Located "x" 1,mkAbsBase (Nil)),(Located "x" 2,mkAbsBase (Nil)),(Located "x" 3,mkAbs 0 (Def "E" [] [3,0,4])),(Located "x" 5,mkAbsBase (Nil))]),Def "E" [] []])
+        `shouldBe`
+        normalForm(mkPar [mkNew [4,5] (mkSum [(Located "x" 1,mkAbsBase Nil),(Located "x" 2,mkAbsBase (Nil)),(Located "x" 3,mkAbs 0 (Def "E" [] [3,0,5])),(Located "x" 4,mkAbsBase Nil)]),Def "E" [] []])
+    it "releases E with name order issues" $
+      let s = mkNew [8] (mkSum [(Located "x" 2,mkAbs 3 Nil),(Located "x" 1,mkAbs 4 (mkSum [])),(Located "x" 3,mkAbs 4 (Def "E" [] [3,4,8])),(Located "x" 0,mkAbs 4 (mkSum []))])
+          e = Def "E" [] []
+      in normalForm (new [0] (s <|> e))
+        `shouldBe` normalForm((new [0] s) <|> e)
+    it "releases E" $
+      property $ \x -> normalForm (new [0] (x <|> Def "E" [] []))
+        === normalForm (new [0] (normalForm x) <|> Def "E" [] [])
+    it "gives associativity" $
+      property $ \x y z -> normalForm ((x <|> y) <|> z :: Species)
+                       === normalForm (x <|> (y <|> z) :: Species)
     it "reduces unnecessarily high binder" $
       normalForm (mkAbs 2 $ mkSum [(Located "x" 2, mkAbsBase Nil)])
         `shouldBe` mkAbs 0 (mkSum [(Located "x" 0, mkAbsBase Nil)])
@@ -191,12 +200,12 @@ spec = do
         `shouldBe` mkAbsBase (mkSum [(Unlocated "x", mkAbsBase Nil)])
     it "removes empty par" $
       normalForm (mkPar [Def "E" [] []]) `shouldBe` (Def "E" [] [])
-    -- it "has binder in freeLocs" $
-    --   let prop abst@(Abs _ l sp) = case normalForm abst of
-    --                                (Abs _ l' sp') -> property(l' `elem` freeLocs sp')
-    --                                (AbsBase _ _) -> property(l `notElem` freeLocs sp)
-    --       prop abst@(AbsBase _ sp) = normalForm abst === mkAbsBase (normalForm sp)
-    --   in property prop
+    it "has binder in freeLocs" $
+      let prop abst@(Abs _ l sp) = case normalForm abst of
+                                   (Abs _ l' sp') -> property(l' `elem` freeLocs sp')
+                                   (AbsBase _ _) -> property(l `notElem` freeLocs sp)
+          prop abst@(AbsBase _ sp) = normalForm abst === mkAbsBase (normalForm sp)
+      in property prop
     -- commented out as now duplicates code pretty heavily
     -- it "has binder as next free location" $
     --   let prop abst@(Abs l sp) = case normalForm abst of
@@ -209,8 +218,8 @@ spec = do
     --               nextFree = head nextLocs
     --       prop abst@(AbsBase sp) = normalForm abst === AbsBase (normalForm sp)
     --   in property prop
-    -- it "does not change freeLocs" $
-    --   property $ \x -> (L.sort $ L.nub $ freeLocs $ normalForm x) === (L.sort $ L.nub $ freeLocs (x::Species))
+    it "does not change freeLocs" $
+      property $ \x -> (L.sort $ L.nub $ freeLocs $ normalForm x) === (L.sort $ L.nub $ freeLocs (x::Species))
     it "gives correct normal form in case with similar locs" $
       normalForm (new [1] (mkPar [mkSum [(Located "z" 0,mkAbs 0 Nil)],mkSum [(Located "z" 1,mkAbsBase Nil)]]))
         `shouldBe`
@@ -221,4 +230,8 @@ spec = do
         mkPar [mkSum [(Located "z" 0,mkAbsBase Nil)],mkSum [(Located "z" 1,mkAbsBase Nil)],new [0] (mkSum [(Located "y" 0,mkAbsBase Nil)])]
     it "correctly simplifies nested news" $
       normalForm(new [10] (new [3] (Def "" [] [3,10])))
-        `shouldBe` new [0,1] (Def "" [] [0,1])
+        `shouldBe` new [0,1] (Def "" [] [1,0])
+    it "can separate two binders, each overlaping half of a par" $
+      normalForm(mkPar [mkNew [0,1] (mkPar [Def "P" [] [10,0,0],Def "S" [] [1,1,4]])])
+        `shouldBe`
+        mkPar[mkNew [0] (Def "P" [] [10,0,0]),mkNew [0] (Def "S" [] [0,0,4])]
