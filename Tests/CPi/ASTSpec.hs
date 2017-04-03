@@ -105,6 +105,13 @@ spec = do
     it  "does not change bound locations with abs" $
       relocate 0 1 (mkAbs 0 (mkSum [(Located "x" 0, mkAbsBase Nil)]))
         `shouldBe` mkAbs 0 (mkSum [(Located "x" 0, mkAbsBase Nil)])
+  describe "relocateAll" $
+    it "can swap locations without capturing" $
+      relocateAll [0, 1] [1, 0] (mkSum [(Located "x" 0, mkAbsBase Nil),
+                                     (Located "y" 1, mkAbsBase Nil)])
+        `shouldBe`
+        (mkSum [(Located "x" 1, mkAbsBase Nil),
+                (Located "y" 0, mkAbsBase Nil)])
   describe "colocate" $ do
     it "can place two simple abstractions at the same location" $
       colocate absA absB `shouldBe` absAB
