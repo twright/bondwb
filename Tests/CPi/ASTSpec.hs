@@ -2,7 +2,6 @@ module CPi.ASTSpec (spec) where
 
 import Test.Hspec
 import Test.QuickCheck
-import Data.Hashable
 import CPi.AST
 import qualified Data.List as L
 
@@ -124,7 +123,7 @@ spec = do
         `shouldBe` mkAbs 11 (Def "" [] [10] <|> Def "" [] [0,9])
     it "still handles another case with overlapping names after normal forms" $
       normalForm (mkAbs 11 (Def "" [] [10]) <|> mkAbsBase (Def "" [] [0,9]))
-        `shouldBe` mkAbsBase (Def "" [] [10] <|> Def "" [] [0,9])
+        `shouldBe` mkAbsBase (Def "" [] [0,9] <|> Def "" [] [10])
     it "does not care about bound variable name when merging" $
       property $ \x y -> normalForm (mkAbs (maxLoc x + 2) (relocate (maxLoc x + 1) (maxLoc x + 2) x) <|> mkAbsBase y)
                          === normalForm (mkAbs (maxLoc x + 1) (relocate (maxLoc x + 2) (maxLoc x + 1) x) <|> mkAbsBase y)
@@ -161,12 +160,15 @@ spec = do
     --                             mNotFree = if null flocs
     --                                        then 0 else maximum flocs + 1
   describe "normalForm" $ do
+    it "simplifies abstractions within sums" $
+      normalForm(mkSum [(Located "y" 2,mkAbs 1 Nil)])
+        `shouldBe` normalForm(mkSum [(Located "y" 2,mkAbsBase Nil)])
     it "is idempotent on species" $
       property $ \x -> normalForm (normalForm x) === normalForm (x :: Species)
     it "is idempotent on abstractions" $
       property $ \x -> normalForm (normalForm x) === normalForm (x :: Abstraction)
     it "lowers the maximum index in a complex expression" $
-       simplify (mkAbs 1 (mkPar [mkSum [(Located "x" 1,mkAbsBase Nil)],mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 1,mkAbsBase Nil),(Located "r" 1,mkAbsBase Nil)]))]])) `shouldBe` (mkAbs 0 (mkPar [mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 0,mkAbsBase Nil),(Located "r" 0,mkAbsBase Nil)]))], mkSum [(Located "x" 0,mkAbsBase Nil)]]))
+       simplify (mkAbs 1 (mkPar [mkSum [(Located "x" 1,mkAbsBase Nil)],mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 1,mkAbsBase Nil),(Located "r" 1,mkAbsBase Nil)]))]])) `shouldBe` (mkAbs 0 (mkPar [mkSum [(Located "x" 0,mkAbsBase Nil)], mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 0,mkAbsBase Nil),(Located "r" 0,mkAbsBase Nil)]))]]))
     it "removes unused binders" $
       shouldBe
         (normalForm $ new [1] $ mkSum [(Located "x" 0, mkAbsBase Nil)])
@@ -206,18 +208,6 @@ spec = do
                                    (AbsBase _ _) -> property(l `notElem` freeLocs sp)
           prop abst@(AbsBase _ sp) = normalForm abst === mkAbsBase (normalForm sp)
       in property prop
-    -- commented out as now duplicates code pretty heavily
-    -- it "has binder as next free location" $
-    --   let prop abst@(Abs l sp) = case normalForm abst of
-    --                                (Abs l' _) -> property(l' === nextFree)
-    --                                (AbsBase _) -> property(l `notElem` freeLocs sp)
-    --         where sp'
-    --               bLocs = boundLocs sp
-    --               fLocs = filter (/=l) $ freeLocs sp
-    --               nextLocs = filter (\x -> (x `notElem` fLocs) && (x `notElem` bLocs)) [0..]
-    --               nextFree = head nextLocs
-    --       prop abst@(AbsBase sp) = normalForm abst === AbsBase (normalForm sp)
-    --   in property prop
     it "does not change freeLocs" $
       property $ \x -> (L.sort $ L.nub $ freeLocs $ normalForm x) === (L.sort $ L.nub $ freeLocs (x::Species))
     it "gives correct normal form in case with similar locs" $
@@ -227,7 +217,7 @@ spec = do
     it "gives correct normal for in case with many overlapping locs" $
       normalForm (new [2] (mkPar [mkSum [(Located "z" 0,mkAbs 0 Nil)],mkSum [(Located "z" 1,mkAbsBase Nil)],mkSum [(Located "y" 2,mkAbs 0 Nil)]]))
         `shouldBe`
-        mkPar [mkSum [(Located "z" 0,mkAbsBase Nil)],mkSum [(Located "z" 1,mkAbsBase Nil)],new [0] (mkSum [(Located "y" 0,mkAbsBase Nil)])]
+        mkPar [new [0] (mkSum [(Located "y" 0,mkAbsBase Nil)]),mkSum [(Located "z" 1,mkAbsBase Nil)],mkSum [(Located "z" 0,mkAbsBase Nil)]]
     it "correctly simplifies nested news" $
       normalForm(new [10] (new [3] (Def "" [] [3,10])))
         `shouldBe` new [0,1] (Def "" [] [1,0])
@@ -235,3 +225,10 @@ spec = do
       normalForm(mkPar [mkNew [0,1] (mkPar [Def "P" [] [10,0,0],Def "S" [] [1,1,4]])])
         `shouldBe`
         mkPar[mkNew [0] (Def "P" [] [10,0,0]),mkNew [0] (Def "S" [] [0,0,4])]
+    it "does not release binders in separating out new locations" $
+      normalForm(mkNew [4,3] (mkPar [mkPar [Nil],Def "S" ["y","x"] [3,4],Nil,Nil,mkSum [(Unlocated "x",mkAbsBase (Nil)),(Located "x" 3,mkAbs 1 (Nil))],mkSum [(Unlocated "x",mkAbs 2 (Nil))]]))
+        `shouldBe` (mkPar [mkNew [1] (mkPar [mkSum [(Located "x" 1,mkAbsBase (Nil)),(Unlocated "x",mkAbsBase (Nil))],mkNew [0] (Def "S" ["y","x"] [1,0])]),mkSum [(Unlocated "x",mkAbsBase (Nil))]])
+    it "can unify new binding order" $
+      normalForm(mkNew [1] $ mkSum [(Located "y" 1, mkAbsBase $ mkNew [0] $ mkSum [(Located "x" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 0, mkAbsBase Nil), (Located "y" 1, mkAbsBase Nil)])])
+        `shouldBe`
+        normalForm(mkNew [1] $ mkSum [(Located "x" 1, mkAbsBase $ mkNew [0] $ mkSum [(Located "y" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 0, mkAbsBase Nil), (Located "y" 1, mkAbsBase Nil)])])
