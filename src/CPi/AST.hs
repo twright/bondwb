@@ -129,6 +129,8 @@ instance Arbitrary Prefix where
   arbitrary = oneof [fmap Unlocated (elements ["x", "y", "z"]),
                      liftM2 Located (elements ["x", "y", "z"])
                                     (choose (0,3))]
+  shrink (Located x l) = [Unlocated x, Located x (l-1)]
+  shrink (Unlocated _) = []
 
 instance Arbitrary Species where
   -- shrink = genericShrink
@@ -166,6 +168,11 @@ instance Arbitrary Species where
             return (Def name args locs)
         ]
         | otherwise = return Nil
+  shrink Nil = []
+  shrink (Par _ _ xs) = Nil:[mkPar xs' | xs' <- shrink xs]
+  shrink (New _ _ locs x) = [Nil, x] ++ [mkNew ls x | ls <- shrink locs] ++ map (mkNew locs) (shrink x)
+  shrink (Def name args locs) = [Nil] ++ [Def name args' locs | args' <- shrink args] ++ [Def name args locs' | locs' <- shrink locs]
+  shrink (Sum _ _ xs) = Nil:[mkSum xs' | xs' <- shrink xs]
 
 instSpec :: Definition -> [Name] -> [Location] -> Species
 instSpec (SpeciesDef (n:ns) ls body) (n':ns') ls' = rename n n'
@@ -184,8 +191,8 @@ data Abstraction
   deriving (Generic)
 
 instance Show Abstraction where
-  show (Abs _ loc spec) = "Abs " ++ show loc ++ " (" ++ show spec ++ ")"
-  show (AbsBase _ spec) = "AbsBase (" ++ show spec ++ ")"
+  show (Abs _ loc spec) = "mkAbs " ++ show loc ++ " (" ++ show spec ++ ")"
+  show (AbsBase _ spec) = "mkAbsBase (" ++ show spec ++ ")"
 
 mkAbs :: Location -> Species -> Abstraction
 mkAbs loc spec = Abs expid loc spec
@@ -231,7 +238,7 @@ expId :: Species -> Maybe Int
 expId (Sum expid _ _) = Just expid
 expId (Par expid _ _) = Just expid
 expId (New expid _ _ _) = Just expid
-expId x = Nothing
+expId _ = Nothing
 
 instance Hashable Abstraction where
   hash (Abs expid _ _) = expid
@@ -261,7 +268,8 @@ instance Arbitrary Abstraction where
                         l <- choose(mloc + 1, mloc + 5)
                         return (mkAbs l spec)
                     , fmap mkAbsBase arbitrary ]
-  -- shrink = genericShrink
+  shrink (AbsBase _ x) = [mkAbsBase x' | x' <- shrink x]
+  shrink (Abs _ l x)   = [mkAbsBase Nil, mkAbsBase x, mkAbs (l-1) x] ++ [mkAbs l x' | x' <- shrink x]
 
 instance Syntax Prefix where
   relocate l l' p@(Located x m)
