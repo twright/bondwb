@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, BangPatterns #-}
 module CPi.AST
   (
   Abstraction(..),
@@ -28,7 +28,12 @@ module CPi.AST
   mkAbsBase,
   mkSum,
   mkPar,
-  mkNew
+  mkNew,
+  denest,
+  partitionNew,
+  closeSpecs,
+  closeLocs,
+  canonicallyReorderLocs
   ) where
 
 import qualified Data.List as L
@@ -203,8 +208,7 @@ mkAbsBase spec = AbsBase expid spec
 
 instance Hashable Species where
   hash Nil = hash(0::Int,0::Int,0::Int,0::Int)
-  hash (Def s nms locs) = hash(1::Int,s,nms,0::Int)
-                          `hashWithSalt` locs
+  hash (Def s nms locs) = hash(1::Int,s,nms,locs)
   hash (Sum expid _ _) = expid
   hash (Par expid _ _) = expid
   hash (New expid _ _ _) = expid
@@ -226,7 +230,8 @@ mkPar xs = res
         nf = normalForm' res
 
 mkNew :: [Location] -> Species -> Species
-mkNew locs xs = trace ("making new from " ++ show locs ++ " and " ++ pretty xs) ans
+mkNew locs xs = ans
+ -- trace ("making new from " ++ show locs ++ " and " ++ pretty xs)
   where expid = hash(4::Int,locs,xs,0::Int)
         -- nf = normalForm' res
         ans = let res = New expid nf locs xs
@@ -307,20 +312,20 @@ instance Syntax Species where
                                                      | loc <- locs]
 
   relocateAll _ _ Nil = Nil
-  relocateAll ls ls' (Sum _ _ xs)
+  relocateAll !ls !ls' (Sum _ _ xs)
     = mkSum [(relocateAll ls ls' pre, relocateAll ls ls' x)
           | (pre, x) <- xs]
-  relocateAll ls ls' (Par _ _ xs) = mkPar $ map (relocateAll ls ls') xs
+  relocateAll !ls !ls' (Par _ _ xs) = mkPar $ map (relocateAll ls ls') xs
   -- should never be used to capture variables!
-  relocateAll ls ls' (New _ _ locs spec) = if null $ L.intersect locs ls'
-    then mkNew locs $ relocateAll ms ms' spec
+  relocateAll !ls !ls' (New _ _ locs spec) = if null $ L.intersect locs ls'
+    then mkNew locs $! relocateAll ms ms' spec
     else error $ "Trying to rewrite ls = " ++ show ls ++ " to ls' = " ++ show ls' ++ " under locs = " ++ show locs ++ " -- not allowed as this would cause name capture!"
-    where ms  = filter (`notElem` locs) ls
-          ms' = map (ls' !!) $ L.findIndices (`elem` ms) ls
-  relocateAll ls ls' (Def name args locs) = Def name args (map rl locs)
-    where rl l = case L.elemIndex l ls of
-                   Just i  -> ls' !! i
-                   Nothing -> l
+    where !ms  = filter (`notElem` locs) ls
+          !ms' = map (ls' !!) $ L.findIndices (`elem` ms) ls
+  relocateAll !ls !ls' (Def name args locs) = Def name args (map rl locs)
+    where rl !l = case L.elemIndex l ls of
+                    Just i  -> ls' !! i
+                    Nothing -> l
 
   rename _ _ Nil = Nil
   rename x x' (Sum _ _ prefspecs) = mkSum [(rename x x' pre, rename x x' spec)
@@ -359,24 +364,31 @@ normalForm' pr@(Par _ _ ss) = res
   where res = case ss' of
           []  -> Nil
           [s] -> s
-          _   -> if ss == ss' then trace ("bottom at pr = " ++ pretty pr ++ " given ss' = " ++ show (map pretty ss') ++ " ss = " ++ show (map pretty ss)) pr else res'
+          _   -> if ss == ss' then pr else res'
+          -- trace ("bottom at pr = " ++ pretty pr ++ " given ss' = " ++ show (map pretty ss') ++ " ss = " ++ show (map pretty ss))
         res' = mkPar ss'
         flatten    = L.concatMap f
         f (Par _ _ ps) = ps
         f s        = [s]
         ss' = L.sort $ filter (/=Nil) $ flatten $ map normalForm ss
-normalForm' (New _ _ [] s) = normalForm s
-normalForm' (New _ _ locs1 (New _ _ locs2 s)) = normalForm $ mkNew (locs1 ++ locs2) s
 normalForm' spec@(New _ _ locs s)
-  | null locs' = trace ("Unwrapping to s' = " ++ pretty s') s'
-  | otherwise = s''''
-  where s'  = trace ("--- normal form of " ++ pretty spec) normalForm s
-        locs' = L.sort $ L.nub $ L.intersect locs (freeLocs s')
-        (locs'', s'') = reduceLocs locs' s'
-        s''' = canonicallyReorderLocs locs'' s''
-        s'''' = case splitFree locs'' s''' of
-          Just nspec -> normalForm nspec
-          Nothing -> if locs == locs'' && s == s''' then spec else normalForm(new locs'' s''')
+  | null locs''' = trace ("Unwrapping to s' = " ++ pretty s') s'''
+  | (locs''' /= locs || s /= s''') && length part == 1 = trace("reapplying with s'''") $ normalForm $ mkNew locs''' s'''
+  | length part > 1 = partNf
+  -- trace ("locs = " ++ show locs ++ ", locs''' = " ++ show locs''' ++ ", eq = " ++ show (locs == locs''') ++ "\ns = " ++ show s ++ ", s'''' = " ++ show s'''' ++ ", eq = " ++ show (s == s'''') ++  "\npart = " ++ show part)
+  | s'''' /= s = mkNew locs''' s''''
+  | otherwise = spec
+  where (locs', s')     = trace ("--- normal form of " ++ pretty spec) $ denest locs s
+        locs''          = L.sort $ L.nub $ L.intersect locs' (freeLocs s')
+        (locs''', s'')  = trace ("s'' for spec = " ++ show spec) $ reduceLocs locs'' (normalForm s')
+        s'''            = trace("s''' for spec = " ++ show spec) $ normalForm s''
+        s''''           = trace("canonically ordering locs''' = " ++ show locs''' ++ " in s''' = " ++ show s''') $ canonicallyReorderLocs locs''' s'''
+        -- (locs'''', s''''')  = reduceLocs locs''' (normalForm s'''')
+        part            = case s''' of
+                            Par _ _ sp -> trace ("partitioning sp = " ++ show sp ++ " to " ++ show p) $ p
+                              where p = partitionNew locs''' sp
+                            sp         -> [(locs''', [sp])]
+        partNf          = normalForm $ mkPar [mkNew ls (mkPar sp) | (ls, sp) <- part]
 
 -- utility functions for rewriting towards normal form
 reduceLocs :: [Location] -> Species -> ([Location], Species)
@@ -384,7 +396,8 @@ reduceLocs olocs m = (nLocs, if olocs == nLocs then m
                              else normalForm m')
   where fLocs = filter (`notElem` olocs) (freeLocs m)
         bLocs = boundLocs m
-        nextLocs = filter (\x -> (x `notElem` fLocs) && (x `notElem` bLocs)) [0..]
+        sLoc = if null bLocs then 0 else maximum bLocs + 1
+        nextLocs = filter (`notElem` fLocs) [sLoc..]
         locLen = length olocs
         nLocs = take locLen nextLocs
         m' = relocateAll olocs nLocs m
@@ -394,30 +407,51 @@ canonicallyReorderLocs :: [Location] -> Species -> Species
 canonicallyReorderLocs locs m = if length locs < 2 || m' == m
                                 then m else m'
   where locPerms = L.permutations locs
-        m's = [normalForm $ relocateAll locs locs' m | locs' <- locPerms]
-        m' = trace("reordering based on "
-          ++ show [(hash m'', pretty m'') | m'' <- m's]) (head $ L.sortOn hash m's)
+        -- compute this way, one more normal form computation required,
+        -- but much less memory
+        m's = [(hash $! reorder locs', reorder locs') | locs' <- locPerms]
+        m' =  snd (head $ L.sortOn fst m's)
+        reorder locs' = normalForm $ relocateAll locs locs' m
+        -- trace("reordering based on "
+        --   ++ show [(hash m'', pretty m'') | m'' <- m's])
 
-splitFree :: [Location] -> Species -> Maybe Species
-splitFree ls pr@(Par _ _ ss) = if null ls || iLocs == ls then
-                               trace("settling inner at " ++ pretty plain) Nothing
-                            else trace ("split into " ++ pretty inexp ++ " and " ++ pretty outexp ++ " forming " ++ pretty res) $ Just $ normalForm res
-  where plain  = trace "making plain" (mkNew ls (normalForm pr))
-        res = if null (rLocs `L.intersect` freeLocs inexp)
-               then trace("releasing free with rLocs = " ++ show rLocs ++ " given iLocs = " ++ show iLocs ++ ", ls = " ++ show ls) (inexp <|> new rLocs outpar)
-               else trace "nesting ownership" (new rLocs (inexp <|> outpar))
-        inexp  = trace ("making in with iLocs = " ++ show iLocs) (normalForm(new [x'] inpar))
-        outexp = trace "making out" (normalForm(new rLocs outpar))
-        outpar = trace "making out" (normalForm(mkPar outs))
-        inpar  = trace "making inpar" (normalForm(mkPar ins))
-        iLocs  = L.foldl L.intersect ls (map freeLocs ss)
-        rLocs = filter (/=x') ls
-        (x:_) = trace("iLocs = " ++ show iLocs ++ ", ls = " ++ show ls) (filter (`notElem` iLocs) ls)
-        x' = L.minimum ls
-        ss' = [normalForm $ relocateAll [x,x'] [x', x] s | s <- ss]
-        ins       = filter (elem x' . freeLocs) ss'
-        outs      = filter (notElem x' . freeLocs) ss'
-splitFree _ _ = Nothing
+denest :: [Location] -> Species -> ([Location], Species)
+denest ls pr@(Par _ _ ss) = case news of
+  []            -> (ls, pr)
+  (ms, s, rs):_ -> denest (L.sort $ ls ++ ms') pr'
+    where nextLocs = filter (`notElem` aLocs) [0..]
+          rLocs    = concatMap freeLocs rs ++ concatMap boundLocs rs
+          sLocs    = freeLocs s ++ boundLocs s
+          aLocs    = rLocs ++ sLocs ++ ls
+          ms'      = take (length ms) nextLocs
+          s'      = relocateAll ms ms' s
+          pr'      = normalForm (mkPar (s':rs))
+  where news = [(ms, s, [w | (j, w) <- iss, j /= i])
+               | (i, New _ _ ms s) <- iss]
+        iss = zip [0..] ss
+denest ls r@New{} = denest ls $ mkPar [r]
+denest ls s = (ls, s)
+
+closeLocs :: [Location] -> [Location] -> [Species] -> [Species]
+          -> ([Location], [Location], [Species], [Species])
+closeLocs lls rls lss rss = case newLls of
+  [] -> (lls, rls, lss, rss)
+  _  -> closeSpecs (lls++newLls) (filter (`notElem` newLls) rls) lss rss
+  where newLls = L.nub $ concat [freeLocs s `L.intersect` rls | s <- lss]
+
+closeSpecs :: [Location] -> [Location] -> [Species] -> [Species]
+           -> ([Location], [Location], [Species], [Species])
+closeSpecs lls rls lss rss = case newLss of
+  [] -> (lls, rls, lss, rss)
+  _  -> closeLocs lls rls (lss++newLss) (filter (`notElem` newLss) rss)
+  where newLss = filter (\s -> not $ null $ freeLocs s `L.intersect` lls) rss
+
+partitionNew :: [Location] -> [Species] -> [([Location], [Species])]
+partitionNew [] ss     = [([], ss)]
+-- partitionNew ls []     = [(ls, [])]
+partitionNew (l:ls) ss = if null rls && null rss then [(lls, lss)]
+                         else (lls, lss) : partitionNew rls rss
+  where (lls, rls, lss, rss) = closeSpecs [l] ls [] ss
 
 instance ProcessAlgebra Species where
   Nil <|> Nil = Nil
@@ -488,9 +522,9 @@ instance Syntax Abstraction where
     if m `elem` ls'
     then error $ "Trying to relocate ls = " ++ show ls ++ " to ls' = " ++
           show ls' ++ " which would capture m = " ++ show m ++ "!"
-    else mkAbs m $ relocateAll ms ms' abst
-    where ms  = filter (/=m) ls
-          ms' = map (ls' !!) $ L.findIndices (`elem` ms) ls
+    else mkAbs m $! relocateAll ms ms' abst
+    where !ms  = filter (/=m) ls
+          !ms' = map (ls' !!) $ L.findIndices (`elem` ms) ls
 
   rename x x' (AbsBase _ spec) = mkAbsBase $ rename x x' spec
   rename x x' (Abs _ m abst) = mkAbs m $ rename x x' abst
@@ -501,14 +535,17 @@ instance Syntax Abstraction where
   simplify = normalForm
 
   normalForm (AbsBase _ x) = mkAbsBase (normalForm x)
-  normalForm (Abs _ l x) = if l `notElem` freeLocs x' then mkAbsBase x'
-                 else mkAbs l' (if l == l' then x'
-                              else normalForm $ relocate l l' x')
+  normalForm abst@(Abs _ l x) = if l `notElem` freeLocs x'
+                                then mkAbsBase x'
+                                else abst'
     where x' = normalForm x
           bLocs = boundLocs x'
+          sLoc = if null bLocs then 0 else maximum bLocs + 1
           fLocs = filter (/=l) $ freeLocs x'
-          nextLocs = filter (\y -> (y `notElem` fLocs) && (y `notElem` bLocs)) [0..]
+          nextLocs = filter (`notElem` fLocs) [sLoc..]
           l' = head nextLocs
+          abst' = if l == l' && x == x' then abst
+                  else trace("rewriting abst = " ++ pretty abst ++ " to " ++ pretty (mkAbs l' $ normalForm $ relocate l l' x')) $ normalForm $ mkAbs l' $ normalForm $ relocate l l' x'
 
 instance ProcessAlgebra Abstraction where
   (<|>) = colocate

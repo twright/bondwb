@@ -130,7 +130,7 @@ spec = do
         `shouldBe` mkAbs 11 (Def "" [] [10] <|> Def "" [] [0,9])
     it "still handles another case with overlapping names after normal forms" $
       normalForm (mkAbs 11 (Def "" [] [10]) <|> mkAbsBase (Def "" [] [0,9]))
-        `shouldBe` mkAbsBase (Def "" [] [0,9] <|> Def "" [] [10])
+        `shouldBe` mkAbsBase (Def "" [] [10] <|> Def "" [] [0,9])
     it "does not care about bound variable name when merging" $
       property $ \x y -> normalForm (mkAbs (maxLoc x + 2) (relocate (maxLoc x + 1) (maxLoc x + 2) x) <|> mkAbsBase y)
                          === normalForm (mkAbs (maxLoc x + 1) (relocate (maxLoc x + 2) (maxLoc x + 1) x) <|> mkAbsBase y)
@@ -234,8 +234,74 @@ spec = do
         mkPar[mkNew [0] (Def "P" [] [10,0,0]),mkNew [0] (Def "S" [] [0,0,4])]
     it "does not release binders in separating out new locations" $
       normalForm(mkNew [4,3] (mkPar [mkPar [Nil],Def "S" ["y","x"] [3,4],Nil,Nil,mkSum [(Unlocated "x",mkAbsBase (Nil)),(Located "x" 3,mkAbs 1 (Nil))],mkSum [(Unlocated "x",mkAbs 2 (Nil))]]))
-        `shouldBe` (mkPar [mkNew [1] (mkPar [mkSum [(Located "x" 1,mkAbsBase (Nil)),(Unlocated "x",mkAbsBase (Nil))],mkNew [0] (Def "S" ["y","x"] [1,0])]),mkSum [(Unlocated "x",mkAbsBase (Nil))]])
+        `shouldBe` normalForm(mkPar [mkNew [1] (mkPar [mkSum [(Located "x" 1,mkAbsBase (Nil)),(Unlocated "x",mkAbsBase (Nil))],mkNew [0] (Def "S" ["y","x"] [1,0])]),mkSum [(Unlocated "x",mkAbsBase (Nil))]])
     it "can unify new binding order" $
-      normalForm(mkNew [1] $ mkSum [(Located "y" 1, mkAbsBase $ mkNew [0] $ mkSum [(Located "x" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 0, mkAbsBase Nil), (Located "y" 1, mkAbsBase Nil)])])
+      normalForm(mkNew [1] $ mkSum [(Located "y" 1, mkAbsBase Nil)] <|> (mkNew [0] $ mkSum [(Located "x" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 0, mkAbsBase Nil), (Located "y" 1, mkAbsBase Nil)]))
         `shouldBe`
-        normalForm(mkNew [1] $ mkSum [(Located "x" 1, mkAbsBase $ mkNew [0] $ mkSum [(Located "y" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 0, mkAbsBase Nil), (Located "y" 1, mkAbsBase Nil)])])
+        normalForm(mkNew [1] $ mkSum [(Located "x" 1, mkAbsBase Nil)] <|> (mkNew [0] $ mkSum [(Located "y" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 1, mkAbsBase Nil), (Located "y" 0, mkAbsBase Nil)]))
+  describe "denest" $ do
+    it "can move restrictions in parallel compositions within restrictions outwards" $
+      denest [0] (mkSum [(Located "x" 0, mkAbsBase Nil)]
+              <|> mkNew [0] (mkSum [(Located "y" 0, mkAbsBase Nil)]))
+        `shouldBe`
+        ([0, 1], normalForm (mkSum [(Located "x" 0, mkAbsBase Nil)]
+                         <|> mkSum [(Located "y" 1, mkAbsBase Nil)]))
+    it "can combine nested new calls" $
+      denest [0,1] (mkNew [1] $ mkNew[2]
+                  $ mkSum [(Located "x" 0, mkAbsBase Nil),
+                           (Located "y" 1, mkAbsBase Nil),
+                           (Located "z" 2, mkAbsBase Nil)])
+        `shouldBe`
+        ([0,1,2,3], normalForm (mkSum [(Located "x" 0, mkAbsBase Nil),
+                                       (Located "y" 3, mkAbsBase Nil),
+                                       (Located "z" 2, mkAbsBase Nil)]))
+  describe "closeSpecs" $ do
+    it "can expand a set of locs" $
+      closeSpecs [0] [1,2,3] [] [mkSum [(Located "x" 0, mkAbsBase Nil),
+                                        (Located "y" 1, mkAbsBase Nil)],
+                                 mkSum [(Located "k" 1, mkAbsBase Nil),
+                                        (Located "w" 3, mkAbsBase Nil)],
+                                 mkSum [(Located "z" 2, mkAbsBase Nil)]]
+        `shouldBe`
+        ([0,1,3], [2], [mkSum [(Located "x" 0, mkAbsBase Nil),
+                               (Located "y" 1, mkAbsBase Nil)],
+                        mkSum [(Located "k" 1, mkAbsBase Nil),
+                               (Located "w" 3, mkAbsBase Nil)]],
+                       [mkSum [(Located "z" 2, mkAbsBase Nil)]])
+  describe "partitionNew" $ do
+    it "can partition a simple restricted list of species in three" $
+      partitionNew [0,1,2]
+                   [mkSum [(Located "x" 0, mkAbsBase Nil)],
+                    mkSum [(Located "y" 1, mkAbsBase Nil)],
+                    mkSum [(Located "z" 2, mkAbsBase Nil)],
+                    mkSum [(Located "w" 1, mkAbsBase Nil)]]
+        `shouldBe`
+        [([0], [mkSum [(Located "x" 0, mkAbsBase Nil)]]),
+         ([1], [mkSum [(Located "y" 1, mkAbsBase Nil)],
+                mkSum [(Located "w" 1, mkAbsBase Nil)]]),
+         ([2], [mkSum [(Located "z" 2, mkAbsBase Nil)]])]
+    it "does not split up locations overlapping in terms" $
+      map (\(x,y) -> (L.sort x, L.sort y))
+        (partitionNew [0,1] [mkSum [(Located "x" 0, mkAbsBase Nil)],
+                             mkSum [(Located "y" 1, mkAbsBase Nil)],
+                             mkSum [(Located "x" 0, mkAbsBase Nil),
+                                    (Located "y" 1, mkAbsBase Nil)]])
+        `shouldBe`
+        [([0,1], L.sort [mkSum [(Located "x" 0, mkAbsBase Nil)],
+                         mkSum [(Located "y" 1, mkAbsBase Nil)],
+                         normalForm $ mkSum [(Located "x" 0, mkAbsBase Nil),
+                                             (Located "y" 1, mkAbsBase Nil)]])]
+    it "can partition apart a term with no free locs" $
+      (partitionNew [0] [mkSum [(Located "x" 0, mkAbsBase Nil)],
+                         mkSum [(Unlocated "y", mkAbsBase Nil)]])
+      `shouldBe`
+      [([0], [mkSum [(Located "x" 0, mkAbsBase Nil)]]),
+       ([],  [mkSum [(Unlocated "y", mkAbsBase Nil)]])]
+    it "can reorder nested news" $
+      normalForm(mkNew [0] (mkSum [(Unlocated "x", mkAbsBase $ mkNew [1] $ Def "E" [] [0, 1])]))
+      `shouldBe`
+      mkNew [1] (mkSum [(Unlocated "x", mkAbsBase $ mkNew [0] $ Def "E" [] [1, 0])])
+    it "can reorder nested abstractions" $
+      normalForm(mkAbs 0 (mkSum [(Unlocated "x", mkAbs 1 $ Def "E" [] [0, 1])]))
+      `shouldBe`
+      mkAbs 1 (mkSum [(Unlocated "x", mkAbs 0 $ Def "E" [] [1, 0])])

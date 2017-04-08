@@ -37,6 +37,8 @@ main = defaultMain
           $ nf (benchUptoEpsilonEnzyme 10000) 0.00001
       , bench "simulate enzymes, 5000 steps, epsilon = 0.00001"
           $ nf (benchUptoEpsilonEnzyme 5000) 0.00001
+      , bench "simulate creating normal form, 10 deep"
+          $ nf benchNormalForm 10 
       , bench "simulate creating normal form, 100 deep"
           $ nf benchNormalForm 100
       , bench "simulate creating normal form, 200 deep"
