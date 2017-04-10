@@ -12,8 +12,8 @@ enzymeS = mkPar [mkSum [(Unlocated "s", mkAbs 0 (mkSum [(Located "r" 0, mkAbsBas
                                           (Located "p" 0, mkAbsBase Nil)]))]]
 enzymeC :: Species
 enzymeC = new [0] (mkPar [mkSum [(Located "x" 0, mkAbsBase Nil)],
-                                    mkSum [(Located "r" 0, mkAbsBase Nil),
-                                         (Located "p" 0, mkAbsBase Nil)]])
+                                 mkSum [(Located "r" 0, mkAbsBase Nil),
+                                        (Located "p" 0, mkAbsBase Nil)]])
 
 enzymeEC :: Species
 enzymeEC = enzymeE <|> enzymeC
@@ -110,16 +110,16 @@ spec = do
       relocateAll [0, 1] [1, 0] (mkSum [(Located "x" 0, mkAbsBase Nil),
                                      (Located "y" 1, mkAbsBase Nil)])
         `shouldBe`
-        (mkSum [(Located "x" 1, mkAbsBase Nil),
-                (Located "y" 0, mkAbsBase Nil)])
+        mkSum [(Located "x" 1, mkAbsBase Nil),
+               (Located "y" 0, mkAbsBase Nil)]
   describe "colocate" $ do
     it "can place two simple abstractions at the same location" $
       colocate absA absB `shouldBe` absAB
     it "does not mess up parallel composition" $
       ((absA `colocate` absB) `colocate` absB) `shouldBe` absABB
     it "can colocate with overlapping names" $
-      (mkAbs 0 (Def "" [] [4]) <|> mkAbsBase (mkPar [Def "" [] [0,3]]))
-        `shouldBe` (mkAbs 5 (mkPar [Def "" [] [4], Def "" [] [0,3]]))
+      mkAbs 0 (Def "" [] [4]) <|> mkAbsBase (mkPar [Def "" [] [0,3]])
+        `shouldBe` mkAbs 5 (mkPar [Def "" [] [4], Def "" [] [0,3]])
     it "releases colocated in normal form" $
       property $ \x y -> let newloc = maximum (0:map (+1) (freeLocs y ++ boundLocs x))
                          in normalForm (concretify $ normalForm (mkAbs newloc x <|> mkAbsBase y))
@@ -152,20 +152,6 @@ spec = do
           mkSum [(Unlocated "s", mkAbs 1 $ mkSum [(Located "z" 1,
                 mkAbs 0 $ mkSum [(Located "z" 0, mkAbsBase Nil)])])]])
         [0, 1]
-    -- it "should give a contiguous list of locations on normalized species with no freeLocs" $
-    --   property $ \x -> case boundLocs $ normalForm (x :: Species) of
-    --                      [] -> property True
-    --                      xs@(_:_) -> filter (>=mNotFree) xs === range(mNotFree, maximum xs)
-    --                       where flocs = freeLocs x
-    --                             mNotFree = if null flocs
-    --                                        then 0 else maximum flocs + 1
-    -- it "should give a contiguous list of locations on normalized abstractions" $
-    --   property $ \x -> case boundLocs $ normalForm (x :: Abstraction) of
-    --                      [] -> property True
-    --                      xs@(_:_) -> filter (>=mNotFree) xs === range(mNotFree, maximum xs)
-    --                       where flocs = freeLocs x
-    --                             mNotFree = if null flocs
-    --                                        then 0 else maximum flocs + 1
   describe "normalForm" $ do
     it "simplifies abstractions within sums" $
       normalForm(mkSum [(Located "y" 2,mkAbs 1 Nil)])
@@ -175,7 +161,7 @@ spec = do
     it "is idempotent on abstractions" $
       property $ \x -> normalForm (normalForm x) === normalForm (x :: Abstraction)
     it "lowers the maximum index in a complex expression" $
-       simplify (mkAbs 1 (mkPar [mkSum [(Located "x" 1,mkAbsBase Nil)],mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 1,mkAbsBase Nil),(Located "r" 1,mkAbsBase Nil)]))]])) `shouldBe` (mkAbs 0 (mkPar [mkSum [(Located "x" 0,mkAbsBase Nil)], mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 0,mkAbsBase Nil),(Located "r" 0,mkAbsBase Nil)]))]]))
+       simplify (mkAbs 1 (mkPar [mkSum [(Located "x" 1,mkAbsBase Nil)],mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 1,mkAbsBase Nil),(Located "r" 1,mkAbsBase Nil)]))]])) `shouldBe` mkAbs 0 (mkPar [mkSum [(Located "x" 0,mkAbsBase Nil)], mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 0,mkAbsBase Nil),(Located "r" 0,mkAbsBase Nil)]))]])
     it "removes unused binders" $
       shouldBe
         (normalForm $ new [1] $ mkSum [(Located "x" 0, mkAbsBase Nil)])
@@ -187,14 +173,14 @@ spec = do
     it "recognises commutativity" $
       property $ \x y -> normalForm ((x::Species) <|> (y::Species)) === normalForm ((y::Species) <|> (x::Species))
     it "relocates restricted names into canonical order" $
-      normalForm(mkPar [mkNew [4,5] (mkSum [(Located "x" 1,mkAbsBase (Nil)),(Located "x" 2,mkAbsBase (Nil)),(Located "x" 3,mkAbs 0 (Def "E" [] [3,0,4])),(Located "x" 5,mkAbsBase (Nil))]),Def "E" [] []])
+      normalForm(mkPar [mkNew [4,5] (mkSum [(Located "x" 1,mkAbsBase Nil),(Located "x" 2,mkAbsBase Nil),(Located "x" 3,mkAbs 0 (Def "E" [] [3,0,4])),(Located "x" 5,mkAbsBase Nil)]),Def "E" [] []])
         `shouldBe`
-        normalForm(mkPar [mkNew [4,5] (mkSum [(Located "x" 1,mkAbsBase Nil),(Located "x" 2,mkAbsBase (Nil)),(Located "x" 3,mkAbs 0 (Def "E" [] [3,0,5])),(Located "x" 4,mkAbsBase Nil)]),Def "E" [] []])
+        normalForm(mkPar [mkNew [4,5] (mkSum [(Located "x" 1,mkAbsBase Nil),(Located "x" 2,mkAbsBase Nil),(Located "x" 3,mkAbs 0 (Def "E" [] [3,0,5])),(Located "x" 4,mkAbsBase Nil)]),Def "E" [] []])
     it "releases E with name order issues" $
       let s = mkNew [8] (mkSum [(Located "x" 2,mkAbs 3 Nil),(Located "x" 1,mkAbs 4 (mkSum [])),(Located "x" 3,mkAbs 4 (Def "E" [] [3,4,8])),(Located "x" 0,mkAbs 4 (mkSum []))])
           e = Def "E" [] []
       in normalForm (new [0] (s <|> e))
-        `shouldBe` normalForm((new [0] s) <|> e)
+        `shouldBe` normalForm(new [0] s <|> e)
     it "releases E" $
       property $ \x -> normalForm (new [0] (x <|> Def "E" [] []))
         === normalForm (new [0] (normalForm x) <|> Def "E" [] [])
@@ -208,7 +194,7 @@ spec = do
       normalForm (mkAbs 1 $ mkSum [(Unlocated "x", mkAbsBase Nil)])
         `shouldBe` mkAbsBase (mkSum [(Unlocated "x", mkAbsBase Nil)])
     it "removes empty par" $
-      normalForm (mkPar [Def "E" [] []]) `shouldBe` (Def "E" [] [])
+      normalForm (mkPar [Def "E" [] []]) `shouldBe` Def "E" [] []
     it "has binder in freeLocs" $
       let prop abst@(Abs _ l sp) = case normalForm abst of
                                    (Abs _ l' sp') -> property(l' `elem` freeLocs sp')
@@ -216,15 +202,16 @@ spec = do
           prop abst@(AbsBase _ sp) = normalForm abst === mkAbsBase (normalForm sp)
       in property prop
     it "does not change freeLocs" $
-      property $ \x -> (L.sort $ L.nub $ freeLocs $ normalForm x) === (L.sort $ L.nub $ freeLocs (x::Species))
+      property $ \x -> L.sort (L.nub $ freeLocs $ normalForm x) === L.sort (L.nub $ freeLocs (x::Species))
     it "gives correct normal form in case with similar locs" $
       normalForm (new [1] (mkPar [mkSum [(Located "z" 0,mkAbs 0 Nil)],mkSum [(Located "z" 1,mkAbsBase Nil)]]))
         `shouldBe`
-        mkPar [mkSum [(Located "z" 0,mkAbsBase Nil)],new [0] (mkSum [(Located "z" 0,mkAbsBase Nil)])]
+        mkPar [new [0] (mkSum [(Located "z" 0,mkAbsBase Nil)]),
+               mkSum [(Located "z" 0,mkAbsBase Nil)]]
     it "gives correct normal for in case with many overlapping locs" $
       normalForm (new [2] (mkPar [mkSum [(Located "z" 0,mkAbs 0 Nil)],mkSum [(Located "z" 1,mkAbsBase Nil)],mkSum [(Located "y" 2,mkAbs 0 Nil)]]))
         `shouldBe`
-        mkPar [new [0] (mkSum [(Located "y" 0,mkAbsBase Nil)]),mkSum [(Located "z" 1,mkAbsBase Nil)],mkSum [(Located "z" 0,mkAbsBase Nil)]]
+        mkPar (L.sort [new [0] (mkSum [(Located "y" 0,mkAbsBase Nil)]),mkSum [(Located "z" 1,mkAbsBase Nil)],mkSum [(Located "z" 0,mkAbsBase Nil)]])
     it "correctly simplifies nested news" $
       normalForm(new [10] (new [3] (Def "" [] [3,10])))
         `shouldBe` new [0,1] (Def "" [] [1,0])
@@ -233,12 +220,12 @@ spec = do
         `shouldBe`
         mkPar[mkNew [0] (Def "P" [] [10,0,0]),mkNew [0] (Def "S" [] [0,0,4])]
     it "does not release binders in separating out new locations" $
-      normalForm(mkNew [4,3] (mkPar [mkPar [Nil],Def "S" ["y","x"] [3,4],Nil,Nil,mkSum [(Unlocated "x",mkAbsBase (Nil)),(Located "x" 3,mkAbs 1 (Nil))],mkSum [(Unlocated "x",mkAbs 2 (Nil))]]))
-        `shouldBe` normalForm(mkPar [mkNew [1] (mkPar [mkSum [(Located "x" 1,mkAbsBase (Nil)),(Unlocated "x",mkAbsBase (Nil))],mkNew [0] (Def "S" ["y","x"] [1,0])]),mkSum [(Unlocated "x",mkAbsBase (Nil))]])
+      normalForm(mkNew [4,3] (mkPar [mkPar [Nil],Def "S" ["y","x"] [3,4],Nil,Nil,mkSum [(Unlocated "x",mkAbsBase Nil),(Located "x" 3,mkAbs 1 Nil)],mkSum [(Unlocated "x",mkAbs 2 Nil)]]))
+        `shouldBe` normalForm(mkPar $ L.sort [mkNew [1] (mkPar $ L.sort [mkSum [(Located "x" 1,mkAbsBase Nil),(Unlocated "x",mkAbsBase Nil)],mkNew [0] (Def "S" ["y","x"] [1,0])]),mkSum [(Unlocated "x",mkAbsBase Nil)]])
     it "can unify new binding order" $
-      normalForm(mkNew [1] $ mkSum [(Located "y" 1, mkAbsBase Nil)] <|> (mkNew [0] $ mkSum [(Located "x" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 0, mkAbsBase Nil), (Located "y" 1, mkAbsBase Nil)]))
+      normalForm (mkNew [1] $ mkSum [(Located "y" 1, mkAbsBase Nil)] <|> mkNew [0] (mkSum [(Located "x" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 0, mkAbsBase Nil), (Located "y" 1, mkAbsBase Nil)]))
         `shouldBe`
-        normalForm(mkNew [1] $ mkSum [(Located "x" 1, mkAbsBase Nil)] <|> (mkNew [0] $ mkSum [(Located "y" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 1, mkAbsBase Nil), (Located "y" 0, mkAbsBase Nil)]))
+        normalForm(mkNew [1] $ mkSum [(Located "x" 1, mkAbsBase Nil)] <|> mkNew [0] (mkSum [(Located "y" 0, mkAbsBase Nil)] <|> mkSum[(Located "x" 1, mkAbsBase Nil), (Located "y" 0, mkAbsBase Nil)]))
   describe "denest" $ do
     it "can move restrictions in parallel compositions within restrictions outwards" $
       denest [0] (mkSum [(Located "x" 0, mkAbsBase Nil)]
@@ -292,8 +279,8 @@ spec = do
                          normalForm $ mkSum [(Located "x" 0, mkAbsBase Nil),
                                              (Located "y" 1, mkAbsBase Nil)]])]
     it "can partition apart a term with no free locs" $
-      (partitionNew [0] [mkSum [(Located "x" 0, mkAbsBase Nil)],
-                         mkSum [(Unlocated "y", mkAbsBase Nil)]])
+      partitionNew [0] [mkSum [(Located "x" 0, mkAbsBase Nil)],
+                        mkSum [(Unlocated "y", mkAbsBase Nil)]]
       `shouldBe`
       [([0], [mkSum [(Located "x" 0, mkAbsBase Nil)]]),
        ([],  [mkSum [(Unlocated "y", mkAbsBase Nil)]])]

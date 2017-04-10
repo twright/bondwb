@@ -176,7 +176,9 @@ instance Arbitrary Species where
   shrink Nil = []
   shrink (Par _ _ xs) = Nil:[mkPar xs' | xs' <- shrink xs]
   shrink (New _ _ locs x) = [Nil, x] ++ [mkNew ls x | ls <- shrink locs] ++ map (mkNew locs) (shrink x)
-  shrink (Def name args locs) = [Nil] ++ [Def name args' locs | args' <- shrink args] ++ [Def name args locs' | locs' <- shrink locs]
+  shrink (Def name args locs) = [Nil] ++ [Def name args' locs | args' <- tails args] ++ [Def name args locs' | locs' <- shrink locs]
+    where tails [] = []
+          tails s = map tail $ L.permutations s
   shrink (Sum _ _ xs) = Nil:[mkSum xs' | xs' <- shrink xs]
 
 instSpec :: Definition -> [Name] -> [Location] -> Species
@@ -200,11 +202,11 @@ instance Show Abstraction where
 
 mkAbs :: Location -> Species -> Abstraction
 mkAbs loc spec = Abs expid loc spec
-  where expid = hash (0::Int, (0::Int, loc, spec))
+  where expid = hash (1::Int, loc, spec)
 
 mkAbsBase :: Species -> Abstraction
 mkAbsBase spec = AbsBase expid spec
-  where expid = hash (1::Int, (1::Int, spec))
+  where expid = hash (2::Int, 1::Int, spec)
 
 instance Hashable Species where
   hash Nil = hash(0::Int,0::Int,0::Int,0::Int)
@@ -373,7 +375,7 @@ normalForm' pr@(Par _ _ ss) = res
         ss' = L.sort $ filter (/=Nil) $ flatten $ map normalForm ss
 normalForm' spec@(New _ _ locs s)
   | null locs''' = trace ("Unwrapping to s' = " ++ pretty s') s'''
-  | (locs''' /= locs || s /= s''') && length part == 1 = trace("reapplying with s'''") $ normalForm $ mkNew locs''' s'''
+  | (locs''' /= locs || s /= s''') && length part == 1 = trace "reapplying with s'''" $ normalForm $ mkNew locs''' s'''
   | length part > 1 = partNf
   -- trace ("locs = " ++ show locs ++ ", locs''' = " ++ show locs''' ++ ", eq = " ++ show (locs == locs''') ++ "\ns = " ++ show s ++ ", s'''' = " ++ show s'''' ++ ", eq = " ++ show (s == s'''') ++  "\npart = " ++ show part)
   | s'''' /= s = mkNew locs''' s''''
@@ -385,7 +387,7 @@ normalForm' spec@(New _ _ locs s)
         s''''           = trace("canonically ordering locs''' = " ++ show locs''' ++ " in s''' = " ++ show s''') $ canonicallyReorderLocs locs''' s'''
         -- (locs'''', s''''')  = reduceLocs locs''' (normalForm s'''')
         part            = case s''' of
-                            Par _ _ sp -> trace ("partitioning sp = " ++ show sp ++ " to " ++ show p) $ p
+                            Par _ _ sp -> trace ("partitioning sp = " ++ show sp ++ " to " ++ show p) p
                               where p = partitionNew locs''' sp
                             sp         -> [(locs''', [sp])]
         partNf          = normalForm $ mkPar [mkNew ls (mkPar sp) | (ls, sp) <- part]
@@ -428,7 +430,7 @@ denest ls pr@(Par _ _ ss) = case news of
           pr'      = normalForm (mkPar (s':rs))
   where news = [(ms, s, [w | (j, w) <- iss, j /= i])
                | (i, New _ _ ms s) <- iss]
-        iss = zip [0..] ss
+        iss = zip ([0..]::[Integer]) ss
 denest ls r@New{} = denest ls $ mkPar [r]
 denest ls s = (ls, s)
 
@@ -494,7 +496,8 @@ instance Pretty Species where
   pretty Nil = "0"
   pretty (Sum _ _ x@((p,s):pss))
     | length x == 1
-      = pretty p ++ "->" ++ pretty s
+      = pretty p ++ "->" ++ if priority s < 30 then pretty s
+                                                else "(" ++ pretty s ++ ")"
     | otherwise
       = pretty (mkSum [(p, s)]) ++ " + " ++ pretty (mkSum pss)
   pretty (Sum _ _ []) = "<Empty Sum>"
@@ -554,7 +557,7 @@ instance ProcessAlgebra Abstraction where
   new locs (Abs _ m spec) = mkAbs m $ new locs spec
 
   priority (AbsBase _ spec) = priority spec
-  priority Abs{} = 11
+  priority Abs{} = 9
 
   boundLocs (Abs _ l spec) = L.nub $ L.sort $ l:boundLocs spec
   boundLocs (AbsBase _ spec) = L.nub $ L.sort $ boundLocs spec
@@ -564,8 +567,9 @@ instance Nameless Abstraction where
     where locs = boundLocs xs
 
 instance Pretty Abstraction where
-  pretty x@(Abs _ l spec)
-    = "("++ show l ++ ")" ++ prettyParens spec x
+  pretty (Abs _ l spec)
+    = "("++ show l ++ ")" ++ if priority spec < 30 then pretty spec
+                             else "(" ++ pretty spec ++ ")"
   pretty (AbsBase _ spec)
     = pretty spec
 

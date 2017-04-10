@@ -15,11 +15,12 @@ cabal-version:       >=1.18
 
 library
   hs-source-dirs:      src
-  ghc-options: -Wall -O2 -fprof-auto
+  ghc-options:         -Wall -O2 -fprof-auto
   exposed-modules:     CPi.Logic, CPi.ODE, CPi.Plot, CPi.Signals,
                        CPi.Lib,  CPi.Matlab,  CPi.Parser,
                        CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions,
-                       CPi.Processes, CPi.Simulation, CPi.Examples, CPi.Vector
+                       CPi.Processes, CPi.Simulation, CPi.Examples, CPi.Vector,
+                       CPi.ParserNew
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
   build-depends:       base >=4.7, parsec >=3.1,
@@ -27,7 +28,8 @@ library
                        process >=1.2, colour >=2.3,
                        data-accessor >=0.2, numeric-quest,
                        hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
-                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class, QuickCheck, memoize, unordered-containers, hashable
+                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class, QuickCheck, unordered-containers,
+                       hashable, megaparsec
   default-language:    Haskell2010
 
 test-suite spec
@@ -35,10 +37,10 @@ test-suite spec
   main-is: Spec.hs
   hs-source-dirs:
       Tests
-  ghc-options: -Wall -O2 -fprof-auto -rtsopts
-  build-depends:       base >=4.7, hspec, containers>=0.5, cpilib, numeric-quest, QuickCheck, hashable
-  other-modules:
-      CPi.ASTSpec
+  ghc-options:      -Wall -O2 -fprof-auto -rtsopts
+  build-depends:    base >=4.7, hspec, containers>=0.5, cpilib, QuickCheck,
+                    hashable, hspec-megaparsec, megaparsec
+  other-modules:    CPi.ASTSpec, CPi.ParserNewSpec
   default-language: Haskell2010
 
 benchmark signal-bench
