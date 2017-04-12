@@ -1,0 +1,8 @@
+species A(;l) = grow -> (A(;l)|A(;l)) + shrink@l + allowShrink@l -> A(;l);
+
+affinity network PolymerReactions(m,n) = {
+  grow at rate MA(m);
+  shrink + allowShrink at rate MA(n);
+}
+
+process Polymer = [1.0] (new l in A(;l)) with network PolymerReactions(2.0, 1.0);

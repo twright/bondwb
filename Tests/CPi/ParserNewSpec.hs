@@ -7,8 +7,15 @@ import Test.QuickCheck
 import CPi.AST
 import CPi.ParserNew
 import Data.Hashable (hash)
+import qualified Data.Map as M
+import CPi.Examples (rabbitSource, rabbitModel)
 
 a `shouldParseNf` b = a `parseSatisfies` (\p -> normalForm p == normalForm b)
+a `shouldParseModel` b = a
+                         `parseSatisfies`
+                         (\m -> speciesDefs m == speciesDefs b
+                             && affinityNetworkDefs m == affinityNetworkDefs b
+                             && processDefs m == processDefs b)
 
 spec :: SpecWith ()
 spec = do
@@ -118,9 +125,92 @@ spec = do
          mkNew [l] (mkPar [mkSum [(Located "x" l, mkAbsBase $ Def "E" [] [])],
                            mkSum [(Located "r" l, mkAbsBase $ Def "S" [] []),
                                   (Located "p" l, mkAbsBase $ Def "P" [] [])]])
+    it "should parse a strand from the genetic XOR gate example" $
+      let l = fromIntegral $ hash "l"
+      in parse species "" "new l in Unbound(bindA, unbindA, boundA, unboundA; l) | Unbound(bindB, unbindB, boundB, unboundB; l) | Transcriber(;l)"
+         `shouldParse`
+         mkNew [l]
+         (mkPar [Def "Unbound" ["bindA", "unbindA", "boundA", "unboundA"] [l],
+                 Def "Unbound" ["bindB", "unbindB", "boundB", "unboundB"] [l],
+                 Def "Transcriber" [] [l]])
+    it "should parse an unbound site from the genetic XOR gate example" $
+      let l = fromIntegral $ hash "l"
+          m = fromIntegral $ hash "m"
+      in parse species "" "bind(m) -> Bound(bind, unbind, bound, unbound; l, m) + unbound@l -> Unbound(bind, unbind, bound, unbound; l)"
+         `shouldParse`
+         mkSum [(Unlocated "bind",
+                 mkAbs m $ Def "Bound"
+                               ["bind", "unbind", "bound", "unbound"] [l, m]),
+                (Located "unbound" l,
+                 mkAbsBase $ Def "Unbound"
+                                 ["bind", "unbind", "bound", "unbound"] [l])]
     it "should be the left inverse of pretty printing, upto normal form" $
       property (\x -> let converted = normalForm $ relocateAll flocs hlocs x
                           flocs     = freeLocs x
                           hlocs     = map (fromIntegral . hash . show) flocs
-                      in (fmap normalForm $ parse species "" $ pretty x)
+                      in fmap normalForm (parse species "" $ pretty x)
                          === Right converted)
+  describe "speciesDef" $ do
+    it "allows us to define the transcription factor from the genetic XOR gate model" $
+      let m = fromIntegral $ hash "m"
+      in  parse speciesDef "" "species TranscriptionFactor(bind, unbind;) = bind(m) -> unbind@m -> TranscriptionFactor(bind, unbind;);"
+          `shouldParse`
+          ("TranscriptionFactor",
+           SpeciesDef ["bind", "unbind"]
+                      []
+                      (mkSum [(Unlocated "bind",
+                               mkAbs m $ mkSum [(Located "unbind" m,
+                                                 mkAbsBase
+                                               $ Def "TranscriptionFactor"
+                                                     ["bind", "unbind"] [])])]))
+    it "should parse an unbound site species definition from the genetic XOR gate example" $
+      let l = fromIntegral $ hash "l"
+          m = fromIntegral $ hash "m"
+      in parse speciesDef "" "species Unbound(bind, unbind, bound, unbound; l) = bind(m) -> Bound(bind, unbind, bound, unbound; l, m) + unbound@l -> Unbound(bind, unbind, bound, unbound; l);"
+         `shouldParse`
+         ("Unbound",
+          SpeciesDef ["bind", "unbind", "bound", "unbound"] [l]
+            $ mkSum [(Unlocated "bind",
+                      mkAbs m $ Def "Bound"
+                                    ["bind", "unbind", "bound", "unbound"]
+                                    [l, m]),
+                     (Located "unbound" l,
+                      mkAbsBase $ Def "Unbound"
+                                  ["bind", "unbind", "bound", "unbound"] [l])])
+  describe "affinityNetworkDef" $ do
+    it "should parse the affinity network definition for a genetic XOR gate" $
+      parse affinityNetworkDef ""
+       ("affinity network M(k2, k3, l2, l3) = {\n"
+     ++ "  transcribe + boundA + unboundB, "
+       ++ "transcribe + unboundA + boundB at rate L(1.0);\n"
+     ++ "  bindA, cobindA at rate MA(k2);\n"
+     ++ "  unbindA + counbindA at rate MA(l2);\n"
+     ++ "}")
+      `shouldParse`
+      ( "M"
+      , AffinityNetworkDef ["k2", "k3", "l2", "l3"]
+        [ Affinity (RateLawAppl "L" [RateLawParamVal 1.0])
+                   [ ["transcribe", "boundA", "unboundB"]
+                   , ["transcribe", "unboundA", "boundB"] ]
+        , Affinity (RateLawAppl "MA" [RateLawParamVar "k2"])
+                   [["bindA"], ["cobindA"]]
+        , Affinity (RateLawAppl "MA" [RateLawParamVar "l2"])
+                   [["unbindA", "counbindA"]]])
+  describe "processDef" $ do
+    it "should parse the process definition for a genetic XOR gate" $
+      parse processDef ""
+        ("process GeneticXORGate = [1.0] Strand\n"
+      ++ "  || [0.1] TranscriptionFactor(cobindA, counbindA)\n"
+      ++ "  || [0.1] TranscriptionFactor(cobindB, counbindB)\n"
+      ++ "  || [0.0] Product\n"
+      ++ "  with network M(0.5,0.5,0.1,0.1);")
+      `shouldParse`
+      ( "GeneticXORGate"
+      , Process (AffinityNetworkAppl "M" [0.5, 0.5, 0.1, 0.1])
+                [ (1.0, Def "Strand" [] [])
+                , (0.1, Def "TranscriptionFactor" ["cobindA", "counbindA"] [])
+                , (0.1, Def "TranscriptionFactor" ["cobindB", "counbindB"] [])
+                , (0.0, Def "Product" [] []) ] )
+  describe "model" $ do
+    it "should parse the mass action rabbit growth model" $
+      parse model "" rabbitSource `shouldParseModel` rabbitModel

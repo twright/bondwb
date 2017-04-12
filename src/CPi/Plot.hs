@@ -24,7 +24,8 @@ module CPi.Plot
      plotTimeSeriesToFileFiltered,
      phasePlot2,
      phasePlot2ToFile,
-     phasePlot2D
+     phasePlot2D,
+     plotTrace
     ) where
 
 import Graphics.Rendering.Chart
@@ -40,9 +41,20 @@ import qualified Control.Exception as X
 import qualified Numeric.LinearAlgebra as LA
 import Control.Monad
 import Graphics.UI.Gtk.Misc.DrawingArea
-import Graphics.Rendering.Chart.Layout
+import qualified Data.List as L
 
 import CPi.Lib
+
+import CPi.Simulation (Trace, formatTrace)
+
+plotTrace :: Trace -> IO ()
+plotTrace tr = plot ts specConcs
+  where tr' = formatTrace tr
+        ts = map fst tr'
+        concs = map snd tr'
+        specs = L.nub $ L.sort $ concatMap (map fst) concs
+        specConcs = [(spec, [sum [c | (s,c) <- sc, s==spec] | sc <- concs])
+                    | spec <- specs]
 
 -- Takes data from the ODE solver and plots them
 plotTimeSeries :: LA.Vector Double -> LA.Matrix Double -> [Species] -> IO ()

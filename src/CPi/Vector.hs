@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveFunctor, GeneralizedNewtypeDeriving, FlexibleContexts, FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveFunctor, GeneralizedNewtypeDeriving, FlexibleContexts, FunctionalDependencies, UndecidableInstances #-}
 
-module CPi.Vector (Tensor(..), Vector(..), Vect(..), (><), vect, (*>), delta, fromList, multilinear) where
+module CPi.Vector (Tensor(..), Vector(..), Vect(..), Nullable(..), (><), vect, (*>), delta, fromList, multilinear) where
 
 import Prelude hiding ((*>))
 
@@ -33,7 +33,6 @@ class (Num k) => Vector k v | v -> k where
   dimension  :: v -> Int
   norm       :: v -> k
   normalize  :: v -> v
-  isnull     :: v -> Bool
   vectZero   :: v
   (<>)       :: v -> v -> k
 
@@ -47,7 +46,16 @@ instance (Hashable a, Hashable b) => Hashable (Tensor a b) where
 instance (Show a, Show b) => Show (Tensor a b) where
   showsPrec n (a :* b) = showsPrec n a . showString "; " . showsPrec n b
 
-instance (Eq k, Num k, Fractional k, Eq i, Hashable i) => Vector k (Vect i k) where
+class Nullable a where
+  isnull :: a -> Bool
+
+-- instance {-# OVERLAPPABLE #-} (Eq k, Num k, Fractional k, Eq i, Hashable i) => Nullable (Vect i k) where
+--   isnull = (==0) . norm
+
+instance (Nullable k, Vector k (Vect i k)) => Nullable (Vect i k) where
+  isnull = isnull . norm
+
+instance (Eq k, Num k, Nullable k, Fractional k, Eq i, Hashable i) => Vector k (Vect i k) where
   vectZero = Vect H.empty
   (|>) a = fmap (*a)
   Vect u +> Vect v = Vect (unionWith (+) u v)
@@ -58,35 +66,38 @@ instance (Eq k, Num k, Fractional k, Eq i, Hashable i) => Vector k (Vect i k) wh
   -- compose ks vs = L.foldl' (+>) (Vect H.empty) $ zipWith (|>) ks vs
   norm v = sum (L.map abs (components v))
   normalize v@(Vect m)
-    | normv == 0 = v
+    | isnull v = vectZero
     | otherwise  = Vect (H.map (/normv) m)
     where normv = norm v
-  isnull = (==0) . norm
   Vect u <> Vect v = H.foldl' (+) 0 $ H.intersectionWith (*) u v
+
+
+-- instance (Eq i, Hashable i) => Vector Double (Vect i Double) where
+
   -- u <> v = (\i -> (\j -> delta i j) >< v) >< u
-fromList :: (Eq k, Num k, Fractional k, Eq i, Hashable i) => [(k,i)] -> Vect i k
+fromList :: (Eq k, Num k, Fractional k, Eq i, Hashable i, Nullable k) => [(k,i)] -> Vect i k
 fromList kvs = Vect $ H.fromListWith (+) $ L.map (\(i,v) -> (v,i)) kvs
 
-instance (Eq k, Num k, Fractional k, Eq i, Hashable i) => Eq (Vect i k) where
+instance (Eq k, Num k, Fractional k, Eq i, Hashable i, Nullable k) => Eq (Vect i k) where
   x == y = isnull (x +> (-1) |> y)
 
 vect :: (Eq k, Num k, Fractional k, Eq i, Hashable i) => i -> Vect i k
 vect i = Vect $ singleton i 1
 
 -- expands a function defined on a basis to one on vectors
-(><) :: (Eq k, Num k, Fractional k, Eq i, Hashable i, Eq j, Hashable j) =>
+(><) :: (Eq k, Num k, Fractional k, Eq i, Hashable i, Eq j, Hashable j, Nullable k) =>
         (i -> Vect j k) -> Vect i k -> Vect j k
 f >< Vect v = L.foldl' (+>) (Vect H.empty) [a |> f i | (i,a) <- H.toList v]
 
 -- expands a funtion defined on lists of basis elements, to a multilinear function on lists of vectors
-multilinear :: (Eq k, Num k, Fractional k, Eq i, Hashable i, Eq j, Hashable j) =>
+multilinear :: (Eq k, Num k, Fractional k, Eq i, Hashable i, Eq j, Hashable j, Nullable k) =>
               ([i] -> Vect j k) -> [Vect i k] -> Vect j k
 multilinear f (v:vs) = (\i -> multilinear (\is -> f (i:is)) vs) >< v
 -- multilinear f [v] = f >< v
 multilinear f [] = f []
 -- f >< Vect v = L.foldl' (+>) (Vect H.empty) [a |> f i | (i,a) <- H.toList v]
 
-(*>) :: (Eq k, Num k, Fractional k, Eq i, Hashable i, Eq j, Hashable j) =>
+(*>) :: (Eq k, Num k, Fractional k, Eq i, Hashable i, Eq j, Hashable j, Nullable k) =>
         Vect i k -> Vect j k -> Vect (Tensor i j) k
 u *> v = (\i -> (\j -> vect (i :* j)) >< v) >< u
 
@@ -94,7 +105,7 @@ delta :: Eq a => a -> a -> Integer
 delta i j | i == j = 1
           | otherwise = 0
 
-instance (Num k, Hashable i, Eq i, Eq k, Fractional k, Show i, Show k) => Show (Vect i k) where
+instance (Num k, Hashable i, Eq i, Eq k, Fractional k, Show i, Show k, Nullable k) => Show (Vect i k) where
   show v@(Vect l)
     | isnull v = "vectZero"
     | otherwise = L.intercalate " +> "

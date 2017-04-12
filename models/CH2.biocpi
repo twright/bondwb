@@ -1,0 +1,16 @@
+species CH2 = new l in Left(;l) | Right(;l);
+
+species Left(;l) = joinL(m) -> LeftBound(;m,l);
+
+species LeftBound(;m,l) = unjoinL@m -> Left(;l);
+
+species Right(;l) = joinR(m) -> RightBound(;m,l);
+
+species RightBound(;m,l) = unjoinL@m -> Right(;l);
+
+affinity network Net(x,y) = {
+  joinL, joinR at rate MA(x);
+  unjoinL + unjoinR at rate MA(y);
+}
+
+process CH2 = [1.0] (new l in Left(;l) | Right(;l)) with network Net(2.0, 1.0);

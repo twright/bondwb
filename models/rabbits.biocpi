@@ -1,0 +1,14 @@
+species Rabbit = reproduce -> (Rabbit|Rabbit)
+               + beEaten;
+
+species Fox = eat -> (Fox|Fox)
+            + die;
+
+affinity network MassActionRabbits = {
+  reproduce at rate MA(2.0);
+  eat, beEaten at rate MA(0.1);
+  die at rate MA(1.0);
+}
+
+process FoxesAndRabbits = [10.0] Rabbit || [1.0] Fox
+                          with network MassActionRabbits;

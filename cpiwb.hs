@@ -15,9 +15,9 @@
 --     You should have received a copy of the GNU General Public License
 --     along with CPiWB.  If not, see <http://www.gnu.org/licenses/>.
 
-import CPi.Lib
-import CPi.Parser
-import CPi.Semantics
+import qualified CPi.Lib as OldLib
+import CPi.Parser as OldParser
+import CPi.Semantics as OldSemantics
 import CPi.ODE
 import CPi.Plot
 import CPi.Logic
@@ -43,7 +43,7 @@ prompt = "CPiWB:> "
 
 -- Our environment will be a stack of the Haskeline,
 -- State transformer (of CPi Definitions), and IO monads:
-type Environment = InputT (StateT Env IO)
+type Environment = InputT (StateT OldLib.Env IO)
 type Formulae = [Formula]
 
 -- Main function:
@@ -162,7 +162,7 @@ helpCmd x
                       say $ "\n"++c++"\n\t"++d++"\n"
     | otherwise
         = say $ "\nThe available commands are:\n"
-          ++"\n"++prettyList (map (\(x,_) -> x) commands)++"\n\n"
+          ++"\n"++OldLib.prettyList (map (\(x,_) -> x) commands)++"\n\n"
           ++"Type \"help <command>\" for help on a specific command.\n"
 
 -- load Command
@@ -178,14 +178,14 @@ loadCmd x = do say $ "Loading: "++(param x);
 -- env Command
 envCmd :: String -> Environment ()
 envCmd _ = do s <- getEnv;
-              say $ prettys $ L.sort s
+              say $ OldLib.prettys $ L.sort s
 
 -- species Command
 speciesCmd :: String -> Environment ()
 speciesCmd x = case parseDefn x of
                  Left err -> say $ "Parse error at:\n"++(show err)
                  Right x  -> do addEnv x;
-                                say $ pretty x
+                                say $ OldLib.pretty x
 
 -- process Command
 processCmd :: String -> Environment ()
@@ -198,16 +198,16 @@ clearCmd _ = putEnv []
 -- trans Command
 transCmd :: String -> Environment ()
 transCmd x = do env <- getEnv;
-                case lookupProcName env (param x) of
+                case OldLib.lookupProcName env (param x) of
                   Nothing   -> say $ "Process \""++(param x)
                                ++"\" is not in the Environment."
                   Just proc -> do let mts = processMTS env proc;
-                                  say $ pretty mts
+                                  say $ OldLib.pretty mts
 
 -- odes Command
 odesCmd :: String -> Environment ()
 odesCmd x = do env <- getEnv
-               case lookupProcName env (param x) of
+               case OldLib.lookupProcName env (param x) of
                  Nothing   -> say $ "Process \""++(param x)
                               ++"\" is not in the Environment."
                  Just proc -> do let mts = processMTS env proc
@@ -226,7 +226,7 @@ plotManualCmd x = do env <- getEnv;
                      let res = read(args!!4)
                      let start = read(args!!2)
                      let end = read(args!!3)
-                     case lookupProcName env (args!!1) of
+                     case OldLib.lookupProcName env (args!!1) of
                        Nothing   -> say $ "Process \""++(args!!1)
                                     ++"\" is not in the Environment."
                        Just proc -> do let mts = processMTS env proc
@@ -235,7 +235,7 @@ plotManualCmd x = do env <- getEnv;
                                        let ts' = timePoints ts
                                        let solns = solveODE env proc mts dpdt ts
                                        let ss = speciesIn env dpdt
-                                       let ss' = speciesInProc proc
+                                       let ss' = OldLib.speciesInProc proc
                                        lift$lift$plotTimeSeriesFiltered ts' solns ss ss'
 
 -- phase2 command
@@ -247,7 +247,7 @@ phase2Cmd x = do env <- getEnv;
                  let end = read(args!!5)
                  let s1' = args!!2
                  let s2' = args!!3
-                 case lookupProcName env (args!!1) of
+                 case OldLib.lookupProcName env (args!!1) of
                    Nothing   -> say $ "Process \""++(args!!1)
                                 ++"\" is not in the Environment."
                    Just proc -> do let mts = processMTS env proc
@@ -256,7 +256,7 @@ phase2Cmd x = do env <- getEnv;
                                    let ts' = timePoints ts
                                    let solns = solveODEoctave env proc mts dpdt ts
                                    let ss = speciesIn env dpdt
-                                   let ss' = (lookupSpecName env s1', lookupSpecName env s2')
+                                   let ss' = (OldLib.lookupSpecName env s1', OldLib.lookupSpecName env s2')
                                    case ss' of
                                      (Just s1,Just s2) -> lift$lift$phasePlot2 ts' solns ss (s1,s2)
                                      otherwise -> say $ "Species "++s1'++" or "++s2'
@@ -272,7 +272,7 @@ plotFileCmd x = do env <- getEnv;
                    let start = read(args!!2)
                    let end = read(args!!3)
                    let file = args!!5
-                   case lookupProcName env (args!!1) of
+                   case OldLib.lookupProcName env (args!!1) of
                      Nothing   -> say $ "Process \""++(args!!1)
                                   ++"\" is not in the Environment."
                      Just proc -> do let mts = processMTS env proc
@@ -281,7 +281,7 @@ plotFileCmd x = do env <- getEnv;
                                      let ts' = timePoints ts
                                      let solns = solveODEoctave env proc mts dpdt ts
                                      let ss = speciesIn env dpdt
-                                     let ss' = speciesInProc proc
+                                     let ss' = OldLib.speciesInProc proc
                                      lift$lift$plotTimeSeriesToFileFiltered ts' solns ss ss' file
 
 -- plotAll Command
@@ -294,7 +294,7 @@ plotAllCmd x = do env <- getEnv;
                   let res = read(args!!4)
                   let start = read(args!!2)
                   let end = read(args!!3)
-                  case lookupProcName env (args!!1) of
+                  case OldLib.lookupProcName env (args!!1) of
                     Nothing   -> say $ "Process \""++(args!!1)
                                  ++"\" is not in the Environment."
                     Just proc -> do let mts = processMTS env proc
@@ -314,7 +314,7 @@ plotOctaveCmd x = do env <- getEnv;
                      let res = read(args!!4)
                      let start = read(args!!2)
                      let end = read(args!!3)
-                     case lookupProcName env (args!!1) of
+                     case OldLib.lookupProcName env (args!!1) of
                        Nothing   -> say $ "Process \""++(args!!1)
                                     ++"\" is not in the Environment."
                        Just proc -> do let mts = processMTS env proc
@@ -323,7 +323,7 @@ plotOctaveCmd x = do env <- getEnv;
                                        let ts' = timePoints ts
                                        let solns = solveODEoctave env proc mts dpdt ts
                                        let ss = speciesIn env dpdt
-                                       let ss' = speciesInProc proc
+                                       let ss' = OldLib.speciesInProc proc
                                        lift$lift$plotTimeSeriesFiltered ts' solns ss ss'
 
 -- plot only the specified species
@@ -335,12 +335,12 @@ plotOnlyCmd x = do env <- getEnv;
                    let res = read(args!!4)
                    let start = read(args!!2)
                    let end = read(args!!3)
-                   let err x = X.throw $ CpiException $
+                   let err x = X.throw $ OldLib.CpiException $
                                "Species \""++x++"\" is not in the Environment."
                    let onlyss = map
-                                (\x->maybe (err x) id (lookupSpecName env x))
+                                (\x->maybe (err x) id (OldLib.lookupSpecName env x))
                                 (drop 5 args)
-                   case lookupProcName env (args!!1) of
+                   case OldLib.lookupProcName env (args!!1) of
                      Nothing   -> say $ "Process \""++(args!!1)
                                   ++"\" is not in the Environment."
                      Just proc -> do let mts = processMTS env proc
@@ -363,12 +363,12 @@ plotDerivsCmd x = do env <- getEnv;
                      let res = read(args!!4)
                      let start = read(args!!2)
                      let end = read(args!!3)
-                     let err x = X.throw $ CpiException $
+                     let err x = X.throw $ OldLib.CpiException $
                                  "Species \""++x++"\" is not in the Environment."
                      let onlyss = map
-                                  (\x->maybe (err x) id (lookupSpecName env x))
+                                  (\x->maybe (err x) id (OldLib.lookupSpecName env x))
                                   (drop 5 args)
-                     case lookupProcName env (args!!1) of
+                     case OldLib.lookupProcName env (args!!1) of
                        Nothing   -> say $ "Process \""++(args!!1)
                                     ++"\" is not in the Environment."
                        Just proc -> do let mts = processMTS env proc
@@ -388,7 +388,7 @@ plotDerivsCmd x = do env <- getEnv;
 checkCmd :: String -> Environment ()
 checkCmd x = do env <- getEnv
                 let args = words x
-                case lookupProcName env (args!!1) of
+                case OldLib.lookupProcName env (args!!1) of
                   Nothing -> say $ "Process \""++(args!!1)
                              ++"\" is not in the Environment."
                   Just p  -> case parseFormula (unwords(drop 2 args)) of
@@ -406,7 +406,7 @@ checkCmd x = do env <- getEnv
 check2Cmd :: String -> Environment ()
 check2Cmd x = do env <- getEnv
                  let args = words x
-                 case lookupProcName env (args!!1) of
+                 case OldLib.lookupProcName env (args!!1) of
                    Nothing -> say $ "Process \""++(args!!1)
                               ++"\" is not in the Environment."
                    Just p  -> case parseFormula (unwords(drop 2 args)) of
@@ -427,7 +427,7 @@ matlabCmd x = do env <- getEnv
                      start = read(args!!2)
                      end = read(args!!3)
                      res = read(args!!4)
-                 case lookupProcName env (args!!1) of
+                 case OldLib.lookupProcName env (args!!1) of
                    Nothing -> say $ "Process \""++(args!!1)
                               ++"\" is not in the Environment."
                    Just p -> let mts = processMTS env p
@@ -443,7 +443,7 @@ evolveCmd x = do env <- getEnv
                      end = read(args!!3)
                      res = read(args!!4)
                      newPname = (args!!5)
-                 case lookupProcName env (args!!1) of
+                 case OldLib.lookupProcName env (args!!1) of
                    Nothing -> say $ "Process \""++(args!!1)
                               ++"\" is not in the Environment."
                    Just p -> let mts = processMTS env p
@@ -451,9 +451,9 @@ evolveCmd x = do env <- getEnv
                                  ts = (res,(start,end))
                                  newP = (evolveProcess env p mts p'
                                                        ts solveODEoctave)
-                             in do addEnv $ ProcessDef newPname newP
+                             in do addEnv $ OldLib.ProcessDef newPname newP
                                    say $ newPname ++ " = "
-                                           ++ (pretty newP)
+                                           ++ (OldLib.pretty newP)
 
 ----------------------
 -- Command help texts:
@@ -490,15 +490,15 @@ helpTextDerivs = ("derivs <process> <start> <end> <points> <species...>","Plots 
 say = outputStrLn
 
 -- Get the Environment state:
-getEnv :: Environment Env
+getEnv :: Environment OldLib.Env
 getEnv = lift get
 
 -- Write the Environment state:
-putEnv :: Env -> Environment ()
+putEnv :: OldLib.Env -> Environment ()
 putEnv = lift . put
 
 -- Add to the Environment state:
-addEnv :: Definition -> Environment ()
+addEnv :: OldLib.Definition -> Environment ()
 addEnv x = do env <- getEnv;
               putEnv (x:env)
 

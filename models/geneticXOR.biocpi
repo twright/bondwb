@@ -1,0 +1,36 @@
+species Unbound(bind, unbind, bound, unbound; l) =
+    bind(m)   -> Bound(bind, unbind, bound, unbound; l, m)
+  + unbound@l -> Unbound(bind, unbound, bound, unbound; l);
+
+species Bound(bind, unbind, bound, unbound; l, m) =
+    unbind@m -> Unbound(bind, unbind, bound, unbound; l, m)
+  + bound@l  -> Bound(bind, unbind, bound, unbound; l, m);
+
+species Transcriber(;l) = transcribe@l -> (Product | Transcriber);
+
+species Strand = new l in
+    Unbound(bindA, unbindA, boundA, unboundA; l)
+  | Unbound(bindB, unbindB, boundB, unboundB; l)
+  | Transcriber(;l);
+
+species TranscriptionFactor(bind, unbind;) =
+  bind(m) -> unbind@m -> TranscriptionFactor(bind, unbind);
+
+species Product = product -> Product;
+
+kinetic law L(k; X, Y) = k*(X + Y);
+
+kinetic law MA(k; *x) = k * product(*x);
+
+affinity network M(k1, k2, k3, l2, l3) = {
+  transcribe + boundA + unboundB, transcribe + unboundA + boundB at rate L(k1);
+  bindA, cobindA at rate MA(k2);
+  unbindA + counbindA at rate MA(l2);
+  unbindB + counbindB at rate MA(l3);
+}
+
+process GeneticXORGate = [1.0] Strand
+                      || [0.1] TranscriptionFactor(cobindA, counbindA)
+                      || [0.1] TranscriptionFactor(cobindB, coreleaseB)
+                      || [0.0] Product
+                      with network M(1.0,0.5,0.5,0.1,0.1);

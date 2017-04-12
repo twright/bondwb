@@ -5,7 +5,7 @@ description:         The Continuous pi-Calculus is a process algebra for modelli
 license:             GPL-3
 license-file:        LICENSE
 author:              Chris Banks, Ian Stark, Thomas Wright
-maintainer:          C.Banks@ed.ac.uk, Ian.Stark@ed.ac.uk, t.d.wright@sms.ed.ac.uk
+maintainer:          C.Banks@ed.ac.uk, Ian.Stark@ed.ac.uk, thomas.wright@ed.ac.uk
 copyright:           Chris Banks, Ian Stark, Thomas Wright
 category:            SystemsBiology
 build-type:          Simple
@@ -62,6 +62,17 @@ executable cpiwb
                        hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
                        Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens,
                        data-default-class, cpilib
+  default-language:    Haskell2010
+
+executable biowb
+  main-is:             biowb.hs
+  other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
+                       FlexibleInstances, PatternGuards
+  build-depends:       base >=4.7, megaparsec,
+                       containers >=0.5, transformers >=0.3,
+                       process >=1.2, colour >=2.3,
+                       haskeline, Chart, Chart-gtk == 1.8, gtk,
+                       Chart-cairo, lens, data-default-class, cpilib
   default-language:    Haskell2010
 
 executable cpiide

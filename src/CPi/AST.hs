@@ -15,7 +15,17 @@ module CPi.AST
   RateLawFamily,
   Env,
   Pretty,
-  Definition(..),
+  SpeciesDefinition(..),
+  RateLawSpec(..),
+  AffinityNetwork,
+  AffinityNetworkDefinition(..),
+  AffinityNetworkSpec(..),
+  Affinity(..),
+  ConcreteAffinity(..),
+  ConcreteAffinityNetwork,
+  RateLawParam(..),
+  AbstractProcess(..),
+  CPiModel(..),
   concretify,
   pretty,
   maxLoc,
@@ -33,11 +43,18 @@ module CPi.AST
   partitionNew,
   closeSpecs,
   closeLocs,
-  canonicallyReorderLocs
+  canonicallyReorderLocs,
+  addSpeciesDef,
+  addKineticLawDef,
+  addProcessDef,
+  addAffinityNetworkDef,
+  emptyCPiModel,
+  combineModels
   ) where
 
 import qualified Data.List as L
 import Data.Map (Map)
+import qualified Data.Map as M
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen
 import Control.Monad
@@ -103,13 +120,85 @@ prefName (Unlocated n) = n
 
 type PrefixSpecies = (Prefix, Abstraction)
 
-data Definition = SpeciesDef
-  { defArgs  :: [Name]
-  , defLocs  :: [Location]
+data RateLawParam = RateLawParamVar String
+                  | RateLawParamVal Double
+                  deriving (Eq, Ord, Show)
+
+data RateLawSpec = RateLawAppl String [RateLawParam]
+                --  | RateLawFn RateLaw
+                 deriving (Eq, Ord, Show)
+
+data Affinity = Affinity { affRateLaw :: RateLawSpec
+                         , affSites   :: [[Name]] }
+                deriving (Eq, Ord, Show)
+
+data ConcreteAffinity = ConcreteAffinity { cAffRateLaw :: RateLaw
+                                         , cAffSites   :: [[Name]] }
+
+type AffinityNetwork = [Affinity]
+
+type ConcreteAffinityNetwork = [ConcreteAffinity]
+
+data AffinityNetworkSpec = AffinityNetworkAppl String [Rate]
+                         | AffinityNetworkSpec AffinityNetwork
+                         deriving (Eq, Ord, Show)
+
+data AbstractProcess = Process AffinityNetworkSpec [(Conc, Species)]
+                       deriving (Eq, Ord, Show)
+
+data SpeciesDefinition = SpeciesDef
+  { specArgs :: [Name]
+  , specLocs :: [Location]
   , specBody :: Species }
   deriving (Eq, Ord, Show)
 
-type Env = Map String Definition
+data AffinityNetworkDefinition = AffinityNetworkDef
+  { affArgs :: [Name]
+  , affBody :: AffinityNetwork }
+  deriving (Eq, Ord, Show)
+
+data CPiModel = Defs
+  { speciesDefs         :: Env
+  , affinityNetworkDefs :: Map String AffinityNetworkDefinition
+  , kineticLawDefs      :: Map String RateLawFamily
+  , processDefs         :: Map String AbstractProcess }
+
+instance Show CPiModel where
+  show (Defs s a _ p) = "Defs " ++ show s ++ " "
+                                ++ show a ++ " "
+                                ++ " M.empty "
+                                ++ show p
+
+addSpeciesDef :: String -> SpeciesDefinition -> CPiModel -> CPiModel
+addSpeciesDef name def (Defs s a k p) = Defs (M.insert name def s) a k p
+
+addAffinityNetworkDef :: String -> AffinityNetworkDefinition -> CPiModel
+                         -> CPiModel
+addAffinityNetworkDef name def (Defs s a k p) = Defs s (M.insert name def a) k p
+
+addKineticLawDef :: String -> RateLawFamily -> CPiModel -> CPiModel
+addKineticLawDef name def (Defs s a k p) = Defs s a (M.insert name def k) p
+
+addProcessDef :: String -> AbstractProcess -> CPiModel -> CPiModel
+addProcessDef name def (Defs s a k p) = Defs s a k (M.insert name def p)
+
+combineModels :: CPiModel -> CPiModel -> CPiModel
+combineModels (Defs s1 a1 k1 p1) (Defs s2 a2 k2 p2) = Defs (s1 `M.union` s2)
+                                                           (a1 `M.union` a2)
+                                                           (k1 `M.union` k2)
+                                                           (p1 `M.union` p2)
+
+massAction :: RateLawFamily
+massAction [k] xs = k * product xs
+massAction _ _ = error "Wrong number of parameters provided to mass action kninetic law"
+
+emptyCPiModel :: CPiModel
+emptyCPiModel = Defs { speciesDefs = M.empty
+                     , kineticLawDefs = M.fromList [("MA", massAction)]
+                     , affinityNetworkDefs = M.empty
+                     , processDefs = M.empty }
+
+type Env = Map String SpeciesDefinition
 
 type ExpId = Int
 
@@ -181,7 +270,7 @@ instance Arbitrary Species where
           tails s = map tail $ L.permutations s
   shrink (Sum _ _ xs) = Nil:[mkSum xs' | xs' <- shrink xs]
 
-instSpec :: Definition -> [Name] -> [Location] -> Species
+instSpec :: SpeciesDefinition -> [Name] -> [Location] -> Species
 instSpec (SpeciesDef (n:ns) ls body) (n':ns') ls' = rename n n'
   $ instSpec (SpeciesDef ns ls body) ns' ls'
 instSpec (SpeciesDef ns (l:ls) body) ns' (l':ls') = relocate l l'

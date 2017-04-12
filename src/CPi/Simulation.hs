@@ -27,7 +27,7 @@ powerset (x:xs) = powerset xs ++ map (x:) (powerset xs)
 toProcess :: P -> Process
 toProcess (Vect v) = Mixture [(abs x, spec) | (spec, x) <- H.toList v]
 
-simulate :: Env -> AffinityNetwork -> Double -> Double -> P -> Trace
+simulate :: Env -> ConcreteAffinityNetwork -> Double -> Double -> P -> Trace
 simulate env network h !t !p0 = (t, p0) : simulate env network h t' p'
   where p    = toProcess p0
         t'   = t + h
@@ -43,6 +43,7 @@ uptoEpsilon epsilon (Vect v) = fromList $ map (\(a, b) -> (b, a))
           | abs s < epsilon = uptoEpsilon' (epsilon - abs s)
                                                         svs
           | otherwise = l
+        uptoEpsilon' _  [] = []
         key (_, s) = abs s
         -- makeKet :: [(Scalar, P)] -> P
         -- makeKet ((s, v):xs) = s |> v +> makeKet xs
@@ -65,10 +66,14 @@ sim tr network epsilon h !t !p0 = (t, p0) : sim tr network epsilon h t' p'
         dpdt = dPdt' tr network p0
         p'   = uptoEpsilon epsilon $ p0 +> h |> dpdt
 
-simulateUptoEpsilon :: Double -> Env -> AffinityNetwork -> Double -> Double -> P -> Trace
+simulateUptoEpsilon :: Double -> Env -> ConcreteAffinityNetwork -> Double -> Double -> P -> Trace
 simulateUptoEpsilon epsilon env network = tr `seq` sim tr network epsilon
   where tr = tracesGivenNetwork network env
 
 formatTrace :: Trace -> [(Double, [(String, Conc)])]
 formatTrace tr = [(t, [(pretty v, conc) | (v, conc)
                         <- H.toList p]) | (t, Vect p) <- tr]
+--
+-- traceToSeries :: Trace -> ([Double], [[Conc]])
+-- traceToSeries = (species, timesteps, concs)
+--   where

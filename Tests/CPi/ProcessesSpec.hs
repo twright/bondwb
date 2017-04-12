@@ -14,26 +14,26 @@ massAction :: RateLawFamily
 massAction [k] xs = k * (product xs)
 massAction _ _ = error "Mass action takes only one parameter"
 
-enzymeAffinityNetwork :: AffinityNetwork
+enzymeAffinityNetwork :: ConcreteAffinityNetwork
 enzymeAffinityNetwork =
-  [ Affinity (massAction [1]) [[Unlocated "e"], [Unlocated "s"]]
-  , Affinity (massAction [2]) [[Unlocated "x", Unlocated "r"]]
-  , Affinity (massAction [3]) [[Unlocated "x", Unlocated "p"]] ]
+  [ ConcreteAffinity (massAction [1]) [["e"], ["s"]]
+  , ConcreteAffinity (massAction [2]) [["x", "r"]]
+  , ConcreteAffinity (massAction [3]) [["x", "p"]] ]
 
 enzymeEbound :: Species
 enzymeEbound = mkSum [(Located "x" 0, mkAbsBase (Def "E" [] []))]
 
-enzymeE :: Definition
+enzymeE :: SpeciesDefinition
 enzymeE = SpeciesDef [] [] $ mkSum [(Unlocated "e", mkAbs 0 enzymeEbound)]
 
-enzymeP :: Definition
+enzymeP :: SpeciesDefinition
 enzymeP = SpeciesDef [] [] $ mkSum [(Unlocated "d", mkAbsBase (Def "P" [] []))]
 
 enzymeSbound :: Species
-enzymeSbound = (mkSum [(Located "r" 0, mkAbsBase (Def "S" [] [])),
-                     (Located "p" 0, mkAbsBase (Def "P" [] []))])
+enzymeSbound = mkSum [(Located "r" 0, mkAbsBase (Def "S" [] [])),
+                     (Located "p" 0, mkAbsBase (Def "P" [] []))]
 
-enzymeS :: Definition
+enzymeS :: SpeciesDefinition
 enzymeS = SpeciesDef [] [] $ mkSum [(Unlocated "s", mkAbs 0 enzymeSbound)]
 
 enzymeDefs :: Env
@@ -87,8 +87,8 @@ spec = do
       partial enzymeDefs (Mixture [(3.0, Def "S" [] [])])
         `shouldBe` partialS
     it "finds the partial interactions for a mixture of E and S" $
-        (partial enzymeDefs (Mixture [(2.0, Def "E" [] []),
-                                      (3.0, Def "S" [] [])]))
+        partial enzymeDefs (Mixture [(2.0, Def "E" [] []),
+                                      (3.0, Def "S" [] [])])
            `shouldBe`(partialS +> partialE)
     it "should return no interactions after hiding" $
       partial enzymeDefs
@@ -102,7 +102,7 @@ spec = do
     --   property $ \x -> normalForm x == Nil || partial enzymeDefs (Mixture [(4.0, x)]) /= vectZero
   describe "norm" $ do
     it "finds the l1 norm of 2.0<1| -3.0<2| + 1.5<3|" $
-      norm (2.0 |> vect (1::Integer) +> (-3.0) |> vect 2 +> 1.5 |> vect 3) `shouldBe` 6.5
+      norm (2.0 |> vect (1::Integer) +> (-3.0) |> vect 2 +> 1.5 |> vect 3) `shouldBe` (6.5::Double)
   describe "conc" $ do
     it "finds the concentration of a site s in partial E||S" $
       conc [Unlocated "s"] (partialS +> partialE) `shouldBe` 3.0
@@ -123,7 +123,7 @@ spec = do
       let f :: [Integer] -> Vect (Tensor Integer Integer) Double
           f [x, y] = vect ((x + 1) :* (y + 1))
           f _ = error "partially defined"
-      in (multilinear f [3 |> vect 1 +> 4 |> vect 2, 5 |> vect 6 +> 7 |> vect 8])
+      in multilinear f [3 |> vect 1 +> 4 |> vect 2, 5 |> vect 6 +> 7 |> vect 8]
         `shouldBe` 15 |> vect (2 :* 7) +> 21 |> vect (2 :* 9)
           +> 20 |> vect (3 :* 7) +> 28 |> vect (3 :* 9)
     it "gives the correct result on basis elements" $

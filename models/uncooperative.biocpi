@@ -1,0 +1,19 @@
+species E = e(l) -> Ebound(;l);
+
+species Ebound(;l) = x@l -> E + b(m) -> u@m -> Ebound(;l);
+
+species S = s(l) -> (r@l -> S + p@l -> P);
+
+species P = beP -> P;
+
+species I = i(m) -> v@m -> I;
+
+affinity network Aff = {
+  e, s at rate MA(1.0);
+  x + r at rate MA(0.5);
+  x + p at rate MA(0.5);
+  b, i at rate MA(1.0);
+  u + v at rate MA(0.1);
+}
+
+process Uncoop = [0.1] E || [1.0] S || [0.3] I with network Aff;

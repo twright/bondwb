@@ -1,0 +1,29 @@
+species B = b(v) -> i@v -> B;
+
+species U(;l, t, r) = s(v) -> V(;v, l, t, r)
+                  + s@t(v) -> V(;v, l, t, r);
+
+species V(;v, l, t, r) = j@t -> U(;l, t, r)
+                      + h@l -> V(;v, l, t, r)
+                      + h@r -> V(;v, l, t, r);
+
+affinity network Aff(k1, k2, k3) = {
+  b, s at rate MA(k1);
+  b, s + h at rate MA(k2);
+  i + j at rate MA(k3);
+}
+
+process P2 = [10.0] B || [1.0] (new n, l, r in U(;n, l, r) | U (;l, r, n))
+             with network Aff(0.1, 1.0, 0.5);
+
+process P4 = [1.0] B || [1.0] (new n, p1, p2, p3, p4
+                               in U(;n,p1,p2) | U(;p1,p2,p3) | U(;p2, p3, p4)
+                                              | U(;p3,p4,n))
+            with network Aff(0.1, 1.0, 0.5);
+
+
+process PSquare = [1.0] B
+               || [1.0] (new n, p1, p2, p3, p4
+                         in U(;p4,p1,p3) | U(;p1,p2,p3) | U(;p2, p3, p4)
+                              | U(;p3,p4,p1))
+                  with network Aff(0.1, 1.0, 0.5);
