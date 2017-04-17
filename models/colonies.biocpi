@@ -1,0 +1,15 @@
+species Colony(;l) = colonize@l -> (Colony(;l) | Colony(;l))
+                   + differentiate@l -> Cell(;l);
+
+species Cell(;l) = cell -> Cell(;l);
+
+affinity network Aff(birth, death) = {
+  colonize at rate MA(birth);
+  differentiate at rate MA(death);
+}
+
+process Cells = [1.0] (new l in Colony(;l)) with network Aff(0.6, 0.4);
+
+process Cells2 = [1.0] (new l in Colony(;l)) with network Aff(0.3, 0.7);
+
+process Cells3 = [1.0] (new l in Colony(;l)) with network Aff(0.8, 0.2);

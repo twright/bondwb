@@ -153,7 +153,7 @@ import Graphics.UI.Gtk.SourceView
       sourceBufferNewWithLanguage )
 import Graphics.UI.Gtk.Layout.Table ()
 
-import Numeric.LinearAlgebra ( (@@>) )
+import Numeric.LinearAlgebra ( (!) )
 import Graphics.UI.Gtk.Gdk.EventM ()
 import Graphics.UI.Gtk.MenuComboToolbar.ComboBox ()
 import Data.List ( transpose, isInfixOf, delete )
@@ -194,6 +194,7 @@ import System.Glib.Attributes
 import System.Glib
 -- import System.Glib.UTFString
 
+a @@> (i, j) = a ! i ! j
 
 main :: IO ()
 main =

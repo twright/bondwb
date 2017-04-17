@@ -82,7 +82,7 @@ definitionName = (lexeme . try) (p >>= check)
                   else return x
 
 number :: Parser Double
-number =  lexeme LEX.float
+number =  LEX.signed spaceConsumer (lexeme LEX.float)
 
 prefix :: Parser Prefix
 prefix = lexeme $ do

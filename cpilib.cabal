@@ -20,14 +20,14 @@ library
                        CPi.Lib,  CPi.Matlab,  CPi.Parser,
                        CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions,
                        CPi.Processes, CPi.Simulation, CPi.Examples, CPi.Vector,
-                       CPi.ParserNew
+                       CPi.ParserNew, CPi.NumericalMethods
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
   build-depends:       base >=4.7, parsec >=3.1,
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3,
                        data-accessor >=0.2, numeric-quest,
-                       hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
+                       hmatrix-gsl, hmatrix <= 0.18.0.0, haskeline,
                        Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class, QuickCheck, unordered-containers,
                        hashable, megaparsec
   default-language:    Haskell2010
@@ -59,7 +59,7 @@ executable cpiwb
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3,
                        data-accessor >=0.2,
-                       hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
+                       hmatrix-gsl, hmatrix <= 0.18.0.0, haskeline,
                        Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens,
                        data-default-class, cpilib
   default-language:    Haskell2010
@@ -83,8 +83,8 @@ executable cpiide
   build-depends:       base >=4.7, parsec >=3.1,
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3, gtksourceview2,
-                       data-accessor >=0.2, text, glib, split, gio, hledger, MissingH,
-                       cairo, hmatrix-gsl, hmatrix <= 0.16.1.5, haskeline,
+                       data-accessor >=0.2, text, glib, split, gio, hledger == 1.2, MissingH, hmatrix == 0.18.0.0,
+                       cairo, haskeline,
                        Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class,
                        cpilib
   default-language:    Haskell2010

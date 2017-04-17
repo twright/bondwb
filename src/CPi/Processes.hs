@@ -13,12 +13,11 @@ import qualified Data.Map as M
 import CPi.Vector
 import Data.Maybe
 import Data.Bifunctor
-import Data.Hashable
 -- import Debug.Trace
 trace _ b = b
 
 instance Nullable Conc where
-  isnull = (<0.001)
+  isnull = (<1e-12)
 
 -- Process space
 type P = Vect Species Conc
@@ -79,7 +78,7 @@ concretifyProcess model (Process affSpec concSpecs)
 concretifyModel :: CPiModel -> Either String ConcreteModel
 concretifyModel model@(Defs env _ _ p)
   = case errors of
-      []            -> Right $ (env, processes)
+      []            -> Right (env, processes)
       ((name, e):_) -> Left $ "Error found in process definition " ++ name
                                ++ ":\n" ++ e
   where processes = M.fromList [ (name,  process)
@@ -140,11 +139,15 @@ react = multilinear react'
 
 actions :: ConcreteAffinityNetwork -> D -> P
 actions network !potential = L.foldl' (+>) vectZero [
-  let concs   = map (`conc` potential) sites'
-      directs = map (`direct` potential) sites'
-      sites'  = map (L.sort . map Unlocated) sites
-  in concs `seq` directs `seq` law concs |> react directs
+  let concs      = map (`conc` potential') sites'
+      directs    = map (`direct` potential') sites'
+      sites'     = map (L.sort . map Unlocated) sites
+  in if maximum (map abs concs) > 1e-12
+     then law concs |> react directs
+     else vectZero
   | ConcreteAffinity law sites <- network ]
+  where Vect h     = potential
+        potential' = Vect $ H.filter ((>1e-12).abs) h
 
 partial' :: (Species -> MTS) -> P -> D
 partial' tr = (partial'' ><)

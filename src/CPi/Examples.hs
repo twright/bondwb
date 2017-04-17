@@ -24,6 +24,7 @@ import qualified Data.Map as M
 
 massAction :: RateLawFamily
 massAction [k] xs = k * product xs
+massAction _ _ = error "mass action called with wrong arguments"
 
 defsCH2 :: Env
 defsCH2 = M.fromList [
@@ -41,9 +42,11 @@ simCH2 = simulate defsCH2 affinityNetworkCH2 0.1 0 (1.0 |> vect (Def "CH2" [] []
 
 logistic :: RateLawFamily
 logistic [b, k] [r] = b * r * (1 - r/k)
+logistic _ _ = error "logistic called with wrong arguments"
 
 functional :: RateLawFamily
 functional [beta, h] [f, r] = beta * f * r / (1 + beta * h * r)
+functional _ _ = error "functional called with wrong arguments"
 
 rabbitDefs :: Env
 rabbitDefs = M.fromList
@@ -115,7 +118,7 @@ affinityNetworkPolymer =
   , ConcreteAffinity (massAction [1]) [["shrink"]] ]
 
 simPolymer :: Trace
-simPolymer = simulateUptoEpsilon 0.0001 polymerDefs affinityNetworkPolymer 0.01 0 (1.0 |> vect (Def "B" [] []))
+simPolymer = simulateUptoEpsilon 0.0001 polymerDefs affinityNetworkPolymer 0.01 0.001 0.0001 0 (1.0 |> vect (Def "B" [] []))
 
 
 rabbitSource :: String

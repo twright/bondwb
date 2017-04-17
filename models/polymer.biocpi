@@ -5,4 +5,15 @@ affinity network PolymerReactions(m,n) = {
   shrink + allowShrink at rate MA(n);
 }
 
+affinity network PolymerReactionsAllShrink(m,n) = {
+  grow at rate MA(m);
+  shrink at rate MA(n);
+}
+
+affinity network PolymerReactionsNoShrink(m) = {
+  grow at rate MA(m);
+}
+
 process Polymer = [1.0] (new l in A(;l)) with network PolymerReactions(2.0, 1.0);
+
+process PolymerNoShrink = [1.0] (new l in A(;l)) with network PolymerReactionsNoShrink(2.0);

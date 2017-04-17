@@ -1,0 +1,12 @@
+species P(;l) = birth -> (P(;l) | P(;l))
+              + death;
+
+species I(;l) = immigrate -> (P(;l) | I(;l));
+
+affinity network Aff = {
+  birth at rate MA(2.0);
+  death at rate MA(1.0);
+  immigrate at rate MA(1.0);
+}
+
+process BDI = [1.0] (new l in I(;l) | P(;l)) with network Aff;

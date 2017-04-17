@@ -7,22 +7,19 @@ module CPi.Simulation
   simulate,
   formatTrace,
   simulateUptoEpsilon,
-  uptoEpsilon
+  uptoEpsilon,
+  simulateMaxSpecies,
+  maxSpecies
   ) where
 
 import CPi.AST
 import CPi.Processes
-import CPi.Transitions
 import CPi.Vector
-import qualified Data.Map as M
+import CPi.NumericalMethods (gear, rungeKutta4)
 import qualified Data.List as L
 import qualified Data.HashMap.Strict as H
 
 type Trace = [(Double, P)]
-
-powerset :: [a] -> [[a]]
-powerset []     = [[]]
-powerset (x:xs) = powerset xs ++ map (x:) (powerset xs)
 
 toProcess :: P -> Process
 toProcess (Vect v) = Mixture [(abs x, spec) | (spec, x) <- H.toList v]
@@ -39,41 +36,39 @@ uptoEpsilon epsilon (Vect v) = fromList $ map (\(a, b) -> (b, a))
                       $ uptoEpsilon' epsilon
                       $ L.sortOn key $ H.toList v
   where uptoEpsilon' :: Conc -> [(Species, Conc)] -> [(Species, Conc)]
-        uptoEpsilon' epsilon l@((_, s):svs)
-          | abs s < epsilon = uptoEpsilon' (epsilon - abs s)
+        uptoEpsilon' ep l@((_, s):svs)
+          | abs s < ep = uptoEpsilon' (ep - abs s)
                                                         svs
           | otherwise = l
         uptoEpsilon' _  [] = []
         key (_, s) = abs s
-        -- makeKet :: [(Scalar, P)] -> P
-        -- makeKet ((s, v):xs) = s |> v +> makeKet xs
-        -- makeKet [] = KetZero
 
--- simulateUptoEpsilon :: Double -> Env -> AffinityNetwork -> Double -> Double -> P -> Trace
--- simulateUptoEpsilon epsilon env network h !t !p0 = (t, p0) : simulateUptoEpsilon epsilon env network h t' p'
---   where t'   = t + h
---         dpdt = dPdt' tr network p0
---         p'   = uptoEpsilon epsilon $ p0 +> (h :+ 0) |> dpdt
---         tr   = transFiltered validPref env
---         prefLists = L.nub $ L.sort $ map (map prefName) $ L.concatMap affSites network
---         prefListSubsets = L.nub $ L.sort $ L.concatMap powerset prefLists
---         validPref :: PrefixFilter
---         validPref Potential = prefListSubsets `seq` (`elem` prefListSubsets)
---         validPref Final = prefLists `seq` (`elem` prefLists)
+simulateMaxSpecies :: Int -> Env -> ConcreteAffinityNetwork -> Double -> Double -> Double -> Double -> P -> Trace
+simulateMaxSpecies n env network tol h hmin t0 p0
+  =
+  -- simA3Adaptive f (maxSpecies n) tol hmin h t0 p0 p1 p2
+  -- simAM3Modified2 f (maxSpecies n) tol 100 hmin h t0 p0 p1 p2
+  gear f (maxSpecies n) tol 0 True 10 hmin h t0 p0 p1 p2 p3 p4
+  -- simRK4 f (maxSpecies n) h t0 p0
+  where f  = dPdt' tr network
+        _:(_, p1):(_, p2):(_,p3):(_,p4):_ = rungeKutta4 f (maxSpecies n) h t0 p0
+        tr = tracesGivenNetwork network env
 
-sim tr network epsilon h !t !p0 = (t, p0) : sim tr network epsilon h t' p'
-  where t'   = t + h
-        dpdt = dPdt' tr network p0
-        p'   = uptoEpsilon epsilon $ p0 +> h |> dpdt
+simulateUptoEpsilon :: Double -> Env -> ConcreteAffinityNetwork -> Double -> Double -> Double -> Double -> P -> Trace
+simulateUptoEpsilon epsilon env network tol h hmin t0 p0
+  = --simA3Adaptive f (uptoEpsilon epsilon) 1e-6 (h/100) h t0 p0 p1 p2
+   gear f (uptoEpsilon epsilon) tol 0 True 10 hmin h t0 p0 p1 p2 p3 p4
+  -- simAM3Modified f (uptoEpsilon epsilon) (5*epsilon) 10000 h t0 p0 p1 p2
+  where f  = dPdt' tr network
+        _:(_, p1):(_, p2):(_,p3):(_,p4):_ = rungeKutta4 f (uptoEpsilon epsilon) h t0 p0
+        tr = tracesGivenNetwork network env
 
-simulateUptoEpsilon :: Double -> Env -> ConcreteAffinityNetwork -> Double -> Double -> P -> Trace
-simulateUptoEpsilon epsilon env network = tr `seq` sim tr network epsilon
-  where tr = tracesGivenNetwork network env
+maxSpecies :: Int -> P -> P
+maxSpecies n (Vect v) = fromList $ map (\(a, b) -> (b, a))
+                      $ take n
+                      $ L.sortOn key $ H.toList v
+  where key (_, s) = - abs s
 
 formatTrace :: Trace -> [(Double, [(String, Conc)])]
-formatTrace tr = [(t, [(pretty v, conc) | (v, conc)
+formatTrace tr = [(t, [(pretty v, c) | (v, c)
                         <- H.toList p]) | (t, Vect p) <- tr]
---
--- traceToSeries :: Trace -> ([Double], [[Conc]])
--- traceToSeries = (species, timesteps, concs)
---   where

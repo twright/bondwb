@@ -1,0 +1,7 @@
+species Particle(;l) = collide -> (Particle(;l) | Particle(;l));
+
+affinity network Aff(birth) = {
+  collide at rate MA(birth);
+}
+
+process Particles = [1.0] (new l in Particle(;l)) with network Aff(1.0);

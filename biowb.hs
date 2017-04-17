@@ -48,7 +48,7 @@ type Environment = InputT (StateT CPiModel IO)
 -- Main function:
 main :: IO ()
 main = do putStrLn welcome;
-          evalStateT (runInputT defaultSettings loop) emptyCPiModel
+          evalStateT (runInputT defaultSettings {historyFile = Just ".history"} loop) emptyCPiModel
               where
                 loop :: Environment ()
                 loop = do input <- getInputLine prompt
@@ -98,6 +98,9 @@ commands = [("help",
                      cmdHelp = helpTextTrans}),
             ("plot",
              CmdRec {cmdFn = plotCmd,
+                     cmdHelp = helpTextPlot}),
+            ("plotUptoEpsilon",
+             CmdRec {cmdFn = plotEpsilonCmd,
                      cmdHelp = helpTextPlot})
                      ]
 
@@ -112,15 +115,39 @@ plotCmd x = do
   let name    = args!!1
       start   = read(args!!2) :: Double
       end     = read(args!!3) :: Double
-      steps   = read(args!!4) :: Int
-      h       = (end - start) / fromIntegral steps
-      epsilon = read(args!!5) :: Double
+      tol     = read(args!!4)
+      h       = read(args!!5) :: Double
+      hmin    = read(args!!6)
+      -- h       = (end - start) / fromIntegral steps
+      n       = read(args!!7) :: Int
   case concretifyModel abstractModel of
     Right (env, defs) ->
       case M.lookup name defs of
         Just (network, p) -> do
-          let simulator = simulateUptoEpsilon epsilon env network h start p
-              res       = take (steps + 1) simulator
+          let simulator = simulateMaxSpecies n env network tol h hmin start p
+              res       = takeWhile ((<=end).fst) simulator
+          lift $ lift $ plotTrace res
+        Nothing -> say $ "Process " ++ name ++ " not defined!"
+    Left err -> say $ "Error in model: " ++ err
+
+plotEpsilonCmd :: String -> Environment ()
+plotEpsilonCmd x = do
+  abstractModel <- getEnv
+  let args    = words x
+  let name    = args!!1
+      start   = read(args!!2) :: Double
+      end     = read(args!!3) :: Double
+      tol     = read(args!!4)
+      h       = read(args!!5) :: Double
+      hmin    = read(args!!6)
+      -- h       = (end - start) / fromIntegral steps
+      epsilon = read(args!!7) :: Double
+  case concretifyModel abstractModel of
+    Right (env, defs) ->
+      case M.lookup name defs of
+        Just (network, p) -> do
+          let simulator = simulateUptoEpsilon epsilon env network tol h hmin start p
+              res       = takeWhile ((<=end).fst) simulator
           lift $ lift $ plotTrace res
         Nothing -> say $ "Process " ++ name ++ " not defined!"
     Left err -> say $ "Error in model: " ++ err
