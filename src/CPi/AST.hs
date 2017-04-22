@@ -51,7 +51,8 @@ module CPi.AST
   addAffinityNetworkDef,
   emptyCPiModel,
   combineModels,
-  concretifyKineticLaw
+  concretifyKineticLaw,
+  prefLoc
   ) where
 
 import qualified Data.List as L
@@ -120,6 +121,10 @@ data Prefix
 prefName :: Prefix -> Name
 prefName (Located n _) = n
 prefName (Unlocated n) = n
+
+prefLoc :: Prefix -> Maybe Location
+prefLoc (Located _ l) = Just l
+prefLoc (Unlocated _) = Nothing
 
 type PrefixSpecies = (Prefix, Abstraction)
 

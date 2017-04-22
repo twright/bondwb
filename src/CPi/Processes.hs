@@ -14,6 +14,7 @@ import CPi.Vector
 import Data.Maybe
 import Data.Bifunctor
 -- import Debug.Trace
+trace :: String -> b -> b 
 trace _ b = b
 
 instance Nullable Conc where
@@ -104,7 +105,7 @@ hide toHide (Vect v) = Vect $ H.filterWithKey shouldHide v
 partial :: Env -> Process -> D
 partial env (Mixture ((c,spec):xs)) = fromList
                                       [(c, s :* s' :* a)
-                                      | Trans _ s a s' <- simplify $ trans spec env]
+                                      | Trans s a s' <- simplify $ trans env spec]
                                       +> partial env (Mixture xs)
 partial env (React network p) = hide (networkSites network) $ partial env p
 partial _ (Mixture []) = vectZero
@@ -119,8 +120,7 @@ tracesGivenNetwork network = trace ("prefLists = " ++ show prefLists) (transFilt
     prefLists = L.nub $ L.sort $ map (L.sort . map prefName) $ L.concatMap (map (map Unlocated) . cAffSites) network
     prefListSubsets = L.nub $ L.sort $ L.concatMap powerset prefLists
     validPref :: PrefixFilter
-    validPref Potential x = trace ("testing potential " ++ show x) (L.sort x `elem` prefListSubsets)
-    validPref Final x = trace ("testing final " ++ show x) (L.sort x `elem` prefLists)
+    validPref x = trace ("testing potential " ++ show x) (L.sort x `elem` prefListSubsets)
 
 primes :: Species -> [Species]
 primes (Par _ _ ss) = L.concatMap primes ss
@@ -152,7 +152,7 @@ actions network !potential = L.foldl' (+>) vectZero [
 partial' :: (Species -> MTS) -> P -> D
 partial' tr = (partial'' ><)
   where partial'' spec = fromList [(1, s :* s' :* a)
-                           | Trans _ s a s' <- simplify $ tr spec]
+                           | Trans s a s' <- simplify $ tr spec]
 
 dPdt' :: (Species -> MTS) -> ConcreteAffinityNetwork -> P -> P
 dPdt' tr network p = trace ("part = " ++ show part ++ ", acts = " ++ show acts)
