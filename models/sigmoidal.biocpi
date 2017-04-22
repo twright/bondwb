@@ -1,0 +1,17 @@
+species S = activate -> S;
+
+species R = phosphorylate -> RP;
+
+species RP = dephosphorylate -> R;
+
+kinetic law MichaelisMenten(k, K; x, y) = k*x*y/(K + y);
+
+kinetic law DecayMM(k, K; x) = k*x/(K + x);
+
+affinity network Aff(k1,l1,k2,l2) = {
+  activate, phosphorylate at rate MichaelisMenten(k1,l1);
+  dephosphorylate at rate DecayMM(k2,l2);
+}
+
+process P = [1.0] S || [0.5] R  || [0.0] RP
+            with network Aff(1,2,0.1,1);

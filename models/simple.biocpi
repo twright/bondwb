@@ -1,0 +1,7 @@
+species S = s -> (S|S);
+
+affinity network Aff = {
+  s at rate MA(1.0);
+}
+
+process Simple = [1.0] S with network Aff;

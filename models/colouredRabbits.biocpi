@@ -1,0 +1,42 @@
+species Red = reproduceRed -> (Red|Red)
+            + beEaten;
+
+species Blue = reproduceBlue -> (Blue|Blue)
+             + beEaten;
+
+species Fox = eat -> (Fox|Fox)
+            + die;
+
+affinity network MassActionRabbits = {
+  reproduceRed at rate MA(2.0);
+  reproduceBlue at rate MA(3.0);
+  eat, beEaten at rate MA(0.1);
+  die at rate MA(1.0);
+}
+
+kinetic law Logistic (b, k; r) = b*r*(1 - r/k);
+
+kinetic law Functional (beta, h; f, r) = beta*f*r/(1 + beta*h*r);
+
+affinity network LogisticRabbits = {
+  reproduceRed at rate Logistic(2, 150);
+  reproduceBlue at rate Logistic(2.05, 150);
+  eat, beEaten at rate MA(0.5);
+  die at rate MA(0.8);
+}
+
+affinity network KineticRabbits = {
+  reproduceRed at rate Logistic(2, 150);
+  reproduceBlue at rate Logistic(3, 100);
+  eat, beEaten at rate Functional(10, 1);
+  die at rate MA(0.8);
+}
+
+process FoxesAndRabbits = [5.0] Red || [5.0] Blue || [1.0] Fox
+                          with network MassActionRabbits;
+
+process FoxesAndLogisticRabbits = [1.0] Red || [1.0] Blue || [1.0] Fox
+                                  with network LogisticRabbits;
+
+process KineticFoxesAndRabbits = [1.0] Red || [1.0] Blue || [1.0] Fox
+                                  with network KineticRabbits;

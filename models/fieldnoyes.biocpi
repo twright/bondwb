@@ -1,0 +1,22 @@
+species Y1 = grow1 -> (Y1|Y1) + shrink1 + be1 -> Y1;
+
+species Y2 = grow2 -> (Y2|Y2) + shrink2 + be2 -> Y2;
+
+species Y3 = grow3 -> (Y3|Y3) + shrink3 + be3 -> Y3;
+
+species Void = create1 -> (Y1|Void) + create2 -> (Y2|Void) + create3 -> (Y3|Void);
+
+affinity network Aff (s, ss, w, sq) = {
+  be2,create1 at rate MA(s);
+  be2,shrink1 at rate MA(s);
+  grow1 at rate MA(s);
+  shrink1,be1 at rate MA(sq);
+  be3,create2 at rate MA(ss);
+  shrink2 at rate MA(ss);
+  be1,shrink2 at rate MA(ss);
+  be1,create3 at rate MA(w);
+  shrink3 at rate MA(w);
+}
+
+process FieldNoyes = [1.0] Void || [4.0] Y1 || [1.1] Y2 || [4.0] Y3
+                     with network Aff(77.27, 0.012941633, 0.1610, 0.000647136);

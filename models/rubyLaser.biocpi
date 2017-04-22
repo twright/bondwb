@@ -1,0 +1,18 @@
+species N = decayN + beN -> N + createPhiFromN -> (N | Phi);
+
+species Phi = decayPhi + bePhi -> Phi;
+
+species Void = createN -> (Void | N) + createPhi -> (Phi | Void);
+
+affinity network Aff(alpha, beta, gamma, rho, sigma, tau) = {
+  bePhi, decayN at rate MA(alpha);
+  decayN at rate MA(beta);
+  createN at rate MA(gamma);
+  createPhi, beN at rate MA(rho);
+  decayPhi at rate MA(sigma);
+  createPhi at rate MA(tau);
+  createPhiFromN at rate MA(tau);
+}
+
+process RubyLaser = [1.0] Void || [-1.0] N || [0.0] Phi
+                    with network Aff(1.5e-18, 2.5e-6, 2.1e-6, 0.6, 0.18, 0.016);

@@ -3,15 +3,15 @@
 module CPi.NumericalMethods
   (explicitEuler, rungeKutta4, fixedPoint, implicitEuler, implicitTrapezoidal,
    adamsMoulton2, adamsMoulton3, adaptiveAM3, adaptiveModifiedAM3,
-   modifiedAM3, gear, gearPred)
+   modifiedAM3, gear, gearPred, nordseik, startNordseik)
   where
 
 import CPi.Vector
--- import Debug.Trace
+import Debug.Trace
 import Data.Maybe
 
-trace :: String -> a -> a
-trace _ = id
+-- trace :: String -> a -> a
+-- trace _ = id
 
 explicitEuler :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> v -> [(Double, v)]
 explicitEuler f reduceVect h !t !p0 = (t, p0) : explicitEuler f reduceVect h t' p'
@@ -101,7 +101,7 @@ adaptiveAM3 f reduceVect tolerance hmin h !t0 !p0 !p1 !p2
         -- !t3' = t0 + h'
         q | diff > 1e-8 = (tolerance * h / diff)**(1/3)
           | otherwise = 5
-        diff = norm (w  +> (-1) |> w')
+        diff = norm (w  +> (-1) |> w'')
         -- q'   = (tolerance * 2*h / norm (w  +> (-1) |> w'))**(1/3)
         -- we may have to halve the stepsize before continuing if the error is
         -- too great
@@ -124,6 +124,8 @@ adaptiveAM3 f reduceVect tolerance hmin h !t0 !p0 !p1 !p2
         !w  = reduceVect(p2 +> h |> (23/12 |> f2 +> (-4/3) |> f1 +> 5/12 |> f0))
         -- use Adams-Moulton as a corrector
         !w' = reduceVect (p2 +> h |> (3/8 |> f' w +> 19/24 |> f2
+                +> (-5/24) |> f1 +> 1/24 |> f0))
+        !w'' = reduceVect (p2 +> h |> (3/8 |> f' w' +> 19/24 |> f2
                 +> (-5/24) |> f1 +> 1/24 |> f0))
         -- !p3 = reduceVect $ fixedPoint tolerance maxFPSteps reduceVect s q0
         -- !q0  = reduceVect $ p2 +> h |> f' p2
@@ -186,6 +188,117 @@ modifiedAM3 f reduceVect tolerance maxFPSteps h !t0 !p0 !p1 !p2
         adj = (1 - w) |> (p2 +> h |> (19/24 |> f' p2 +> (-5/24)|> f' p1
                              +> 1/24 |> f' p0))
         s q = w |> (e |> f' q +> q) +> adj
+
+
+-- nordseik :: (Vector Double v) => (v -> v) -> (v -> v) -> Doub
+nordseik :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Int -> Double -> Double -> Double -> Double -> v -> v -> v -> v -> v -> v -> [(Double, v)]
+nordseik g reduceVect tolabs tolrel maxFPSteps hmin hmax h !x !yx !fx !ax !bx !cx !dx
+  = case res of
+      Just (yxh, fxh, axh, bxh, cxh, dxh) ->
+          trace ("-----\nx = " ++ show x ++ "\ny = "
+                        ++ show (components yx) ++ "\nfx = "
+                        ++ show (components fx) ++ "\n-----")
+                ((x, yx) : nordseik g reduceVect tolabs tolrel maxFPSteps hmin hmax h xh yxh fxh axh bxh cxh dxh)
+          -- TODO: Implement error control!
+      Nothing -> error "did not converge!"
+    --  (t', fxh') : rest
+  where
+    !xh = x + h
+    f  = g
+    !u   = (yx,fx,ax,bx,cx,dx)
+    !res = fmap (\(v1,v2,v3,v4,v5,v6) -> (reduceVect v1, reduceVect v2, reduceVect v3, reduceVect v4, reduceVect v5, reduceVect v6)) $ correctNordseikFP f tolabs tolrel maxFPSteps h u (yx +> h|>(fx +> ax +> bx +> cx +> dx), fx, ax, bx, cx, dx)
+
+nordseik' :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Int -> Double -> Double -> Double -> Double -> v -> v -> v -> v -> v -> v -> [(Double, v, v, v, v, v, v)]
+nordseik' g reduceVect tolabs tolrel maxFPSteps hmin hmax h !x !yx !fx !ax !bx !cx !dx
+  = case res of
+      Just (yxh, fxh, axh, bxh, cxh, dxh) ->
+          trace ("-----\nx = " ++ show x ++ "\ny = "
+                        ++ show (components yx) ++ "\nfx = "
+                        ++ show (components fx) ++ "\n-----")
+                ((x, yx, fx, ax, bx, cx, dx) : nordseik' g reduceVect tolabs tolrel maxFPSteps hmin hmax h xh yxh fxh axh bxh cxh dxh)
+          -- TODO: Implement error control!
+      Nothing -> error "did not converge!"
+    --  (t', fxh') : rest
+  where
+    !xh = x + h
+    f  = g
+    !u   = (yx,fx,ax,bx,cx,dx)
+    !res = fmap (\(v1,v2,v3,v4,v5,v6) -> (reduceVect v1, reduceVect v2, reduceVect v3, reduceVect v4, reduceVect v5, reduceVect v6)) $ correctNordseikFP f tolabs tolrel maxFPSteps h u (yx +> h|>(fx +> ax +> bx +> cx +> dx), fx, ax, bx, cx, dx)
+
+startNordseik :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Int -> Int -> Double -> Double -> Double -> Double -> v -> v -> v -> v -> v -> v -> [(Double, v)]
+startNordseik g reduceVect tolabs tolrel maxFPSteps maxStartSteps hmin hmax h !x0 !y0 !f0 !a0 !b0 !c0 !d0
+  | maxStartSteps < 1 = error "Failed to stabalize at start!"
+  | err < tolabs = trace ("=~-~-~= found start! =~-~-~=\n"
+                       ++ "\ny = " ++ show (components y0')
+                       ++ "\nf = " ++ show (components f0')
+                       ++ "\na = " ++ show (components a0')
+                       ++ "\nb = " ++ show (components b0')
+                       ++ "\nc = " ++ show (components c0')
+                       ++ "\nd = " ++ show (components d0') ++ "\n") $
+                         map (\(x,y,_,_,_,_,_) -> (x,y))
+                         (sim h x0 y0 f0' a0' b0' c0' d0')
+  | otherwise = startNordseik g reduceVect tolabs tolrel
+                maxFPSteps (maxStartSteps-1) hmin hmax h
+                x0 y0 f0 a0' b0' c0' d0'
+  where
+    sim = nordseik' g reduceVect tolabs tolrel maxFPSteps hmin hmax
+    _:_:_:_:(x1,y1,f1,a1,b1,c1,d1):_
+      = trace ("===== trying start: ====="
+            ++ "\ny = " ++ show (components y0)
+            ++ "\nf = " ++ show (components f0)
+            ++ "\na = " ++ show (components a0)
+            ++ "\nb = " ++ show (components b0)
+            ++ "\nc = " ++ show (components c0)
+            ++ "\nd = " ++ show (components d0) ++ "\n")
+          (sim h x0 y0 f0 a0 b0 c0 d0)
+    (x1r,y1r,f1r,a1r,b1r,c1r,d1r) = (x1,y1,f1,(-1)|>a1,b1,(-1)|>c1,d1)
+    _:_:_:_:(_,y0',f0',a0',b0',c0',d0'):_ = sim (-h) x1r y1r f1r a1r b1r c1r d1r
+    dist a b = norm (a +> (-1)|>b)
+    err      = dist y0 y0' `max` dist f0 f0'
+                 `max` dist a0 a0' `max` dist b0 b0'
+                 `max` dist c0 c0' `max` dist d0 d0'
+
+correctNordseikFP :: (Vector Double v) => (v -> v) -> Double -> Double -> Int -> Double -> (v,v,v,v,v,v) -> (v,v,v,v,v,v) -> Maybe (v,v,v,v,v,v)
+correctNordseikFP f tolabs tolrel maxSteps h u@(yx,fx,ax,bx,cx,dx) v@(yxh, fxh, axh, bxh, cxh, dxh)
+  | maxSteps < 1 = Nothing
+  | err < tolabs -- + tolrel*norm yxh
+  -- |   && norm (fxh +> (-1)|>yxh') < tolabs + tolrel*norm yxh
+    -- && norm (a +> (-1)|>a') < tolabs + tolrel*norm a
+    -- && norm (b +> (-1)|>b') < tolabs + tolrel*norm b
+    -- && norm (c +> (-1)|>c') < tolabs + tolrel*norm c
+    -- && norm (d +> (-1)|>d') < tolabs + tolrel*norm d
+    = trace ("err = " ++ show err ++ "\nyxh (" ++ show maxSteps ++ ") = " ++ show (components yxh) ++ "\nfxh = " ++ show (components fxh) ++ "\nfp = " ++ show (components fp)) $ Just v'
+  | otherwise = trace ("err = " ++ show err) $ correctNordseikFP f tolabs tolrel (maxSteps-1) h u $! v'
+  where
+    dist a b = norm (a +> (-1)|>b)
+    err    = dist yxh yxh' `max` dist fxh fxh'
+               `max` dist axh axh' `max` dist bxh bxh'
+               `max` dist cxh cxh' `max` dist dxh dxh'
+    !v'@(yxh',fxh',axh',bxh',cxh',dxh') = correctNordseik f h (fp,ybase,abase,bbase,cbase,dbase) v
+    !ybase = yx +> h|>(fx +> ax +>    bx +>    cx +>     dx)
+    !fp    =        fx +> 2|>ax +> 3|>bx +> 4|>cx +>  5|>dx
+    !abase =                 ax +> 3|>bx +> 6|>cx +> 10|>dx
+    !bbase =                          bx +> 4|>cx +> 10|>dx
+    !cbase =                                   cx +>  5|>dx
+    !dbase =                                             dx
+
+correctNordseik :: (Vector Double v) => (v -> v) -> Double -> (v,v,v,v,v,v) -> (v,v,v,v,v,v) -> (v,v,v,v,v,v)
+correctNordseik f h (fp, ybase, abase, bbase, cbase, dbase) (yxh, fxh, axh, bxh, cxh, dxh) = (yxh', fxh', a', b', c', d')
+  --  trace ("~~~\nyxh = " ++ show (components yxh) ++ "\nfxh = " ++ show (components fxh) ++ "\naxh = " ++ show (components axh) ++ "\nbxh = " ++ show (components bxh) ++ "\ncxh = " ++ show (components cxh) ++ "\ndxh = " ++ show (components dxh) ++ "\ne'  = " ++ show (components e') ++ "\nfp  = " ++ show (components fp) ++ "\nh    = " ++ show h ++ "\nybase = " ++ show (components ybase) ++ "\n~~~")
+      -- (yxh', fxh', a', b', c', d')
+  where
+    !fxh' = f yxh
+    !e'   = fxh'  +> (-1)|>fp
+    !yxh' = ybase +> (95*h/288)|>e'
+    !a'   = abase +> 25/24|>e'
+    !b'   = bbase +> 85/72|>e'
+    !c'   = cbase +> 5/48|>e'
+    !d'   = dbase +> 1/120|>e'
+    -- !y'   = y +> h|>(fx +> a +> b +> c +> d +> 95/288|>e)
+    -- !a'   = a +> 3|>b +> 5|>c +> 10|>d +> 25/24|>e
+    -- !b'   = b +> 4|>c +> 10|>d +> 35/72|>e
+    -- !c'   = c +> 5|>d +> 5/48|>e
+    -- !d'   = d +> 1/120|>e
 
 gear :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Bool -> Int -> Double -> Double -> Double -> v -> v -> v -> v -> v -> [(Double, v)]
 gear f reduceVect tolabs tolrel adapt maxFPSteps hmin h !t0 !p0 !p1 !p2 !p3 !p4

@@ -9,6 +9,7 @@ import CPi.ParserNew
 import Data.Hashable (hash)
 import qualified Data.Map as M
 import CPi.Examples (rabbitSource, rabbitModel)
+import CPi.Symbolic
 
 a `shouldParseNf` b = a `parseSatisfies` (\p -> normalForm p == normalForm b)
 a `shouldParseModel` b = a
@@ -214,3 +215,48 @@ spec = do
   describe "model" $ do
     it "should parse the mass action rabbit growth model" $
       parse model "" rabbitSource `shouldParseModel` rabbitModel
+  describe "number" $ do
+    it "parses floats" $
+      parse number "" "2.1" `shouldParse` 2.1
+    it "parses integers" $
+      parse number "" "2" `shouldParse` 2.0
+  describe "symbolic" $ do
+    describe "symbIdentifier" $ do
+      it "parses lowercase identifiers" $
+        parse symbIdentifier "" "k" `shouldParse` "k"
+      it "parses uppercase identifiers" $
+        parse symbIdentifier "" "L" `shouldParse` "L"
+    describe "symbTerm" $ do
+      it "parses vars" $
+        parse symbTerm "" "x" `shouldParse` var "x"
+      it "parses decimal vals" $
+        parse symbTerm "" "2.1" `shouldParse` val 2.1
+      it "parses integral vals" $
+        parse symbTerm "" "2" `shouldParse` val 2
+      it "parses sines" $
+        parse symbTerm "" "sin x" `shouldParse` sin (var "x")
+      it "parses cosines" $
+        parse symbTerm "" "cos x" `shouldParse` cos (var "x")
+      it "parses tangents" $
+        parse symbTerm "" "tan x" `shouldParse` tan (var "x")
+      it "parses exponentials" $
+        parse symbTerm "" "exp x" `shouldParse` exp (var "x")
+      it "parses logarithms" $
+        parse symbTerm "" "log x" `shouldParse` log (var "x")
+      it "parses nested expressions" $
+        parse symbTerm "" "sin cos tan x"
+          `shouldParse` sin (cos (tan (var "x")))
+    describe "symbExpr" $ do
+      it "parses sums" $
+        parse symbExpr "" "sin x + cos y"
+          `shouldParse` (sin (var "x") + cos (var "y"))
+      it "parses products" $
+        parse symbExpr "" "2*x*y"
+          `shouldParse` (val 2 * var "x" * var "y")
+      it "parses nested expessions" $
+        parse symbExpr "" "2 * cos (x + y) + sin(z * w)"
+          `shouldParse` ((2 * cos (var "x" + var "y"))
+                       + sin(var "z" * var "w"))
+      it "parses hill equation" $
+        parse symbExpr "" "L^n / (k + L^n)"
+          `shouldParse` (var "L"**var "n" / (var "k" + var "L"**var "n"))

@@ -26,6 +26,7 @@ module CPi.AST
   RateLawParam(..),
   AbstractProcess(..),
   CPiModel(..),
+  KineticLawDefinition(..),
   concretify,
   pretty,
   maxLoc,
@@ -49,7 +50,8 @@ module CPi.AST
   addProcessDef,
   addAffinityNetworkDef,
   emptyCPiModel,
-  combineModels
+  combineModels,
+  concretifyKineticLaw
   ) where
 
 import qualified Data.List as L
@@ -60,6 +62,7 @@ import Test.QuickCheck.Gen
 import Control.Monad
 import GHC.Generics
 import Data.Hashable
+import qualified CPi.Symbolic as Symb
 -- import Debug.Trace
 
 trace :: a -> b -> b
@@ -156,6 +159,19 @@ data AffinityNetworkDefinition = AffinityNetworkDef
   { affArgs :: [Name]
   , affBody :: AffinityNetwork }
   deriving (Eq, Ord, Show)
+
+data KineticLawDefinition = KineticLawDef
+  { kinParms :: [Name]
+  , kinArgs :: [Name]
+  , kinBody :: Symb.SymbolicExpr }
+  deriving (Eq, Ord, Show)
+
+concretifyKineticLaw :: KineticLawDefinition -> RateLawFamily
+concretifyKineticLaw (KineticLawDef params args body) params' args'
+  = case Symb.eval env body of
+      Left err -> error $ concat err
+      Right x  -> x
+  where env = M.fromList $ (params ++ args) `zip` (params' ++ args')
 
 data CPiModel = Defs
   { speciesDefs         :: Env

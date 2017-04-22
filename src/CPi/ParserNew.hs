@@ -2,14 +2,19 @@ module CPi.ParserNew where
 
 import Text.Megaparsec
 import Text.Megaparsec.String
+import Text.Megaparsec.Expr
+import Text.Megaparsec.Prim (MonadParsec)
 import qualified Text.Megaparsec.Lexer as LEX
 import qualified Data.Map as M
 import Control.Monad
 import Data.Hashable (hash)
 import Data.Maybe
+import Data.Scientific (toRealFloat)
+import Data.Bifunctor
 -- import Control.Applicative
 
 import CPi.AST hiding ((<|>))
+import CPi.Symbolic
 
 parseFile :: String -> String -> Either (ParseError Char Dec) CPiModel
 parseFile = runParser model
@@ -57,6 +62,20 @@ reservedWord w = string w *> notFollowedBy alphaNumChar *> spaceConsumer
 reservedWords :: [String]
 reservedWords = ["new", "species", "network", "process", "ratelaw", "0"]
 
+symbReservedWords :: [String]
+symbReservedWords = ["sin", "sinh", "asin", "asinh",
+                     "cos", "cosh", "acos", "acosh",
+                     "tan", "tanh", "atan", "atanh",
+                     "exp", "log", "sign", "abs"]
+
+symbIdentifier :: Parser String
+symbIdentifier = (lexeme . try) (p >>= check)
+  where p       = (:) <$> letterChar <*> many alphaNumChar
+        check x = if x `elem` symbReservedWords
+                  then fail $ "name " ++ show x
+                                      ++ " cannot be used, as it is reserved"
+                  else return x
+
 identifier :: Parser String
 identifier = (lexeme . try) (p >>= check)
   where p       = (:) <$> lowerChar <*> many alphaNumChar
@@ -82,7 +101,7 @@ definitionName = (lexeme . try) (p >>= check)
                   else return x
 
 number :: Parser Double
-number =  LEX.signed spaceConsumer (lexeme LEX.float)
+number =  LEX.signed spaceConsumer (toRealFloat <$> lexeme LEX.number)
 
 prefix :: Parser Prefix
 prefix = lexeme $ do
@@ -145,21 +164,19 @@ atom = nil <|> def <|> parens species <|> guardedSum1 <|> emptyPar <|> emptySum
 term :: Parser Species
 term = guardedSum <|> atom <|> restrictionSimple
 
-restrictionSimple :: Parser Species
-restrictionSimple = do
+restrictionOver :: Parser Species -> Parser Species
+restrictionOver base = do
   _ <- symbol "new"
   locs <- locationName `sepBy1` comma
   _ <- symbol "in"
-  spec <- term
+  spec <- base
   return $ mkNew (map (fromIntegral . hash) locs) spec
 
 restriction :: Parser Species
-restriction = do
-  _ <- symbol "new"
-  locs <- locationName `sepBy1` comma
-  _ <- symbol "in"
-  spec <- species
-  return $ mkNew (map (fromIntegral . hash) locs) spec
+restriction = restrictionOver species
+
+restrictionSimple :: Parser Species
+restrictionSimple = restrictionOver term
 
 emptyPar :: Parser Species
 emptyPar = do
@@ -171,10 +188,10 @@ emptySum = do
   _ <- symbol "<Empty Sum>"
   return $ mkSum []
 
--- sepBy1' :: MonadParsec m => m a -> m sep -> m [a]
 -- a version of sepBy1 which only tries to continue capturing the next term,
 -- rather than committing - this prevents the parser from being confused by the
 -- difference between || and |
+sepBy1' :: MonadParsec e s f => f a -> f b -> f [a]
 sepBy1' p sep = go
   where go = try ((:) <$> (p <* sep) <*> go) <|> ((: []) <$> p)
 
@@ -210,7 +227,65 @@ process = do
   network <- affinityNetworkAppl
   return $ Process network components
 
+-- Symbolic expressions
+
+symbExpr :: Parser SymbolicExpr
+symbExpr = makeExprParser symbTerm symbExprTable
+  where symbExprTable = [ [ prefixOp "-" negate
+                          , prefixOp "+" id ]
+                        , [ binaryOp "**" (**)
+                          , binaryOp "^" (**) ]
+                        , [ binaryOp "*" (*)
+                          , binaryOp "/" (/) ]
+                        , [ binaryOp "+" (+)
+                          , binaryOp "-" (-) ] ]
+        binaryOp name f = InfixL (f <$ symbol name)
+        prefixOp name f = Prefix (f <$ symbol name)
+
+symbTerm :: Parser SymbolicExpr
+symbTerm = parens symbExpr
+       <|> symbol "sin"   *> (sin    <$> symbTerm)
+       <|> symbol "sinh"  *> (sinh   <$> symbTerm)
+       <|> symbol "asin"  *> (asin   <$> symbTerm)
+       <|> symbol "asinh" *> (asinh  <$> symbTerm)
+       <|> symbol "cos"   *> (cos    <$> symbTerm)
+       <|> symbol "cosh"  *> (cosh   <$> symbTerm)
+       <|> symbol "acos"  *> (acos   <$> symbTerm)
+       <|> symbol "acosh" *> (cosh   <$> symbTerm)
+       <|> symbol "tan"   *> (tan    <$> symbTerm)
+       <|> symbol "tanh"  *> (tanh   <$> symbTerm)
+       <|> symbol "atan"  *> (atan   <$> symbTerm)
+       <|> symbol "atanh" *> (atanh  <$> symbTerm)
+       <|> symbol "exp"   *> (exp    <$> symbTerm)
+       <|> symbol "log"   *> (log    <$> symbTerm)
+       <|> symbol "abs"   *> (abs    <$> symbTerm)
+       <|> symbol "sign"  *> (signum <$> symbTerm)
+       <|> val <$> number
+       <|> var <$> symbIdentifier
+
 -- Definitions:
+kineticLawDef :: Parser (String, KineticLawDefinition)
+kineticLawDef = do
+  _ <- symbol "kinetic"
+  _ <- symbol "law"
+  name <- definitionName
+  (params, args) <- parens $ do
+    params <- symbIdentifier `sepBy` comma
+    _ <- semi
+    args <- symbIdentifier `sepBy` comma
+    return (params, args)
+  _ <- symbol "="
+  body <- symbExpr
+  _ <- semi
+  let unboundVars = filter (`notElem` (params ++ args)) $ freeVars body
+  if null unboundVars
+  then return (name, KineticLawDef params args body)
+  else fail $ "Definition of " ++ name ++ " which binds "
+              ++ show (params ++ args) ++ " contains unbound variables."
+
+concreteKineticLawDef :: Parser (String, RateLawFamily)
+concreteKineticLawDef = second concretifyKineticLaw <$> kineticLawDef
+
 processDef :: Parser (String, AbstractProcess)
 processDef = do
   _ <- symbol "process"
@@ -224,9 +299,9 @@ siteList :: Parser [String]
 siteList = identifier `sepBy1` symbol "+"
 
 rateLawParam :: Parser RateLawParam
-rateLawParam = var <|> val
-  where var = fmap RateLawParamVar identifier
-        val = fmap RateLawParamVal number
+rateLawParam = variable <|> value
+  where variable = fmap RateLawParamVar identifier
+        value    = fmap RateLawParamVal number
 
 rateLawAppl :: Parser RateLawSpec
 rateLawAppl = do
@@ -277,12 +352,13 @@ speciesDef = do
               ++ " contains unbound locations."
 
 definition :: Parser CPiModel
-definition = sDef <|> pDef <|> aDef
+definition = sDef <|> pDef <|> aDef <|> kDef
   where -- we use a real empty model, rather than the default template as we
         -- will combine with this as unit later
         z = Defs M.empty M.empty M.empty M.empty
         sDef = (\(n,x) -> addSpeciesDef n x z) <$> speciesDef
         pDef = (\(n,x) -> addProcessDef n x z) <$> processDef
+        kDef = (\(n,x) -> addKineticLawDef n x z) <$> concreteKineticLawDef
         aDef = (\(n,x) -> addAffinityNetworkDef n x z) <$> affinityNetworkDef
 
 model :: Parser CPiModel

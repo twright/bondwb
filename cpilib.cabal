@@ -20,16 +20,16 @@ library
                        CPi.Lib,  CPi.Matlab,  CPi.Parser,
                        CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions,
                        CPi.Processes, CPi.Simulation, CPi.Examples, CPi.Vector,
-                       CPi.ParserNew, CPi.NumericalMethods
+                       CPi.ParserNew, CPi.NumericalMethods, CPi.Symbolic
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
   build-depends:       base >=4.7, parsec >=3.1,
                        containers >=0.5, transformers >=0.3,
                        process >=1.2, colour >=2.3,
-                       data-accessor >=0.2, numeric-quest,
+                       data-accessor >=0.2,
                        hmatrix-gsl, hmatrix <= 0.18.0.0, haskeline,
                        Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class, QuickCheck, unordered-containers,
-                       hashable, megaparsec
+                       hashable, megaparsec, scientific
   default-language:    Haskell2010
 
 test-suite spec
@@ -40,7 +40,7 @@ test-suite spec
   ghc-options:      -Wall -O2 -fprof-auto -rtsopts
   build-depends:    base >=4.7, hspec, containers>=0.5, cpilib, QuickCheck,
                     hashable, hspec-megaparsec, megaparsec
-  other-modules:    CPi.ASTSpec, CPi.ParserNewSpec
+  other-modules:    CPi.ASTSpec, CPi.ParserNewSpec, CPi.SymbolicSpec
   default-language: Haskell2010
 
 benchmark signal-bench

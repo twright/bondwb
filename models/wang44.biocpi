@@ -1,0 +1,15 @@
+species R = a -> 0;
+
+species X = xDecays -> 0 + b -> X;
+
+species S = sMakesR -> (S|R) + sMakesX -> (S|X);
+
+affinity network Aff = {
+  a, b at rate MA(2);
+  xDecays at rate MA(1);
+  sMakesR at rate MA(2);
+  sMakesX at rate MA(1);
+}
+
+process P = [1.0] S || [1.0] R
+            with network Aff;

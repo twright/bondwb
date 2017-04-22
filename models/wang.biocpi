@@ -1,0 +1,29 @@
+species A = a -> C;
+
+species B = b -> D;
+
+species C = c -> 0;
+
+species D = 0;
+
+affinity network Aff23 = {
+  a, b at rate MA(1);
+  c at rate MA(1);
+}
+
+process Pi23 = [1.5] A || [1.0] B with network Aff23;
+
+species S = s(l) -> (u@l -> S + t@l -> P);
+
+species E = e(l) -> (a@l -> E);
+
+species P = d -> 0;
+
+affinity network Aff24 = {
+  e, s at rate MA(1.0);
+  a + u at rate MA(0.5);
+  a + t at rate MA(1.0);
+  d at rate MA(0.5);
+}
+
+process Pi24 = [1.0] S || [0.5] E with network Aff24;

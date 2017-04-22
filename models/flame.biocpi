@@ -1,0 +1,8 @@
+species C = grow -> (C|C) + shrink + cat -> C;
+
+affinity network Aff = {
+  grow, cat at rate MA(1.0);
+  shrink, cat, cat at rate MA(1.0);
+}
+
+process Flame = [1e-4] C with network Aff;
