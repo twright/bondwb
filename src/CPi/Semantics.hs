@@ -1,6 +1,6 @@
 -- (C) Copyright Chris Banks 2011
 
--- This file is part of The Continuous Pi-calculus Workbench (CPiWB). 
+-- This file is part of The Continuous Pi-calculus Workbench (CPiWB).
 
 --     CPiWB is free software: you can redistribute it and/or modify
 --     it under the terms of the GNU General Public License as published by
@@ -15,9 +15,9 @@
 --     You should have received a copy of the GNU General Public License
 --     along with CPiWB.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# OPTIONS_GHC -XPatternGuards #-}
+{-# OPTIONS_GHC -XPatternGuards -w #-}
 
-module CPi.Semantics 
+module CPi.Semantics
     (-- * Important functions:
      processMTS,
      -- * Datatypes:
@@ -71,18 +71,18 @@ instance Pretty MTS where
     pretty (MTS (t:ts)) = ((pretty t)++"\n")++(pretty (MTS ts))
     pretty (MTS []) = ""
 
-instance Pretty Trans where 
-    pretty (TransSC s n c) 
+instance Pretty Trans where
+    pretty (TransSC s n c)
         = (pretty s)++" ---"++n++"--> "++(pretty c)
     pretty (TransT s t s')
         = prettyTauTrans s t s'
     pretty (TransTA s t s')
         = prettyTauTrans s t s'
-    
+
 prettyTauTrans s t s' = (pretty s)++" ---"++(pretty t)++"--> "++(pretty s')
 
 instance Pretty Concretion where
-    pretty (ConcBase s o i) 
+    pretty (ConcBase s o i)
         = "("++(prettyNames o)++";"++(prettyNames i)++")"++(pretty s)
     pretty (ConcPar c ss)
         = (pretty c)++" | "++concat(L.intersperse " | " (map pretty ss))
@@ -124,11 +124,11 @@ concAconv (old,new) c
     | (not(old `elem` (fnc c))) && (not(new `elem` (fnc c)))
         = concRename (old,new) c
     | (new `elem` (fnc c))
-        = X.throw $ CpiException $ 
-          "CPi.Semantics.concAconv: " 
+        = X.throw $ CpiException $
+          "CPi.Semantics.concAconv: "
           ++"Tried to alpha-convert to an existing free name."
     | otherwise
-        = X.throw $ CpiException 
+        = X.throw $ CpiException
           "CPi.Semantics.concAconv: Tried to alpha-convert a non-bound name."
 
 -- Normal form for concretions
@@ -147,22 +147,22 @@ instance Nf Concretion where
                 liftfps (o,i) [] outs ins
                     = ConcPar (ConcBase (nf (Par ins)) o i) (map nf outs)
                 liftfps (o,i) (s:ss) outs ins
-                    | (i/\(fn s))==[]     
+                    | (i/\(fn s))==[]
                         = liftfps (o,i) ss (s:outs) ins
-                    | otherwise 
+                    | otherwise
                         = liftfps (o,i) ss outs (s:ins)
           -- (b;y)A=(b;y)B  when A=B
           nf' (ConcBase s o i) = ConcBase (nf s) o i
           -- Commu. and assoc. of ConcPar and F|0 = F
           nf' (ConcPar c []) = nf c
-          nf' (ConcPar c ss) 
+          nf' (ConcPar c ss)
               = ConcPar (nf c) (L.sort (dropNils (flatten (map nf ss))))
                 where
                   dropNils = filter (\x->x/=Nil)
                   flatten [] = []
                   flatten (x:xs) = (f x)++(flatten xs)
                       where
-                        f (Par ss) = ss 
+                        f (Par ss) = ss
                         f s = [s]
           nf' (ConcNew net@(AffNet ns) (ConcNew net'@(AffNet ns') c))
               | net##net' && not(net#<c || net'#<c)
@@ -189,7 +189,7 @@ buildMTS env net mts ss = ifnotnil
                           (buildMTS env net precompx)
                           precompx
     where
-      precompx = derivMTS env (transs env mts ss) 
+      precompx = derivMTS env (transs env mts ss)
 
 -- Given initial species transtions, calculate all transition derivatives:
 derivMTS :: Env -> MTS -> MTS
@@ -199,7 +199,7 @@ derivMTS env mts = ifnotnil (newPrimes env mts) (\x->(derivMTS env (transs env m
 complexMTS :: Env -> AffNet -> MTS -> MTS
 complexMTS env net mts = derivMTS env (transs env mts (appls net mts))
 
--- Takes an MTS and returns the all prime species on the RHS of a transition 
+-- Takes an MTS and returns the all prime species on the RHS of a transition
 -- which don't appear on the LHS of some transition.
 newPrimes :: Env -> MTS -> [Species]
 newPrimes env mts = newPrimes' (openMTS mts)
@@ -227,7 +227,7 @@ mtsCard x = length $ openMTS x
 trans :: Env -> MTS -> Species -> MTS
 trans env mts s = trans' env mts s
     where
-      trans' env mts s' 
+      trans' env mts s'
           = ifnotnil (lookupTrans mts s') (\x -> mts) (trans'' env mts s')
           where
             trans'' :: Env -> MTS -> Species -> MTS
@@ -250,19 +250,19 @@ trans env mts s = trans' env mts s
                        (openMTS(trans' env mts (Sum pss))))
             -- Par
             trans'' _ mts (Par []) = mts
-            trans'' env mts (Par (ss)) 
+            trans'' env mts (Par (ss))
                 = MTS (transPar ss [] []) ->++ mts
-                  where 
+                  where
                     transPar (x:xs) alphas taus
                         = transPar xs (alphas'++alphas) ((taus' s alphas' alphas)++taus)
-                          where 
+                          where
                             alphas' = openMTS(trans env (MTS []) x)
                             taus' src (tr:trs) trs'
                                 | (TransSC s n c) <- tr
                                     = (taus'' tr trs')++(taus' src trs trs')
                                 | otherwise
                                     = taus' src trs trs'
-                                where 
+                                where
                                   taus'' (TransSC src n c) ((TransSC src' n' c'):trs')
                                       | Just dst <- pseudoapp c c'
                                           = (TransTA s (TTauAff (n,n'))
@@ -274,11 +274,11 @@ trans env mts s = trans' env mts s
                                   taus'' _ [] = []
                             taus' _ [] _ = []
                     transPar [] alphas taus
-                        = ((evs alphas)++taus) 
-                          where 
+                        = ((evs alphas)++taus)
+                          where
                             evs ((TransT src tau dst):ts)
                                 = (TransT s tau (nf(Par (replace src dst ss)))):(evs ts)
-                            evs ((TransSC src n dst):ts) 
+                            evs ((TransSC src n dst):ts)
                                 = (TransSC s n (nf(ConcPar dst (remove src ss)))):(evs ts)
                             evs (_:ts) = evs ts
                             evs [] = []
@@ -286,11 +286,11 @@ trans env mts s = trans' env mts s
             trans'' env mts (New net c)
                 = MTS ((restrict(openMTS(trans' env (MTS []) c)))
                        ++(openMTS mts))
-                where 
+                where
                   restrict [] = []
                   -- restrict (new x...) x.A ----x---> A
-                  restrict ((TransSC _ n dst):trs) 
-                      | n `elem` (sites net) 
+                  restrict ((TransSC _ n dst):trs)
+                      | n `elem` (sites net)
                           = restrict trs
                       | otherwise
                           = (TransSC s n (nf(ConcNew net dst))):(restrict trs)
@@ -298,9 +298,9 @@ trans env mts s = trans' env mts s
                   restrict ((TransT _ t dst):trs)
                           = (TransT s t (nf(New net dst))):(restrict trs)
                   restrict ((TransTA _ t@(TTauAff (n,n')) dst):trs)
-                      -- allow tau<n,m> 
+                      -- allow tau<n,m>
                       | (r /= Nothing)
-                          = (TransT s (TTau ((\(Just x)->x)r)) 
+                          = (TransT s (TTau ((\(Just x)->x)r))
                                         (nf(New net dst)))
                             :(restrict trs)
                       -- restrict tau<n,m> where n or m not in net
@@ -330,7 +330,7 @@ openMTS = \(MTS x) -> x
 lookupTrans :: MTS -> Species -> [Trans]
 lookupTrans (MTS []) _ =  []
 lookupTrans (MTS (tran:trans)) s
-    | (nf s) == (nf(transSrc tran))   = tran:(lookupTrans (MTS trans) s) 
+    | (nf s) == (nf(transSrc tran))   = tran:(lookupTrans (MTS trans) s)
     | otherwise                       = lookupTrans (MTS trans) s
 
 -- The source Species of a transition:
@@ -402,15 +402,15 @@ appls net (MTS (tr:trs)) = appls' $ concs (tr:trs)
           concs (_:trs)
               = concs trs
           appls' :: [(Concretion,Name)] -> [Species]
-          appls' cns = [maybe Nil id (pseudoapp c c') 
-                        | (c,n) <- cns, 
-                          (c',n') <- cns, 
+          appls' cns = [maybe Nil id (pseudoapp c c')
+                        | (c,n) <- cns,
+                          (c',n') <- cns,
                           aff net (n,n') /= Nothing ]
 
 
 -- List the distinct prime species in an MTS:
 allPrimes :: Env -> MTS -> [Species]
-allPrimes env (MTS ts) 
+allPrimes env (MTS ts)
     = nice . L.nub . concat . map (primes env) $ map transSrc ts
       where
         nice [] = []
@@ -452,7 +452,7 @@ primes env spec = primes' env (nf spec)
 -- NOTE: do we want to check conc.>0 ??
 supp :: Env -> Process -> [Species]
 supp env (Process [] _) = []
-supp env (Process [(s,c)] _) = primes env s    
+supp env (Process [(s,c)] _) = primes env s
 supp env (Process ((s,c):ps) aff) = (primes env s)++(supp env (Process ps aff))
 
 -- | Gives the Class 1 (Species-->Concretion) transitions of an MTS.
@@ -472,7 +472,7 @@ cardT t (MTS ts) = card t ts
 cardP :: Env -> Species -> Species -> Integer
 cardP env d@(Def _ _) s' = case lookupDef env d of
                              Just s -> card (nf s) (primes env s')
-                             Nothing -> X.throw (CpiException 
+                             Nothing -> X.throw (CpiException
                                                  ("Species "++(pretty d)++" not in the Environment."))
 cardP env s s' = card (nf s) (primes env s')
 
@@ -525,8 +525,8 @@ partial env (Process [] _) = Map.empty
 partial env proc@(Process ps _)
     = foldr dplus d0 (map partial' ps)
       where
-        partial' (s,c) = foldr dplus d0 
-                         (map (\tr-> 
+        partial' (s,c) = foldr dplus d0
+                         (map (\tr->
                                dVec (triple tr)
                                (c * (fromInteger(cardP env (transSrc tr) s))))
                           pots)
@@ -561,18 +561,18 @@ tensor env net ds1 ds2 = foldr pplus p0 (map f ds)
       -- x,y are (Spec,Name,Conc),Concentration);
       -- a is Rate; p is Species result of pseudoapplication
       f (((s,n,c),v),((s',n',c'),v'),a,p)
-          = ((((embed env p) `pminus` (p1 s)) `pminus` (p1 s')) 
+          = ((((embed env p) `pminus` (p1 s)) `pminus` (p1 s'))
             `ptimes` a) `ptimes` (v*v')
-      
+
 -- Immediate behaviour
 dPdt :: Env -> Process -> P
 dPdt _ (Process [] _) = p0
 dPdt env p@(Process [(s,c)] net)
-    = (foldr pplus p0 (map tauexpr taus)) 
+    = (foldr pplus p0 (map tauexpr taus))
       `pplus` ((tensor env net part1 part1) `ptimes` 0.5)
       where
         tauexpr (TransT src (TTau r) dst)
-            = (((embed env src) `pminus` (embed env dst)) 
+            = (((embed env src) `pminus` (embed env dst))
                `ptimes` r) `ptimes` c
         tauexpr _ = X.throw $ CpiException
                     ("Bug: CPi.Semantics.dPdt.tauexpr passed something other than a TransT")
@@ -590,7 +590,7 @@ dPdt env (Process (p:ps) net)
 
 {-
 ---------------------------
-Here lies an attempted implementation of process semantics 
+Here lies an attempted implementation of process semantics
 in a nice, lazy way...
 ---------------------------
 

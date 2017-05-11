@@ -33,3 +33,8 @@ process Repressilator3 = [0] Lacl  || [2] MLacl
                       || [0] TetR  || [0] MTetR
                       || [0] Cl    || [0] MCl
                       with network Aff(4, 10, 2);
+
+process Repressilator4 = [0] Lacl  || [2] MLacl
+                      || [0] TetR  || [0] MTetR
+                      || [0] Cl    || [0] MCl
+                      with network Aff(100, 10, 2);

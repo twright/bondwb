@@ -1,6 +1,6 @@
 -- (C) Copyright Chris Banks 2011
 
--- This file is part of The Continuous Pi-calculus Workbench (CPiWB). 
+-- This file is part of The Continuous Pi-calculus Workbench (CPiWB).
 
 --     CPiWB is free software: you can redistribute it and/or modify
 --     it under the terms of the GNU General Public License as published by
@@ -14,6 +14,8 @@
 
 --     You should have received a copy of the GNU General Public License
 --     along with CPiWB.  If not, see <http://www.gnu.org/licenses/>.
+
+{-# OPTIONS_GHC -w #-}
 
 module CPi.Parser
     (parseFile,
@@ -59,7 +61,7 @@ lexer = P.makeTokenParser cpiDef
 
 cpiDef = emptyDef {
            commentLine = "--",
-           reservedNames = 
+           reservedNames =
                ["species","network","process","tau", "new", "0"],
            reservedOpNames =
                ["=","|","+","||","-","@",".",":"] }
@@ -75,7 +77,7 @@ identifier = P.identifier lexer
 reserved = P.reserved lexer
 rOp = P.reservedOp lexer
 
-double = try (P.float lexer) 
+double = try (P.float lexer)
          <|> do i<- P.integer lexer;
                 return (fromInteger i)
 
@@ -149,10 +151,10 @@ pSumOp = do rOp "+";
 
 sumOp :: Species -> Species -> Species
 sumOp (Sum ss) (Sum ss') = (Sum (ss++ss'))
-sumOp _ _ = X.throw $ X.PatternMatchFail 
+sumOp _ _ = X.throw $ X.PatternMatchFail
             "Unexpected pattern: Sum must be prefix guarded!"
 -- FIXME: This won't happen for correct syntax (prefix guarded Sum)
---        Either change the parser so we don't allow it (hard?), 
+--        Either change the parser so we don't allow it (hard?),
 --         or handle this properly up in the IO monad.
 
 
@@ -224,7 +226,7 @@ pComm = try (do n <- identifier;
 
 pCommParam = try pCommIO <|> pCommI <|> pCommO
 pCommI = do is <- parens pNameList;
-            return ([],is) 
+            return ([],is)
 pCommO = do os <- angles pNameList;
             return (os,[])
 pCommIO = parens (do os <- pNameList;
@@ -240,7 +242,7 @@ pCommIO = parens (do os <- pNameList;
 lexerF = P.makeTokenParser defLBC
 
 defLBC = emptyDef {
-           reservedNames = 
+           reservedNames =
                ["true","false"],
            reservedOpNames =
                ["+","-","*","/",
@@ -255,7 +257,7 @@ fbraces = P.braces lexerF     -- {}
 fidentifier = P.identifier lexerF -- Species
 freserved = P.reserved lexerF
 fOp = P.reservedOp lexerF
-fdouble = try (P.float lexerF) 
+fdouble = try (P.float lexerF)
           <|> do i<- P.integer lexerF;
                  return (fromInteger i)
 fws = P.whiteSpace lexerF
@@ -277,7 +279,7 @@ fOps = [[unop "!" LBC.Neg,
         [iu "U" LBC.Until,
          bu "U" LBC.Until,
          biop "U" (LBC.Until (0,infty))],
-        [biop "&" LBC.Conj], 
+        [biop "&" LBC.Conj],
         [biop "|" LBC.Disj],
         [biop "==>" LBC.Impl],
         [gtee]]
@@ -299,7 +301,7 @@ pFitl s f = do fOp s
                                 t2 <- fdouble
                                 return (t1,t2))
                return $ f i
-pFGtee = do s <- fidentifier 
+pFGtee = do s <- fidentifier
             fOp "|>"
             return $ LBC.Gtee s
 
@@ -317,7 +319,7 @@ pFValBool = do v1 <- pFValExpr
 
 pFValExpr = buildExpressionParser valOps pFVal
 valOps = [[op "*" LBC.Times, op "/" LBC.Quot],
-         [op "+" LBC.Plus, op "-" LBC.Minus]]          
+         [op "+" LBC.Plus, op "-" LBC.Minus]]
     where
       op s f = Infix (fOp s >> return f) AssocLeft
 

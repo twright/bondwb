@@ -50,3 +50,36 @@ spec = do
       eval env (var "x" + val 5) `shouldBe` Right 6
     it "propogates errors from sums" $
       eval env (val 2 + var "w") `shouldSatisfy` isLeft
+  describe "simplify" $ do
+    it "disregards constant left multiples" $
+      simplify (val 1 * var "a") `shouldBe` var "a"
+    it "disregards constant right multiples" $
+      simplify (var "a" * val 1) `shouldBe` var "a"
+    it "cancels zero left multiples" $
+      simplify (val 0 * var "a") `shouldBe` val 0
+    it "cancels zero right multiples" $
+      simplify (var "a" * val 0) `shouldBe` val 0
+    it "multiplies constants" $
+      simplify(val 2 * val 3) `shouldBe` val 6
+    it "adds constants" $
+      simplify(val 2 + val 3) `shouldBe` val 5
+    it "cancels exp log" $
+      simplify(exp (log (var "x"))) `shouldBe` var "x"
+    it "cancels log exp" $
+      simplify(log (exp (var "x"))) `shouldBe` var "x"
+    it "brings log outside left prod" $
+      simplify (var "a" * log(var "x")) `shouldBe` log (var "x" ** var "a")
+    it "brings log outside right prod" $
+      simplify (log(var "x") * var "a") `shouldBe` log (var "x" ** var "a")
+    it "combines powers" $
+      simplify((var "x" ** var "a") * (var "x" ** var "b"))
+        `shouldBe` var "x" ** (var "a" + var "b")
+    it "brings products outside of powers" $
+      simplify((var "x" * var "y") ** var "a")
+        `shouldBe` (var "x" ** var "a") * (var "y" ** var "a")
+    it "combines double powers" $
+      simplify((var "x" ** var "a") ** var "b")
+        `shouldBe` var "x" ** (var "a" * var "b")
+    it "can fully simplify complex expression with exp log" $
+      simplify(var "x" * exp(val (-1.0) * log (val 1.0 * var "x")))
+        `shouldBe` val 1.0

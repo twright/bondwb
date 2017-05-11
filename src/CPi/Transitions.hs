@@ -5,6 +5,7 @@ module CPi.Transitions
    TransitionSemanticsFiltered(..), PrefixFilter, (--:), (-->)) where
 
 import CPi.AST
+import CPi.Base
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Function(fix)
@@ -35,39 +36,16 @@ delocate u@Unlocated{} = u
 finalize :: Transition -> Transition
 finalize (Trans x prefs y) = Trans x (map delocate prefs) (mkAbsBase $ concretify y)
 
-instance Syntax Transition where
+instance Expression Transition where
   simplify (Trans x prefs y)  = simplify x --:L.sort prefs--> simplify y
-
-  relocate l l' (Trans x prefs y) = relocate l l' x
-                                    --:map (relocate l l') prefs-->
-                                    relocate l l' y
-
-  relocateAll ls ls' (Trans x prefs y) = relocateAll ls ls' x
-                                         --:map (relocateAll ls ls') prefs-->
-                                         relocateAll ls ls' y
-
-  rename n n' (Trans x prefs y) = rename n n' x
-                                  --:map (rename n n') prefs-->
-                                  rename n n' y
-
-  freeLocs (Trans x prefs y)  = foldr ((++).freeLocs) [] prefs
-                                ++ freeLocs x ++ freeLocs y
 
 instance Pretty MTS where
   pretty xs = "{| "
     ++ L.intercalate ",\n   " (L.sort $ map pretty xs)
     ++ " |}"
 
-instance Syntax MTS where
+instance Expression MTS where
   simplify = L.sort . map simplify
-
-  relocate l l' = fmap (relocate l l')
-
-  relocateAll ls ls' = fmap (relocateAll ls ls')
-
-  rename n n' = fmap (rename n n')
-
-  freeLocs = concatMap freeLocs
 
 type MTS = [Transition]
 
@@ -124,7 +102,7 @@ instance TransitionSemanticsFiltered Species where
           where specMTS = tr' (instSpec specdef args locs)
         Nothing      -> error $ "Species " ++ name ++ " not defined"
       location :: [Prefix] -> Maybe Location
-      location prefs = case map prefLoc prefs of
+      location prefs = case L.nub $ map prefLoc prefs of
                          [Just loc] -> Just loc
                          _          -> Nothing
 

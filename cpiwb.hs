@@ -15,6 +15,8 @@
 --     You should have received a copy of the GNU General Public License
 --     along with CPiWB.  If not, see <http://www.gnu.org/licenses/>.
 
+{-# OPTIONS_GHC -w #-}
+
 import qualified CPi.Lib as OldLib
 import CPi.Parser as OldParser
 import CPi.Semantics as OldSemantics

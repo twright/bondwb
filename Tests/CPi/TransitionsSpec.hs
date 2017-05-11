@@ -3,6 +3,7 @@ module CPi.TransitionsSpec (spec) where
 import Test.Hspec
 import CPi.AST
 import CPi.Transitions
+import CPi.Base
 -- import Data.Map (Map)
 import qualified Data.Map as M
 
@@ -173,3 +174,15 @@ spec = do
         `shouldBe` pretty (simplify enzymeCTrans)
     it "finds C finalized transitions with recursive definitions" $
       simplify (transF enzymeDefs enzymeCrec) `shouldBe` enzymeCTransDef
+    it "finds all transitions with 3 sites upto pretty" $
+      pretty (simplify (trans M.empty (mkSum [(Located "a" 0, mkAbsBase Nil)]
+                           <|> mkSum [(Located "b" 0, mkAbsBase Nil)]
+                           <|> mkSum [(Located "c" 0, mkAbsBase Nil)])))
+        `shouldBe`
+        "{| b@0->0 | c@0->0 | a@0->0 --{a@0,b@0,c@0}--> 0,\n"
+     ++ "   b@0->0 | c@0->0 | a@0->0 --{a@0,b@0}--> c@0->0,\n"
+     ++ "   b@0->0 | c@0->0 | a@0->0 --{a@0,c@0}--> b@0->0,\n"
+     ++ "   b@0->0 | c@0->0 | a@0->0 --{a@0}--> b@0->0 | c@0->0,\n"
+     ++ "   b@0->0 | c@0->0 | a@0->0 --{b@0,c@0}--> a@0->0,\n"
+     ++ "   b@0->0 | c@0->0 | a@0->0 --{b@0}--> c@0->0 | a@0->0,\n"
+     ++ "   b@0->0 | c@0->0 | a@0->0 --{c@0}--> b@0->0 | a@0->0 |}"

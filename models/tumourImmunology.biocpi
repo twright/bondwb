@@ -1,0 +1,107 @@
+species EC2 = growEC -> (EC2|EC2)
+            + deactivateEC -> 0
+            + catEC -> EC2
+            + dieEC -> 0;
+
+species EC = bindEC(l) -> ECBound(;l)
+           + dieEC -> 0;
+
+species ECBound(;l) = unbindEC@l -> EC
+                    + deactivateEC@l -> ECInactive;
+
+species TC = growTC -> (TC|TC)
+           + bindTC(l) -> TCBound(;l)
+           + catTCUnbound -> TC
+           + catTC -> TC;
+
+species TCBound(;l) = unbindTC@l -> TC
+                    + killTC@l -> TCDying
+                    + catTCB -> TCBound(;l)
+                    + catTCBound -> TCBound(;l)
+                    + catTC -> TCBound(;l);
+
+species IS = growEC -> (IS|EC);
+
+species ECInactive = dieEC -> 0;
+
+species TCDying = dieTC -> 0;
+
+kinetic law GrowEC(s, f, g; E, T, C) = s + exp(log(f) + log(C) - log(g + T));
+kinetic law GrowTC(a, b; T, TTot) = a*T*(1 - b*TTot);
+
+kinetic law GrowEC2(s, p, g; E, T) = s + p * E * T /(g + T);
+
+kinetic law GrowTC2(a, b; T) = a*T*(1 - b*T);
+
+species TC2 = growTC -> (TC2|TC2)
+            + killTC -> 0
+            + catTC -> TC2;
+
+kinetic law Constant(k;) = k;
+
+kinetic law GrowEC3(s, f, g; E,C) = s + 1e5*C;
+
+affinity network Aff1(s, a, b, f, g, k1, km1, k2, k3, d1, d2) = {
+  growEC, catTCUnbound, catTCBound at rate GrowEC(s, f, g);
+  growTC,catTC at rate GrowTC(a, b);
+  bindEC, bindTC at rate MA(k1);
+  unbindEC + unbindTC at rate MA(km1);
+  unbindEC + killTC at rate MA(k2);
+  deactivateEC + unbindTC at rate MA(k3);
+  dieEC at rate MA(d1);
+  dieTC at rate MA(d2);
+}
+
+affinity network Aff2(s, a, b, p, g, m, n, d) = {
+  growEC, catTC at rate GrowEC2(s, p, g);
+  growTC at rate GrowTC2(a, b);
+  deactivateEC, catTC at rate MA(m);
+  killTC, catEC at rate MA(n);
+  dieEC at rate MA(d);
+}
+
+affinity network Aff3(s, a, b, f, g, k1, km1, k2, k3, d1, d2) = {
+  growEC, catTCunbound, catTCbound at rate GrowEC(s, f, g);
+  growTC,catTC at rate GrowTC(a, b);
+  dieEC at rate MA(d1);
+  dieTC at rate MA(d2);
+}
+
+process P1 = [0.1] EC2 || [1.0] TC2
+            with network Aff2(1.3e4,0.18,2.0e-9,0.1245,2.019e7,3.422e-10,1.101e-7,0.0412);
+
+process P2 = [1.0] EC2 || [1.0] TC2
+            with network Aff2(1.3e4,0.18,2.0e-9,0.1245,2.019e7,3.422e-10,1.101e-7,0.0412);
+
+process P3 = [5.0] EC2 || [1.0] TC2
+            with network Aff2(1.3e4,0.18,2.0e-9,0.1245,2.019e7,3.422e-10,1.101e-7,0.0412);
+
+process P4 = [10000000.0] EC2 || [1.0] TC2
+            with network Aff2(1.3e4,0.18,2.0e-9,0.1245,2.019e7,3.422e-10,1.101e-7,0.0412);
+
+process P5 = [0.0] EC2 || [1.0] TC2
+            with network Aff2(1.3e4,0.18,2.0e-9,0.1245,2.019e7,3.422e-10,1.101e-7,0.0412);
+
+process P6 = [1e6] EC || [4e6] TC || [1.0] IS
+            with network Aff1(1.3e4,0.18,2.0e-9,10000.0,1e4,0.000001,0.1,1.0,0.1,5.0,0.5);
+
+process P7 = [10.0] IS || [10000.0] new l in TCBound(;l)
+            with network Aff1(1.3e4,0.18,2.0e-9,1.0,1000,1.0,0.9,0.1,0.1,0.001,0.1);
+
+process P8 = [1.0] TC || [2.0] IS
+            with network Aff3(1.3e4,0.18,2.0e-9,0.1,0.1,1.0,0.9,1.0,1.0,1,0.1);
+
+process P9 = [1.0] EC || [1.0e6] TC || [1.0] IS
+            with network Aff1(1.3e4,0.18,2.0e-9,1.0,20190000,0.0124501104422,0.1,0.1,8.843373493975903e-7,2.748594377510045e-9,0.0412,0.01);
+
+process P10 = [1e5] EC || [1000000.0] TC || [1.0] IS
+            with network Aff1(1.3e4,0.18,2.0e-9,1.0,1000,0.0001,0.9,0.1,0.1,1,0.5);
+
+process P11 = [5e5] EC || [1000000.0] TC || [1.0] IS
+            with network Aff1(1.3e4,0.18,2.0e-9,1e2,10000,0.0000001,0.0001,0.01,0.001,0.0412,0.5);
+
+process P12 = [1e6] EC || [4e6] TC || [1.0] IS
+            with network Aff1(1.3e4,0.18,2.0e-9,1000000.0,1e2,0.00001,0.1,1.0,0.1,5.0,0.5);
+
+process P13 = [1e6] EC || [4e6] TC || [1.0] IS
+            with network Aff1(1.3e4,0.18,2.0e-9,500000.0,1e4,0.00001,0.1,1.0,0.1,5.0,0.5);

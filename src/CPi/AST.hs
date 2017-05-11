@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, BangPatterns #-}
+{-# LANGUAGE DeriveGeneric, FlexibleInstances, BangPatterns #-}
 module CPi.AST
   (
   Abstraction(..),
@@ -14,7 +14,6 @@ module CPi.AST
   RateLaw,
   RateLawFamily,
   Env,
-  Pretty,
   SpeciesDefinition(..),
   RateLawSpec(..),
   AffinityNetwork,
@@ -64,6 +63,7 @@ import Control.Monad
 import GHC.Generics
 import Data.Hashable
 import qualified CPi.Symbolic as Symb
+import CPi.Base
 -- import Debug.Trace
 
 trace :: a -> b -> b
@@ -80,18 +80,11 @@ type Rate = Double
 type RateLaw = [Conc] -> Rate
 type RateLawFamily = [Double] -> RateLaw
 
--- Pretty printing
-class (Show a) => Pretty a where
-  pretty :: a -> String
-  pretty = show
-
-class (Pretty a) => Syntax a where
+class (Pretty a, Expression a) => Syntax a where
   relocate :: Location -> Location -> a -> a
   relocateAll :: [Location] -> [Location] -> a -> a
   rename :: Name -> Name -> a -> a
   freeLocs :: a -> [Location]
-  simplify :: a -> a
-  simplify = id
   normalForm :: a -> a
   normalForm = simplify
 
@@ -381,6 +374,11 @@ instance Arbitrary Abstraction where
   shrink (AbsBase _ x) = [mkAbsBase x' | x' <- shrink x]
   shrink (Abs _ l x)   = [mkAbsBase Nil, mkAbsBase x, mkAbs (l-1) x] ++ [mkAbs l x' | x' <- shrink x]
 
+instance Expression Prefix where
+
+instance Expression [Prefix] where
+  simplify ps = L.sort $ map simplify ps
+
 instance Syntax Prefix where
   relocate l l' p@(Located x m)
     | l == m = Located x l'
@@ -447,8 +445,6 @@ instance Syntax Species where
   rename x x' (Def name args locs) = Def name [if y == x then x'
                                                else y | y <- args] locs
 
-  simplify = normalForm
-
   normalForm Nil = Nil
   normalForm d@Def{} = d
   normalForm (Sum _ nf _) = nf
@@ -461,6 +457,9 @@ instance Syntax Species where
   freeLocs (Par _ _ ss) = foldr ((++) . freeLocs) [] ss
   freeLocs (New _ _ locs s) = filter (`notElem` locs) $ freeLocs s
   freeLocs (Def _ _ locs) = locs
+
+instance Expression Species where
+  simplify = normalForm
 
 normalForm' :: Species -> Species
 normalForm' Nil = Nil
@@ -645,8 +644,6 @@ instance Syntax Abstraction where
   freeLocs (AbsBase _ spec) = freeLocs spec
   freeLocs (Abs _ m abst) = filter (/=m) $ freeLocs abst
 
-  simplify = normalForm
-
   normalForm (AbsBase _ x) = mkAbsBase (normalForm x)
   normalForm abst@(Abs _ l x) = if l `notElem` freeLocs x'
                                 then mkAbsBase x'
@@ -659,6 +656,9 @@ instance Syntax Abstraction where
           l' = head nextLocs
           abst' = if l == l' && x == x' then abst
                   else trace("rewriting abst = " ++ pretty abst ++ " to " ++ pretty (mkAbs l' $ normalForm $ relocate l l' x')) $ normalForm $ mkAbs l' $ normalForm $ relocate l l' x'
+
+instance Expression Abstraction where
+  simplify = normalForm
 
 instance ProcessAlgebra Abstraction where
   (<|>) = colocate
@@ -703,3 +703,6 @@ concretify (Abs _ l spec) = new [l] spec
 -- Pretty print a list of Names.
 prettyNames :: (Show a) => [a] -> String
 prettyNames ns = L.intercalate "," (map show ns)
+
+instance Pretty [Prefix] where
+  pretty prefs = L.intercalate "," (map pretty prefs)

@@ -1,13 +1,14 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveFunctor, GeneralizedNewtypeDeriving, FlexibleContexts, FunctionalDependencies, UndecidableInstances #-}
 
-module CPi.Vector (Tensor(..), Vector(..), Vect(..), Nullable(..), (><), vect, (*>), delta, fromList, multilinear) where
+module CPi.Vector (Tensor(..), Vector(..), Vect(..), Nullable(..), (><), vect, (*>), delta, toList, fromList, multilinear) where
 
 import Prelude hiding ((*>))
-
+import CPi.Base
 import Data.Hashable
-import Data.HashMap.Strict hiding (fromList)
+import Data.HashMap.Strict hiding (fromList, toList)
 import qualified Data.HashMap.Strict as H
 import qualified Data.List as L
+import GHC.Exts (sortWith)
 
 -- Module inspired by Jan Skibinski's Quantum Vector module
 
@@ -21,8 +22,11 @@ infix 5 ><  -- closure
 newtype (Num k, Hashable i) => Vect i k = Vect (HashMap i k)
   deriving Functor
 -- newtype Bra = (Num b, Hashable a) => Map a b
+--
+-- instance (Eq k, Eq i) => Eq (Vect i k) where
+--   x == y = toList x == toList y
 
-class (Num k) => Vector k v | v -> k where
+class (Eq k, Num k, Fractional k, Nullable k) => Vector k v | v -> k where
   -- (*>)       :: v -> v -> v
   (+>)       :: v -> v -> v
   (|>)       :: k -> v -> v
@@ -40,11 +44,17 @@ class (Num k) => Vector k v | v -> k where
 data Tensor a b =  a :* b
   deriving (Eq, Ord)
 
+instance (Expression a, Expression b) => Expression (Tensor a b) where
+  simplify (a :* b) = simplify a :* simplify b
+
 instance (Hashable a, Hashable b) => Hashable (Tensor a b) where
   hashWithSalt i (u :* v) = i `hashWithSalt` u `hashWithSalt` v
 
 instance (Show a, Show b) => Show (Tensor a b) where
   showsPrec n (a :* b) = showsPrec n a . showString "; " . showsPrec n b
+
+instance (Pretty a, Pretty b) => Pretty (Tensor a b) where
+  pretty (a :* b) = pretty a ++ "; " ++ pretty b
 
 class Nullable a where
   isnull :: a -> Bool
@@ -71,6 +81,9 @@ instance (Eq k, Num k, Nullable k, Fractional k, Eq i, Hashable i) => Vector k (
     where normv = norm v
   Vect u <> Vect v = H.foldl' (+) 0 $ H.intersectionWith (*) u v
 
+instance (Expression k, Expression i, Vector k (Vect i k), Hashable i, Eq i) => Expression (Vect i k) where
+  simplify (Vect v) = reduce $ fromList [(simplify k, simplify i)
+                                        | (i, k) <- H.toList v]
 
 -- instance (Eq i, Hashable i) => Vector Double (Vect i Double) where
 
@@ -78,8 +91,11 @@ instance (Eq k, Num k, Nullable k, Fractional k, Eq i, Hashable i) => Vector k (
 fromList :: (Eq k, Num k, Fractional k, Eq i, Hashable i, Nullable k) => [(k,i)] -> Vect i k
 fromList kvs = Vect $ H.fromListWith (+) $ L.map (\(i,v) -> (v,i)) kvs
 
-instance (Eq k, Num k, Fractional k, Eq i, Hashable i, Nullable k) => Eq (Vect i k) where
-  x == y = isnull (x +> (-1) |> y)
+toList :: (Num k, Hashable i, Ord i) => Vect i k -> [(k,i)]
+toList (Vect v) = sortWith snd $ fmap (\(x,y) -> (y,x)) (H.toList v)
+
+instance (Eq k, Num k, Fractional k, Expression k, Expression i, Eq i, Hashable i, Nullable k) => Eq (Vect i k) where
+  x == y = isnull $ simplify $ x +> (-1) |> y
 
 vect :: (Eq k, Num k, Fractional k, Eq i, Hashable i) => i -> Vect i k
 vect i = Vect $ singleton i 1
@@ -105,12 +121,17 @@ delta :: Eq a => a -> a -> Integer
 delta i j | i == j = 1
           | otherwise = 0
 
-instance (Num k, Hashable i, Eq i, Eq k, Fractional k, Show i, Show k, Nullable k) => Show (Vect i k) where
-  show v@(Vect l)
+instance (Num k, Hashable i, Eq i, Eq k, Fractional k, Ord i, Show i, Show k, Nullable k) => Show (Vect i k) where
+  show v
     | isnull v = "vectZero"
     | otherwise = L.intercalate " +> "
-      [show k ++ " |" ++ show i ++ ">"  | (i,k) <- toList l]
+      [show k ++ " |" ++ show i ++ ">"  | (k,i) <- toList v]
 
+instance (Num k, Hashable i, Eq i, Eq k, Fractional k, Ord i, Pretty i, Show k, Nullable k) => Pretty (Vect i k) where
+  pretty v
+    | isnull v = "vectZero"
+    | otherwise = L.intercalate " +> "
+      [show k ++ " |" ++ pretty i ++ ">"  | (k,i) <- toList v]
 
 -- (*>) :: (Hashable i, Hashable j) => Vect i k -> Vect j k -> Vect (Tensor i j) k
 -- Vect u *> Vect v = Vect (u :* Vect v)

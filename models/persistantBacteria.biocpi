@@ -1,0 +1,4 @@
+species Persistant(;p) = bejoined(;p) -> 
+                         beleft ;
+
+species Y = toX -> X + die;

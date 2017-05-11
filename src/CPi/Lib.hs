@@ -1,6 +1,6 @@
 -- (C) Copyright Chris Banks 2011
 
--- This file is part of The Continuous Pi-calculus Workbench (CPiWB). 
+-- This file is part of The Continuous Pi-calculus Workbench (CPiWB).
 
 --     CPiWB is free software: you can redistribute it and/or modify
 --     it under the terms of the GNU General Public License as published by
@@ -15,9 +15,9 @@
 --     You should have received a copy of the GNU General Public License
 --     along with CPiWB.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# OPTIONS_GHC -XDeriveDataTypeable -XTypeSynonymInstances -XFlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable, TypeSynonymInstances, FlexibleInstances #-}
 
-module CPi.Lib 
+module CPi.Lib
     (CpiException(..),
      Species(..),
      Process(..),
@@ -66,14 +66,14 @@ module CPi.Lib
      infty,
      (/\),(\/),(#),(##),(\\)
      ) where
-     
+
 import qualified Data.List as L
 --import qualified Data.Map as Map
 --import Data.Map (Map)
 import qualified Control.Exception as X
 import qualified Data.Typeable as T
 
-data CpiException = CpiException String
+newtype CpiException = CpiException String
                     deriving (Show,T.Typeable)
 instance X.Exception CpiException
 
@@ -87,16 +87,17 @@ type InNames = [Name]
 type Rate = Double
 type Conc = Double
 type PrefixSpecies = (Prefix,Species)
+infty :: Double
 infty = 1/0
 
 data Prefix = Comm Name OutNames InNames
             | Tau Rate
               deriving (Eq, Ord, Show)
 
-data Aff = Aff ((Name,Name),Rate)
+newtype Aff = Aff ((Name,Name),Rate)
          deriving(Eq, Ord, Show)
 
-data AffNet = AffNet [Aff]
+newtype AffNet = AffNet [Aff]
          deriving(Eq, Ord, Show)
 
 data Species = Nil
@@ -106,7 +107,7 @@ data Species = Nil
              | New AffNet Species
                deriving (Ord, Show)
 
-data Process = Process [(Species,Conc)] AffNet 
+data Process = Process [(Species,Conc)] AffNet
                deriving (Eq, Ord, Show)
 
 data Definition = SpeciesDef Name [Name] Species
@@ -131,57 +132,58 @@ instance Eq Species where
 -- CPi components.
 class (Show a) => Pretty a where
     pretty :: a -> String
-    pretty x = show x
+    pretty = show
 
 instance Pretty Process where
     pretty (Process x@((s,c):scs) n)
         | null x = ""
         | length x == 1
-            = "["++(show c)++"] "++(pretty s)
+            = "["++show c++"] "++pretty s
         | otherwise
-            = (pretty (Process [(s,c)] n))++" || "++(pretty (Process scs n))
+            = pretty (Process [(s,c)] n)++" || "++pretty (Process scs n)
     pretty (Process [] _) = "<Empty process>"
 
 instance Pretty Species where
     pretty Nil = "0"
-    pretty (Def i ns) = i ++"("++(prettyNames ns)++")"
+    pretty (Def i ns) = i ++"("++prettyNames ns++")"
                           -- NOTE: temp removed def params!
-    pretty x'@(Sum x@((p,s):pss)) 
-        | (length x == 1) 
-            = (pretty p)++(prettyPs s x')
-        | otherwise 
-            = (pretty $ Sum [(p,s)])++" + "++(pretty $ Sum pss)
+    pretty x'@(Sum x@((p,s):pss))
+        | length x == 1
+            = pretty p++prettyPs s x'
+        | otherwise
+            = pretty (Sum [(p,s)])++" + "++pretty (Sum pss)
     pretty (Sum []) = "<Empty Sum>"
     pretty x'@(Par x@(s:ss))
-        | (null x) 
+        | null x
             = ""
-        | (length x == 1) 
+        | length x == 1
             = pretty s
-        | otherwise 
-            = (prettyPs s x')++" | "++(prettyPs (Par ss) x')
+        | otherwise
+            = prettyPs s x'++" | "++prettyPs (Par ss) x'
     pretty (Par []) = "<Empty Par>"
-    pretty (New n s) = (pretty n)++" "++(pretty s)
+    pretty (New n s) = pretty n++" "++pretty s
 
 instance Pretty Prefix where
-    pretty (Tau r) = "tau<"++(show r)++">."
+    pretty (Tau r) = "tau<"++show r++">."
     pretty (Comm n [] []) = n++"."
-    pretty (Comm n [] is) = n++"("++(prettyNames is)++")."
-    pretty (Comm n os []) = n++"<"++(prettyNames os)++">."
-    pretty (Comm n os is) = n++"("++(prettyNames os)++";"
-                            ++(prettyNames is)++")."
+    pretty (Comm n [] is) = n++"("++prettyNames is++")."
+    pretty (Comm n os []) = n++"<"++prettyNames os++">."
+    pretty (Comm n os is) = n++"("++prettyNames os++";"
+                            ++prettyNames is++")."
 
 instance Pretty Aff where
     pretty (Aff ((n1,n2),r)) = n1++"-"++n2++"@"++(show r)
 
+prettyAffs :: Pretty a => [a] -> String
 prettyAffs affs = concat(L.intersperse ", " (map pretty affs))
 
 instance Pretty AffNet where
     pretty (AffNet affs) = "{"++(prettyAffs affs)++"}"
 
 instance Pretty Definition where
-    pretty (SpeciesDef n fns s) 
+    pretty (SpeciesDef n fns s)
         = n++"("++(prettyNames fns)++") = "++(pretty s)
-    pretty (ProcessDef  n p) 
+    pretty (ProcessDef  n p)
         = n++" = "++(pretty p)
 
 -- Ordering for Definitions:
@@ -195,19 +197,19 @@ instance Ord Definition where
 
 -- |Pretty print a list of Names.
 prettyNames :: [Name] -> String
-prettyNames ns = concat(L.intersperse "," ns)
+prettyNames = L.intercalate ","
 
 -- Parenthesisation
 prettyPs :: Species -> Species -> String
-prettyPs x x' 
-    | ((prio x)<=(prio x')) 
-        = (pretty x)
-    | otherwise 
-        =  "("++(pretty x)++")"
+prettyPs x x'
+    | (prio x :: Integer) <= prio x'
+        = pretty x
+    | otherwise
+        =  "("++pretty x++")"
     where prio Nil = 10
           prio (Def _ _) = 10
           prio (Sum ss)
-              | (length ss == 1) = 10
+              | length ss == 1 = 10
               | otherwise = 20
           prio (Par _) = 30
           prio (New _ _) = 40
@@ -221,17 +223,17 @@ sites :: AffNet -> [Name]
 sites net = sites' net []
     where
       sites' :: AffNet -> [Name] -> [Name]
-      sites' (AffNet ((Aff ((s1,s2),_)):affs)) r 
+      sites' (AffNet (Aff ((s1,s2),_):affs)) r
           = sites' (AffNet affs) (s1:s2:r)
       sites' (AffNet []) r = L.nub r
 
 aff :: AffNet -> (Name,Name) -> Maybe Rate
-aff (AffNet affs) (n,n') 
-    | (a /= Nothing) = a
-    | otherwise = (aff' (n',n) affs)
-    where a = (aff' (n,n') affs)
+aff (AffNet affs) (n,n')
+    | a /= Nothing = a
+    | otherwise = aff' (n',n) affs
+    where a = aff' (n,n') affs
           aff' _ []          =  Nothing
-          aff' k ((Aff ((x,y),r)):affs')
+          aff' k (Aff ((x,y),r):affs')
               | k == (x,y) =  Just r
               | otherwise  =  aff' k affs'
 
@@ -241,12 +243,12 @@ netUnion (AffNet n) (AffNet n') = AffNet (n \/ n')
 --Free/Bound names:
 fn :: Species -> [Name]
 fn Nil = []
-fn (Def l ns) = ns
+fn (Def _ ns) = ns
 fn (Par []) = []
 fn (Par (x:xs)) = (fn x) \/ (fn (Par xs))
 fn (New n s) = (fn s) \\ (sites n)
 fn (Sum []) = []
-fn (Sum (((Tau r),s):xs)) = (fn s) \/ (fn (Sum xs))
+fn (Sum (((Tau _),s):xs)) = (fn s) \/ (fn (Sum xs))
 fn (Sum (((Comm n o i),s):xs)) = [n] \/ o \/ ((fn s) \\ i) \/ (fn (Sum xs))
 
 bn :: Species -> [Name]
@@ -256,8 +258,8 @@ bn (Par []) = []
 bn (Par (x:xs)) = (bn x) \/ (bn (Par xs))
 bn (New n s) = (bn s) \/ ((fn s) /\ (sites n))
 bn (Sum []) = []
-bn (Sum (((Tau r),s):xs)) = (bn s) \/ (bn (Sum xs))
-bn (Sum (((Comm n o i),s):xs)) = (bn s) \/ ((fn s) /\ i) \/ (bn (Sum xs))
+bn (Sum (((Tau _),s):xs)) = (bn s) \/ (bn (Sum xs))
+bn (Sum (((Comm _ _ i),s):xs)) = (bn s) \/ ((fn s) /\ i) \/ (bn (Sum xs))
 
 -- rename the given name in a species:
 rename :: (Name,Name) -> Species -> Species
@@ -266,17 +268,17 @@ rename r (Def l ns) = Def l (vecRename r ns)
 rename r (Par ss) = Par (map (rename r) ss)
 rename r (New net s) = New (netRename r net) (rename r s)
 rename r (Sum pfxs) = Sum (pfxRename r pfxs)
-      
+
 -- Renaming on name vectors
 vecRename :: (Name,Name) -> [Name] -> [Name]
 vecRename _ [] = []
-vecRename r@(old,new) (n:ns) 
+vecRename r@(old,new) (n:ns)
     | n == old  = new : vecRename r ns
     | otherwise = n : vecRename r ns
 
 -- Renaming on affinity networks:
 netRename :: (Name,Name) -> AffNet -> AffNet
-netRename r (AffNet affs) = AffNet (netRename' r affs)
+netRename rr (AffNet affss) = AffNet (netRename' rr affss)
     where
       netRename' _ [] = []
       netRename' r@(old,new) ((Aff ((n,n'),p)):affs)
@@ -291,12 +293,12 @@ pfxRename r ((pfx,s):pfxs)
     = ((pfxRename' r pfx),(rename r s)):(pfxRename r pfxs)
       where
         pfxRename' _ (Tau rate) = Tau rate
-        pfxRename' r@(old,new) (Comm n ons ins)
-            | n == old  = Comm new (vecRename r ons) (vecRename r ins)
-            | otherwise = Comm n (vecRename r ons) (vecRename r ins)
+        pfxRename' l@(old,new) (Comm n ons ins)
+            | n == old  = Comm new (vecRename l ons) (vecRename l ins)
+            | otherwise = Comm n (vecRename l ons) (vecRename l ins)
 
 -- Substitution of free names in a Species:
--- sub [(n,n')] s = find free Names n in Species s 
+-- sub [(n,n')] s = find free Names n in Species s
 --                  and replace with New Names n'
 -- Substitution is capture avoiding (will alpha-convert to avouid name capture)
 sub :: [(Name,Name)] -> Species -> Species
@@ -315,7 +317,7 @@ sub ((old,new):rs) s
         = sub rs s
     | otherwise
     -- name to be replaced is not free -- error!
-        = X.throw $ CpiException 
+        = X.throw $ CpiException
           "CPi.Lib.sub: Tried to substitute a non-free name."
 
 -- alpha-conversion of species
@@ -324,15 +326,15 @@ aconv (old,new) s
     | (not(old `elem` (fn s))) && (not(new `elem` (fn s)))
         = rename (old,new) s
     | (new `elem` (fn s))
-        = X.throw $ CpiException 
+        = X.throw $ CpiException
           "CPi.Lib.aconv: Tried to alpha-convert to an existing free name."
     | otherwise
-        = X.throw $ CpiException 
+        = X.throw $ CpiException
           "CPi.Lib.aconv: Tried to alpha-convert a non-bound name."
 
 -- a fresh renaming of a name in s
 renaming :: Name -> Species -> Name
-renaming n s = renaming' (renames n) s
+renaming nn ss = renaming' (renames nn) ss
     where
       renaming' (n:ns) s
           | not(n `elem` (fn s)) = n
@@ -357,7 +359,7 @@ lookupDef ((SpeciesDef i ps s):env) def@(Def x ns)
     | i == x    = Just (sub (zip ps ns) s)
     | otherwise = lookupDef env def
 lookupDef ((ProcessDef _ _):env) def = lookupDef env def
-lookupDef _ _ = X.throw $ CpiException 
+lookupDef _ _ = X.throw $ CpiException
                 "Unexpected pattern: CPi.Lib.lookupDef expects a Def!"
 
 -- Reverse definition lookup:
@@ -404,7 +406,7 @@ compose (Process p1 a1) (Process p2 a2)
 
 speciesInProc :: Process -> [Species]
 -- List of species in a process
-speciesInProc (Process scs _) = [s | (s,c)<-scs]
+speciesInProc (Process scs _) = map fst scs
 
 -- A simplified string representation of a species
 specName :: Species -> String
@@ -426,11 +428,11 @@ class Nf a where
 
 -- normal form for species
 instance Nf Species where
-    nf s
-        | result==s = result
+    nf m
+        | result==m = result
         | otherwise = nf result
         where
-          result = nf' s
+          result = nf' m
           nf' Nil = Nil
           nf' (Def s ns) = Def s ns
           nf' (Sum []) = Nil
@@ -438,7 +440,7 @@ instance Nf Species where
           nf' (Sum pfs) = Sum (L.sort (map nf pfs))
           nf' (Par []) = Nil
           nf' (Par [s]) = nf s
-          -- commutativity and associativity of Par 
+          -- commutativity and associativity of Par
           -- and 0|A = A
           nf' (Par ss) = Par (L.sort (dropNils (flatten (map nf ss))))
               where
@@ -446,36 +448,36 @@ instance Nf Species where
                 flatten [] = []
                 flatten (x:xs) = (f x)++(flatten xs)
                     where
-                      f (Par ss) = ss 
+                      f (Par sss) = sss
                       f s = [s]
           -- (new M)(new N)A = (new MUN)A  when M#N and ¬(M#A or N#A)
           nf' (New net@(AffNet ns) (New net'@(AffNet ns') s))
-              | (net##net') && not(net#s || net'#s) 
+              | (net##net') && not(net#s || net'#s)
                   = nf (New (net `netUnion` net') s)
               | net#s
                   = nf (New net' s)
               | net'#s
                   = nf (New net s)
-              | otherwise 
+              | otherwise
                   = (New (AffNet (L.sort ns)) (New (AffNet (L.sort ns')) (nf s)))
           -- (new M)(A|B) = A|(new M)B  when M#A
-          nf' (New net (Par ss)) = liftfps net ss [] []
+          nf' (New network (Par ss)) = liftfps network ss [] []
               where
                 liftfps :: AffNet -> [Species] -> [Species] -> [Species] -> Species
                 liftfps net [] [] ins
                     = New net (nf (Par ins))
-                liftfps net [] outs []
+                liftfps _ [] outs []
                     = nf (Par outs)
                 liftfps net [] outs ins
                     = Par ((New net (nf (Par ins))):(map nf outs))
-                liftfps net (s:ss) outs ins
-                    | net#s     = liftfps net ss (s:outs) ins
-                    | otherwise = liftfps net ss outs (s:ins)
+                liftfps net (s:sss) outs ins
+                    | net#s     = liftfps net sss (s:outs) ins
+                    | otherwise = liftfps net sss outs (s:ins)
           -- (new M)A = A  when M#A
           nf' (New net@(AffNet ns) s)
               | net#s     = nf s
               | otherwise = New (AffNet (L.sort ns)) (nf s)
-    
+
 instance Nf PrefixSpecies where
     nf (p,s) = (p,(nf s))
 
@@ -508,15 +510,16 @@ s2d x = read x :: Double
 ifnotnil :: [a]        -- ^ List
          -> ([a] -> b) -- ^ Function
          -> b          -- ^ Default
-         -> b          
-ifnotnil [] f b = b
-ifnotnil xs f b = f xs
+         -> b
+ifnotnil [] _ b = b
+ifnotnil xs f _ = f xs
 
 -- | Pretty print a list of pretty printable expressions.
 prettys :: (Pretty a) => [a] -> String
 prettys x = concat $ map (\z->(pretty z)++"\n") x
 
 -- | Pretty print a list
+prettyList :: [String] -> String
 prettyList x = L.concat $ L.intersperse "\n" x
 
 -- | Replace first matched element of a list with something else.
@@ -527,6 +530,7 @@ replace src dst (x:xs)
     | otherwise = x:(replace src dst xs)
 
 -- | Remove first matched element of a list.
+remove :: (Eq x) => x -> [x] -> [x]
 remove _ [] = []
 remove m (x:xs)
     | x==m      = xs
@@ -537,8 +541,11 @@ card :: (Eq a) => a -> [a] -> Integer
 card e l = toInteger $ length $ filter (\a->a==e) l
 
 -- | First element of a triple.
+tri1 :: (x, y, z) -> x
 tri1 (x,_,_) = x
 -- | Second element of a triple.
+tri2 :: (x, y, z) -> y
 tri2 (_,x,_) = x
 -- | Third element of a triple.
+tri3 :: (x, y, z) -> z
 tri3 (_,_,x) = x

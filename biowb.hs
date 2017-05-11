@@ -115,16 +115,18 @@ plotCmd x = do
   let name    = args!!1
       start   = read(args!!2) :: Double
       end     = read(args!!3) :: Double
-      tol     = read(args!!4)
-      h       = read(args!!5) :: Double
-      hmin    = read(args!!6)
+      tolabs  = read(args!!4) :: Double
+      tolrel  = read(args!!5) :: Double
+      h       = read(args!!6)
+      hmin    = read(args!!7)
+      hmax    = read(args!!8)
       -- h       = (end - start) / fromIntegral steps
-      n       = read(args!!7) :: Int
+      n       = read(args!!9) :: Int
   case concretifyModel abstractModel of
     Right (env, defs) ->
       case M.lookup name defs of
         Just (network, p) -> do
-          let simulator = simulateMaxSpecies n env network tol h hmin start p
+          let simulator = simulateMaxSpecies n env network tolabs tolrel h hmin hmax start p
               res       = takeWhile ((<=end).fst) simulator
           lift $ lift $ plotTrace res
         Nothing -> say $ "Process " ++ name ++ " not defined!"
@@ -137,16 +139,18 @@ plotEpsilonCmd x = do
   let name    = args!!1
       start   = read(args!!2) :: Double
       end     = read(args!!3) :: Double
-      tol     = read(args!!4)
-      h       = read(args!!5) :: Double
-      hmin    = read(args!!6)
+      tolabs  = read(args!!4) :: Double
+      tolrel  = read(args!!5) :: Double
+      h       = read(args!!6)
+      hmin    = read(args!!7)
+      hmax    = read(args!!8)
       -- h       = (end - start) / fromIntegral steps
-      epsilon = read(args!!7) :: Double
+      epsilon = read(args!!9) :: Double
   case concretifyModel abstractModel of
     Right (env, defs) ->
       case M.lookup name defs of
         Just (network, p) -> do
-          let simulator = simulateUptoEpsilon epsilon env network tol h hmin start p
+          let simulator = simulateUptoEpsilon epsilon env network tolabs tolrel h hmin hmax start p
               res       = takeWhile ((<=end).fst) simulator
           lift $ lift $ plotTrace res
         Nothing -> say $ "Process " ++ name ++ " not defined!"

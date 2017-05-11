@@ -1,9 +1,9 @@
 {-# LANGUAGE GADTSyntax, TypeSynonymInstances, FlexibleInstances #-}
 
-module CPi.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicExpr, var, val) where
+module CPi.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicExpr, var, val, simplify) where
 
 import qualified Data.Map as M
-
+import CPi.Base
 -- import Data.Functor
 -- import Data.Foldable
 import qualified Data.List as L
@@ -60,6 +60,7 @@ instance Fractional SymbolicExpr where
 
 instance Floating SymbolicExpr where
   pi     = val pi
+  a ** b = a `Pow` b
   exp    = Exp
   log    = Log
   sqrt a = a ** fromRational (1/2)
@@ -162,3 +163,78 @@ instance Symbolic SymbolicExpr where
   eval env (ATanH x) = second atanh $ eval env x
   eval env (Abs x) = second abs $ eval env x
   eval env (Sign x) = second signum $ eval env x
+
+instance Expression SymbolicExpr where
+  simplify s | s == s' = s
+             | otherwise = simplify s'
+    where s' = simp s
+
+          genSimProd a b
+            | a' > b' = b' * a'
+            | otherwise = a' * b'
+            where a' = simplify a
+                  b' = simplify b
+
+          simp (Atom x) = Atom x
+
+          simp (Atom(Const 1.0) `Prod` a) = a
+          simp (a `Prod` Atom(Const 1.0)) = a
+          simp (Atom(Const 0.0) `Prod` _) = val 0.0
+          simp (_ `Prod` Atom(Const 0.0)) = val 0.0
+          simp (Atom(Const a) `Prod` Atom(Const b)) = val (a*b)
+          simp (y `Prod` Log x) = Log (x**y)
+          simp (Log x `Prod` y) = Log (x**y)
+          simp (a `Prod` (b `Sum` c)) = (a*b) + (b*c)
+          simp ((a `Sum` b) `Prod` c) = (a*c) + (b*c)
+          simp (l@(x `Pow` a) `Prod` r@(y `Pow` b))
+            | x == y = x**(a + b)
+            | otherwise = genSimProd l r
+          simp (x `Prod` r@(y `Pow` b))
+            | x == y = x**(val 1 + b)
+            | otherwise = genSimProd x r
+          simp (l@(x `Pow` a) `Prod` y)
+            | x == y = x**(a + val 1)
+            | otherwise = genSimProd l y
+          simp (a `Prod` b) = genSimProd a b
+
+          simp (Atom(Const 0.0) `Sum` a) = a
+          simp (a `Sum` Atom(Const 0.0)) = a
+          simp (Atom(Const a) `Sum` Atom(Const b)) = val (a+b)
+          simp (Sum a b)
+            | a' > b' = b' + a'
+            | otherwise = a' + b'
+            where a' = simplify a
+                  b' = simplify b
+
+          simp (_ `Pow` Atom(Const 0.0)) = val 1.0
+          simp (a `Pow` Atom(Const 1.0)) = a
+          simp (Atom(Const 0.0) `Pow` _) = val 0.0
+          simp (Atom(Const 1.0) `Pow` _) = val 1.0
+          simp (Atom (Const a) `Pow` Atom(Const b)) = val a ** val b
+          simp ((x `Prod` y) `Pow` a) = (x ** a) * (y ** a)
+          simp ((x `Pow` a) `Pow` b) = x ** (a * b)
+          simp (a `Pow` b) = a'**b'
+            where a' = simplify a
+                  b' = simplify b
+
+          simp (Abs (Atom (Const 0))) = val 0
+
+          simp (Log (Exp x)) = x
+          simp (Exp (Log x)) = x
+
+          simp (Exp x) = exp $ simplify x
+          simp (Log x) = log $ simplify x
+          simp (Sin x) = sin $ simplify x
+          simp (SinH x) = sinh $ simplify x
+          simp (ASin x) = asin $ simplify x
+          simp (ASinH x) = asinh $ simplify x
+          simp (Cos x) = cos $ simplify x
+          simp (CosH x) = cosh $ simplify x
+          simp (ACos x) = acos $ simplify x
+          simp (ACosH x) = acosh $ simplify x
+          simp (Tan x) = tan $ simplify x
+          simp (TanH x) = tanh $ simplify x
+          simp (ATan x) = atan $ simplify x
+          simp (ATanH x) = atanh $ simplify x
+          simp (Abs x) = abs $ simplify x
+          simp (Sign x) = signum $ simplify x

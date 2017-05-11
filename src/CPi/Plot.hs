@@ -72,11 +72,10 @@ plotTimeSeriesD da ts soln ss
 
 -- Plots the data to a PDF file
 plotTimeSeriesToFile :: LA.Vector Double -> LA.Matrix Double -> [Species] -> String -> IO ()
-plotTimeSeriesToFile ts soln ss file
+plotTimeSeriesToFile ts soln ss
     = plotToFile
       (LA.toList ts)
       (zip (map pretty ss) (map LA.toList (LA.toColumns soln)))
-      file
 
 -- Only plots selected species
 plotTimeSeriesFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species]
@@ -84,7 +83,7 @@ plotTimeSeriesFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [
 plotTimeSeriesFiltered ts soln ss ss'
     = plot
       (LA.toList ts)
-      (filter (\(s,_)-> s `elem` (map specName ss'))
+      (filter (\(s,_)-> s `elem` map specName ss')
        (zip (map specName ss) (map LA.toList (LA.toColumns soln))))
 
 plotTimeSeriesFilteredD :: DrawingArea -> LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species] -> IO ()
@@ -92,18 +91,17 @@ plotTimeSeriesFilteredD drawingArea ts soln ss ss'
     = plotD
       drawingArea
       (LA.toList ts)
-      (filter (\(s,_)-> s `elem` (map specName ss'))
+      (filter (\(s,_)-> s `elem` map specName ss')
        (zip (map specName ss) (map LA.toList (LA.toColumns soln))))
 
 -- Only plots selected species to a PDF file
 plotTimeSeriesToFileFiltered :: LA.Vector Double -> LA.Matrix Double -> [Species] -> [Species]
                              -> String -> IO ()
-plotTimeSeriesToFileFiltered ts soln ss ss' file
+plotTimeSeriesToFileFiltered ts soln ss ss'
     = plotToFile
       (LA.toList ts)
-      (filter (\(s,_)-> s `elem` (map specName ss'))
+      (filter (\(s,_)-> s `elem` map specName ss')
        (zip (map pretty ss) (map LA.toList (LA.toColumns soln))))
-      file
 
 -- Plots the time series in a GTK window
 plot :: [Double] -> [(String,[Double])] -> IO ()
@@ -111,7 +109,7 @@ plot ts dims = renderableToWindow (toRenderable (layout ts dims)) 639 480
 
 plotD  :: DrawingArea -> [Double] -> [(String,[Double])] -> IO ()
 plotD da ts dims = do
-  updateCanvas (toRenderable (layout ts dims)) da
+  _ <- updateCanvas (toRenderable (layout ts dims)) da
   return ()
 
 -- Plots the time series to a file
@@ -119,6 +117,7 @@ plotToFile :: [Double] -> [(String,[Double])] -> String -> IO ()
 plotToFile ts dims file = void $ renderableToFile (FileOptions (842, 595) PDF) file (toRenderable (layout ts dims))
 
 -- gets a plot layout with plots for each dimension
+layout :: [Double] -> [(String, [Double])] -> Layout Double Double
 layout ts dims = layout_plots .~ plots ts (colours (length dims)) dims
   $ def
                  -- layout1_legend ^= Nothing $ {-remove to add legend-}
@@ -130,8 +129,8 @@ plots :: [Double] -> [AlphaColour Double] -> [(String,[Double])] ->
          [Plot Double Double]
 plots _ _ [] = []
 plots ts (colour:cs) ((lbl,pts):dims)
-    = (toPlot
-      $ plot_lines_style .~ solidLine 1 colour
+    = toPlot
+      ( plot_lines_style .~ solidLine 1 colour
       $ plot_lines_values .~ [zip ts pts]
       $ plot_lines_title .~ lbl
       $ def
@@ -156,7 +155,7 @@ filterPhasePlot :: LA.Vector Double
                 -> [Species]
                 -> (Species,Species)
                 -> [(String, [Double])]
-filterPhasePlot ts soln ss ss'
+filterPhasePlot _ soln ss ss'
     = filter (\(s,_) -> s == specName (fst ss') || s == specName (snd ss'))
              (zip (map specName ss) (map LA.toList $ LA.toColumns soln))
 
@@ -179,6 +178,7 @@ plotPhaseToFile dims file = void $ renderableToFile
 -- 						( void $ render (getLayout ts soln ss ss') (fromIntegral ww, fromIntegral wh) )
 -- 					)
 
+plotPhase :: PlotValue y0 => [(String, [y0])] -> IO ()
 plotPhase dims = renderableToWindow (toRenderable (layout2phase dims)) 640 480
 
 plotPhaseD  :: DrawingArea -> [(String,[Double])] -> IO ()
@@ -192,16 +192,18 @@ phasePlot2D :: DrawingArea
             -> IO ()
 phasePlot2D da ts soln ss ss' = plotPhaseD da $ filterPhasePlot ts soln ss ss'
 
+plotphase :: [(x, y)] -> Plot x y
 plotphase pts
     = toPlot
       $ plot_lines_values .~ [pts]
       $ plot_lines_style .~ solidLine 1 (opaque blue)
       $ def
 
+layout2phase :: PlotValue y0 => [(String, [y0])] -> Layout y0 y0
 layout2phase dims
-    = layout_plots .~ [plotphase $ zip (snd (dims!!0)) (snd (dims!!1))]
+    = layout_plots .~ [plotphase $ zip (snd (head dims)) (snd (dims!!1))]
 --      $ layout1_bottom_axis ^: laxis_generate ^= autoScaledLogAxis defaultLogAxis
-      $ layout_x_axis . laxis_title .~ "["++fst (dims!!0)++"]"
+      $ layout_x_axis . laxis_title .~ "["++fst (head dims)++"]"
 --      $ layout1_left_axis ^: laxis_generate ^= autoScaledLogAxis defaultLogAxis
       $ layout_y_axis . laxis_title .~ "["++fst (dims!!1)++"]"
       $ def
@@ -221,20 +223,20 @@ colours n
     | n==4 = [clr 0 1 0,clr 0 1 1,clr 0 0 1,clr 1 0 1]
     | n==5 = [clr 0 1 0,clr 0 1 1,clr 0 0 1,clr 1 0 1,clr 1 0 0]
     | n==6 = [clr 0 1 0,clr 0 1 1,clr 0 0 1,clr 1 0 1,clr 1 0 0,clr 0 0 0]
-    | otherwise = sec 1 ++ sec 2 ++ sec 3 ++ sec 4 ++ sec 5
+    | otherwise = sec (1::Integer) ++ sec 2 ++ sec 3 ++ sec 4 ++ sec 5
     where
       s = fromIntegral(n `div` 5)
       e = fromIntegral(n `mod` 5)
       f x y
           | x<=y = 1.0
           | otherwise = 0.0
-      g x = [1..(s+(f x e))]
+      g x = [1..(s + f x e)]
       sec x
-          | x==1 = [clr 0 1 ((m-1)/(s+(f x e)-1)) | m<-g x]
-          | x==2 = [clr 0 ((s+(f x e)-m)/(s+(f x e))) 1 | m<-[1..(s+(f x e))]]
-          | x==3 = [clr (m/(s+(f x e))) 0 1 | m<-[1..(s+(f x e))]]
-          | x==4 = [clr 1 0 ((s+(f x e)-m)/(s+(f x e))) | m<-[1..(s+(f x e))]]
-          | x==5 = [clr ((s+(f x e)-m)/(s+(f x e))) 0 0 | m<-[1..(s+(f x e))]]
+          | x==1 = [clr 0 1 ((m-1)/(s + f x e - 1)) | m<-g x]
+          | x==2 = [clr 0 ((s + f x e - m)/(s + f x e)) 1 | m<-[1..(s + f x e)]]
+          | x==3 = [clr (m/(s + f x e)) 0 1 | m<-[1..(s + f x e)]]
+          | x==4 = [clr 1 0 ((s + f x e - m)/(s + f x e)) | m<-[1..(s + f x e)]]
+          | x==5 = [clr ((s + f x e - m)/(s + f x e)) 0 0 | m<-[1..(s + f x e)]]
           | otherwise = undefined
 
 clr :: Double -> Double -> Double -> AlphaColour Double

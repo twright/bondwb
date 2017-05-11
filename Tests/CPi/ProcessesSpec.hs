@@ -5,10 +5,12 @@ import Prelude hiding ((*>))
 import Test.Hspec
 import Test.QuickCheck
 import CPi.AST
+import CPi.Base
 import CPi.Processes
 -- import Data.Map (Map)
 import qualified Data.Map as M
 import CPi.Vector
+import CPi.Symbolic
 
 massAction :: RateLawFamily
 massAction [k] xs = k * (product xs)
@@ -73,6 +75,15 @@ partialC = vect (normalForm enzymeC
                                           <|> Def "P" [] []))
                   :* [Unlocated "p"])
 
+partialEnzymeMM :: D'
+partialEnzymeMM
+  =  var "[S]" |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] [])
+                                      :* [Unlocated "s"])
+  +> var "[P]" |> vect (Def "P" [] [] :* mkAbsBase (Def "P" [] [])
+                                      :* [Unlocated "p"])
+  +> var "[E]" |> vect (Def "E" [] [] :* mkAbsBase (Def "E" [] [])
+                                      :* [Unlocated "e"])
+
 spec :: SpecWith ()
 spec = do
   describe "partial" $ do
@@ -103,11 +114,17 @@ spec = do
   describe "norm" $ do
     it "finds the l1 norm of 2.0<1| -3.0<2| + 1.5<3|" $
       norm (2.0 |> vect (1::Integer) +> (-3.0) |> vect 2 +> 1.5 |> vect 3) `shouldBe` (6.5::Double)
+    it "finds the l1 norm of a symbolic vector" $
+      simplify (norm $ var "a" |> vect (1::Integer) +> var "b" |> vect 2
+                                +> var "c" |> vect 3)
+      `shouldBe` abs(var "a") + abs(var "b") + abs(var "c")
   describe "conc" $ do
     it "finds the concentration of a site s in partial E||S" $
       conc [Unlocated "s"] (partialS +> partialE) `shouldBe` 3.0
     it "finds the concentration of a site e in partial E||S" $
       conc [Unlocated "e"] (partialS +> partialE) `shouldBe` 2.0
+    it "finds the concentration of site s from symbolic MM enzyme" $
+      simplify (conc [Unlocated "s"] partialEnzymeMM) `shouldBe` abs(var "[S]")
   describe "direct" $ do
     it "finds the direction of E||S at site s" $
       direct [Unlocated "s"] (partialS +> partialE)
@@ -115,9 +132,19 @@ spec = do
     it "finds the direction of E||S at site e" $
       direct [Unlocated "e"] (partialS +> partialE)
         `shouldBe` vect (Def "E" [] []) *> vect (simplify $ mkAbs 0 enzymeEbound)
+    it "finds the direction of s in symbolic MM interactions" $
+      simplify (direct [Unlocated "s"] partialEnzymeMM)
+        `shouldBe` simplify (vect (Def "S" [] [] :* mkAbsBase (Def "P" [] [])))
   describe "hide" $ do
     it "hides some sites in an interaction vector" $
       hide [[Unlocated "e"]] (partialS +> partialE) `shouldBe` partialS
+    it "hides a site in the symbolic interaction vector for MM enzymes" $
+      toList (simplify (hide [[Unlocated "e"]] partialEnzymeMM))
+      `shouldBe`
+      toList (simplify (var "[S]" |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] [])
+                                                 :* [Unlocated "s"])
+             +> var "[P]" |> vect (Def "P" [] [] :* mkAbsBase (Def "P" [] [])
+                                                 :* [Unlocated "p"])))
   describe "multilinear" $ do
     it "extends a simple function to a multilinear one" $
       let f :: [Integer] -> Vect (Tensor Integer Integer) Double

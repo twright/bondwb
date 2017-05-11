@@ -1,0 +1,63 @@
+species Tumour = catT -> Tumour
+               + startMitosis -> TumourM
+               + killI -> Tumour
+               + dieT -> 0;
+
+species TumourM = catT -> TumourM
+                + finishMitosis -> (Tumour|Tumour)
+                + killIM -> TumourM
+                + dieM -> 0;
+
+species Immune = growImmune -> (Immune|Immune)
+               + dieImmune -> 0
+               + kill -> Immune;
+
+species Drug = decayD -> 0 + drugEffect -> Drug;
+
+kinetic law ImmuneGrowth(k, alpha, rho, n; I, T) = k + rho * I * T**n / (alpha + T**n);
+
+kinetic law DrugAction(k, m; u, C) = k * (1 - exp(-m*u)) * C;
+
+affinity network Aff1(a1, a4, d2, d3, c1, c2, c3, c4, k, d1, n, rho, alpha, k1, k2, k3, k4, gamma) = {
+  dieT at rate MA(d2);
+  startMitosis at rate MA(a1);
+  kill, dieT at rate MA(c1);
+  dieImmune, killI at rate MA(c2);
+  dieM at rate MA(d3);
+  finishMitosis at rate MA(a4);
+  kill, dieM at rate MA(c3);
+  dieImmune, killIM at rate MA(c4);
+  drugEffect, dieM at rate DrugAction(k1, k2);
+  growImmune, catT at rate ImmuneGrowth(k, alpha, rho, n);
+  dieImmune at rate MA(d1);
+  drugEffect, dieImmune at rate DrugAction(k3, k4);
+  decayD at rate MA(gamma);
+}
+
+affinity network Aff3(a1, a4, d2, d3, c1, c2, c3, c4, k, d1, n, rho, alpha, k1, k2, k3, k4, gamma) = {
+  dieT at rate MA(d2);
+  startMitosis at rate MA(a1);
+  dieM at rate MA(d3);
+  finishMitosis at rate MA(a4);
+}
+
+affinity network Aff2(a1, a4, d2, d3, c1, c2, c3, c4, k, d1, n, rho, alpha, k1, k2, k3, k4, gamma) = {
+  growImmune at rate Constant(k);
+  dieImmune at rate MA(d1);
+}
+
+kinetic law Constant(k;) = k;
+
+process P1a = [1e7] Tumour || [0.01] Immune with network Aff1(0.8470, 0.9159, 0.1145, 0.6641, 2.16e-7, 3.422e-10, 2.16e-7, 3.422e-10, 1.3e4, 0.04, 3, 0.2, 2.7e16,0,0,0,0,0);
+
+process P1b = [1.0] Tumour with network Aff1(0.8470, 0.9159, 0.1145, 0.6641, 2.16e-7, 3.422e-10, 2.16e-7, 3.422e-10, 1.3e4, 0.04, 3, 0.2, 2.7e16,0,0,0,0,0);
+
+process P1c = [5.0] Immune with network Aff2(0.8470, 0.9159, 0.1145, 0.6641, 2.16e-7, 3.422e-10, 2.16e-7, 3.422e-10, 1.3e4, 0.04, 3, 0.2, 0.3e6,0,0,0,0,0);
+
+process P2 = [1.0] Tumour || [0.1] Immune || [1.0] Drug with network Aff1(0.8470, 0.9159, 0.1145, 0.6641, 2.16e-7, 3.422e-10, 2.16e-7, 3.422e-10, 1.3e4, 0.04, 3, 0.2, 0.3e6,0.1,0.1,0.01,0.01,0.01);
+
+process P3 = [1e4] Tumour || [0.01] Immune with network Aff1(2.0, 2.34, 0.1145, 0.6641, 2.16e-7, 3.422e-10, 2.16e-7, 3.422e-10, 1.3e4, 0.04, 3, 0.2, 2.7e16,0,0,0,0,0);
+
+process P4 = [1e7] Tumour || [3e5] TumourM || [0.01] Immune || [1e6] Drug with network Aff1(2.0, 2.35, 0.1145, 0.6641, 2.16e-7, 3.422e-10, 2.16e-7, 3.422e-10, 1.3e4, 0.04, 3, 0.2, 2.7e16,5.0,0.1,0.01,0.01,0.7);
+
+process P5 = [1e7] Tumour || [3e5] TumourM || [5e6] Immune || [1e6] Drug with network Aff1(2.0, 2.35, 0.1145, 0.6641, 2.16e-7, 3.422e-10, 2.16e-7, 3.422e-10, 1.3e4, 0.04, 3, 0.2, 2.7e16,5.0,0.1,1.0,0.1,0.7);

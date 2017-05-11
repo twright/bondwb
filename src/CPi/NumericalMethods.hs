@@ -3,12 +3,13 @@
 module CPi.NumericalMethods
   (explicitEuler, rungeKutta4, fixedPoint, implicitEuler, implicitTrapezoidal,
    adamsMoulton2, adamsMoulton3, adaptiveAM3, adaptiveModifiedAM3,
-   modifiedAM3, gear, gearPred, nordseik, startNordseik)
+   modifiedAM3, gear, gearPred, nordseik, startNordseik,rungeKuttaFehlberg45)
   where
 
 import CPi.Vector
 import Debug.Trace
 import Data.Maybe
+import Control.Applicative ()
 
 -- trace :: String -> a -> a
 -- trace _ = id
@@ -19,7 +20,8 @@ explicitEuler f reduceVect h !t !p0 = (t, p0) : explicitEuler f reduceVect h t' 
         p' = reduceVect $ p0 +> h |> f p0
 
 rungeKutta4 :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> v -> [(Double, v)]
-rungeKutta4 f reduceVect h !t !p0 = (t, p0) : rungeKutta4 f reduceVect h t' p'
+rungeKutta4 f reduceVect h !t !p0 = trace ("x(" ++ show t ++ ") = " ++ show (components p0)) $
+                                    (t, p0) : rungeKutta4 f reduceVect h t' p'
   where t'   = t + h
         f'   = f.reduceVect
         !k1  = f' p0
@@ -27,7 +29,43 @@ rungeKutta4 f reduceVect h !t !p0 = (t, p0) : rungeKutta4 f reduceVect h t' p'
         !k3  = f' $ p0 +> h/2 |> k2
         !k4  = f' $ p0 +> h |> k3
         !p'  = reduceVect
-             $ p0 +> h/6 |> (k1 +> 2 |> k2 +> 3 |> k3 +> k4)
+             $ p0 +> h/6 |> (k1 +> 2 |> k2 +> 2 |> k3 +> k4)
+
+rungeKuttaFehlberg45 :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Double -> Double -> Double -> Double -> v -> [(Double, v)]
+rungeKuttaFehlberg45 f reduceVect h hmin hmax tolabs tolrel !t !p0 = trace ("x(" ++ show t ++ ") = " ++ show (components p0) ++ ", s = " ++ show s ++ ", h = " ++ show h ++ ", diff = " ++ show diff) $
+                                    (t, p0) : rungeKuttaFehlberg45 f reduceVect h' hmin hmax tolabs tolrel t' p''
+  where t'   = t + h
+        f'   = f.reduceVect
+        h'   = if s < 1/0 then (s*h `min` hmax) `max` hmin else hmax
+        diff = norm (p' +> (-1) |> p'')
+        s    = 0.84 * ((tolabs + tolrel * norm p'') * h / diff)**(1/4)
+        !k1  = h |> f' p0
+        !k2  = h |> f' (p0 +> 1/4 |> k1)
+        !k3  = h |> f' (p0 +> 3/32 |> k1
+                           +> 9/32 |> k2)
+        !k4  = h |> f' (p0 +> 1932/2197 |> k1
+                           +> (-7200/2197) |> k2
+                           +> 7296/2197 |> k3)
+        !k5  = h |> f' (p0 +> 439/216 |> k1
+                           +> (-8) |> k2
+                           +> 3680/513 |> k3
+                           +> (-845/4104) |> k4)
+        !k6  = h |> f' (p0 +> (-8/27) |> k1
+                           +> 2 |> k2
+                           +> (-3544/2565) |> k3
+                           +> 1859/4104 |> k4
+                           +> (-11/40) |> k5)
+        !p'  = reduceVect
+             $ p0 +> 25/216    |> k1
+                  +> 1408/2565 |> k3
+                  +> 2197/4101 |> k4
+                  +> (-1/5)    |> k5
+        !p'' = reduceVect
+             $ p0 +> 16/135      |> k1
+                  +> 6656/12825  |> k3
+                  +> 28561/56430 |> k4
+                  +> (-9/50)     |> k5
+                  +> 2/55        |> k6
 
 fixedPoint :: (Vector Double v) => Double -> Int -> (v -> v) -> (v -> v) -> v -> v
 fixedPoint tolerance maxSteps reduceVect f !x
@@ -85,38 +123,38 @@ adamsMoulton3 f reduceVect tolerance maxFPSteps h !t0 !p0 !p1 !p2
         s q = p2 +> h |> (3/8 |> f' q +> 19/24 |> f' p2 +> (-5/24) |> f' p1
                           +> 1/24 |> f' p0)
 
-adaptiveAM3 :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Double -> Double -> v -> v -> v -> [(Double, v)]
-adaptiveAM3 f reduceVect tolerance hmin h !t0 !p0 !p1 !p2
+adaptiveAM3 :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Double -> Double -> Double -> Double -> v -> v -> v -> [(Double, v)]
+adaptiveAM3 f reduceVect tolabs tolrel hmin hmax h !t0 !p0 !p1 !p2
   -- | h < hmin = error $ "step size below minimum limit! with:\nq  = " ++ show q ++ "\nw  = " ++ show w ++ "\nw' = " ++ show w'
   -- if the difference between the predictor and corrector is too great
   -- we need to lower h and recompute
   -- it is harder to see how to adaptively increase h
   | q < 1 && h > hmin = trace ("x(" ++ show t0 ++ ") = " ++ show (components p0)) $ (t0, p0)
-          : adaptiveAM3 f reduceVect tolerance hmin hdown t1 p0' p1' p2'
-  | q > 4 = (takeWhile ((<t0+4.05*h).fst) $! res)
+          : adaptiveAM3 f reduceVect tolabs tolrel hmin hmax hdown t1 p0' p1' p2'
+  | q > 4 && h < hmax = (takeWhile ((<t0+4.05*h).fst) $! res)
             ++ (dropWhile ((<t0+4.05*h).fst)
-            $! adaptiveAM3 f reduceVect tolerance hmin hup t0 p0'' p1'' p2'')
+            $! adaptiveAM3 f reduceVect tolabs tolrel hmin hmax hup t0 p0'' p1'' p2'')
   | otherwise = res
   where !t1 = t0 + h
         -- !t3' = t0 + h'
-        q | diff > 1e-8 = (tolerance * h / diff)**(1/3)
+        q | diff > 1e-8 = ((tolabs + tolrel * norm w) * h / diff)**(1/3)
           | otherwise = 5
         diff = norm (w  +> (-1) |> w'')
         -- q'   = (tolerance * 2*h / norm (w  +> (-1) |> w'))**(1/3)
         -- we may have to halve the stepsize before continuing if the error is
         -- too great
         hdown = trace("halving h to " ++ show (h/2)) $ h/2
-        hup = trace("doubling h to " ++ show (h*2)) $ 2*h -- be more cautous about increasing step size
+        hup = trace("doubling h to " ++ show (h*2)) $ 2*h `min` hmax -- be more cautous about increasing step size
         p0' = p1
         p1' = 1/2 |> (p1 +> p2)
         p2' = p2
 
         (_,!p0''):_:(_,!p1''):_:(_,!p2''):_ = res
-        res = trace ("x(" ++ show t0 ++ ") = " ++ show (components p0)) $ (t0, p0) : adaptiveAM3 f reduceVect tolerance hmin h t1 p1 p2 w'
+        res = trace ("x(" ++ show t0 ++ ") = " ++ show (components p0)) $ (t0, p0) : adaptiveAM3 f reduceVect tolabs tolrel hmin hmax h t1 p1 p2 w'
 
         -- get initial guess from forward Euler
         -- !q0 = reduceVect $ p0 +> h |> f p0
-        f'   = f.reduceVect
+        f'   = f
         f2 = f' p2
         f1 = f' p1
         f0 = f' p0
@@ -223,7 +261,7 @@ nordseik' g reduceVect tolabs tolrel maxFPSteps hmin hmax h !x !yx !fx !ax !bx !
     !xh = x + h
     f  = g
     !u   = (yx,fx,ax,bx,cx,dx)
-    !res = fmap (\(v1,v2,v3,v4,v5,v6) -> (reduceVect v1, reduceVect v2, reduceVect v3, reduceVect v4, reduceVect v5, reduceVect v6)) $ correctNordseikFP f tolabs tolrel maxFPSteps h u (yx +> h|>(fx +> ax +> bx +> cx +> dx), fx, ax, bx, cx, dx)
+    !res = (\(v1,v2,v3,v4,v5,v6) -> (reduceVect v1, reduceVect v2, reduceVect v3, reduceVect v4, reduceVect v5, reduceVect v6)) <$> correctNordseikFP f tolabs tolrel maxFPSteps h u (yx +> h|>(fx +> ax +> bx +> cx +> dx), fx, ax, bx, cx, dx)
 
 startNordseik :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Int -> Int -> Double -> Double -> Double -> Double -> v -> v -> v -> v -> v -> v -> [(Double, v)]
 startNordseik g reduceVect tolabs tolrel maxFPSteps maxStartSteps hmin hmax h !x0 !y0 !f0 !a0 !b0 !c0 !d0
@@ -283,7 +321,7 @@ correctNordseikFP f tolabs tolrel maxSteps h u@(yx,fx,ax,bx,cx,dx) v@(yxh, fxh, 
     !dbase =                                             dx
 
 correctNordseik :: (Vector Double v) => (v -> v) -> Double -> (v,v,v,v,v,v) -> (v,v,v,v,v,v) -> (v,v,v,v,v,v)
-correctNordseik f h (fp, ybase, abase, bbase, cbase, dbase) (yxh, fxh, axh, bxh, cxh, dxh) = (yxh', fxh', a', b', c', d')
+correctNordseik f h (fp, ybase, abase, bbase, cbase, dbase) (yxh, _, _, _, _, _) = (yxh', fxh', a', b', c', d')
   --  trace ("~~~\nyxh = " ++ show (components yxh) ++ "\nfxh = " ++ show (components fxh) ++ "\naxh = " ++ show (components axh) ++ "\nbxh = " ++ show (components bxh) ++ "\ncxh = " ++ show (components cxh) ++ "\ndxh = " ++ show (components dxh) ++ "\ne'  = " ++ show (components e') ++ "\nfp  = " ++ show (components fp) ++ "\nh    = " ++ show h ++ "\nybase = " ++ show (components ybase) ++ "\n~~~")
       -- (yxh', fxh', a', b', c', d')
   where
@@ -300,27 +338,27 @@ correctNordseik f h (fp, ybase, abase, bbase, cbase, dbase) (yxh, fxh, axh, bxh,
     -- !c'   = c +> 5|>d +> 5/48|>e
     -- !d'   = d +> 1/120|>e
 
-gear :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Bool -> Int -> Double -> Double -> Double -> v -> v -> v -> v -> v -> [(Double, v)]
-gear f reduceVect tolabs tolrel adapt maxFPSteps hmin h !t0 !p0 !p1 !p2 !p3 !p4
+gear :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Bool -> Int -> Double -> Double -> Double -> Double -> v -> v -> v -> v -> v -> [(Double, v)]
+gear f reduceVect tolabs tolrel adapt maxFPSteps hmin hmax h !t0 !p0 !p1 !p2 !p3 !p4
   | h < hmin = error "passed minimum stepsize"
   | isNothing fp || q < 1
     = trace ("x(" ++ show t0 ++ ") (halving) = " ++ show (components p0))
       $ (t0, p0) : (t1, p1)
-      : gear f reduceVect tolabs tolrel adapt maxFPSteps hmin h' (t0 + 2*h) p0' p1' p2' p3' p4'
-  | adapt && q > 4 && (t1'' `approxeq` (t0 + h''))
-                   && (t2'' `approxeq` (t0 + 2*h''))
-                   && (t3'' `approxeq` (t0 + 3*h''))
-                   && (t4'' `approxeq` (t0 + 4*h''))
+      : gear f reduceVect tolabs tolrel adapt maxFPSteps hmin hmax h' (t0 + 2*h) p0' p1' p2' p3' p4'
+  | adapt && q > 4 && h'' < hmax && (t1'' `approxeq` (t0 + h''))
+                                 && (t2'' `approxeq` (t0 + 2*h''))
+                                 && (t3'' `approxeq` (t0 + 3*h''))
+                                 && (t4'' `approxeq` (t0 + 4*h''))
     = trace "doubling!" pre ++ (dropWhile ((<t0+4.05*h'').fst)
-            $! gear f reduceVect tolabs tolrel adapt maxFPSteps hmin h'' t0 p0'' p1'' p2'' p3'' p4'')
+            $! gear f reduceVect tolabs tolrel adapt maxFPSteps hmin hmax h'' t0 p0'' p1'' p2'' p3'' p4'')
   | otherwise = res
   -- trace("t1'' = " ++ show t1'' ++ ", t0 + h = " ++ show (t0 + h''))
   where !t1 = t0 + h
         res | isJust fp = trace ("x(" ++ show t0 ++ ") = \n" ++ show (components p0) ++ "\nsticking with q = " ++ show q) ((t0, p0)
-            : gear f reduceVect tolabs tolrel adapt maxFPSteps hmin h t1 p1 p2 p3 p4 p5)
+            : gear f reduceVect tolabs tolrel adapt maxFPSteps hmin hmax h t1 p1 p2 p3 p4 p5)
             | otherwise = undefined
         res'' = (t0, p0)
-            : gear f reduceVect tolabs tolrel False maxFPSteps hmin h t1 p1 p2 p3 p4 p5
+            : gear f reduceVect tolabs tolrel False maxFPSteps hmin hmax h t1 p1 p2 p3 p4 p5
             -- ++ "\nt1'' = " ++ show t1'' ++ ", t0 + h = " ++ show (t0 + h'')
             -- ++ if isNothing fp then "" else ("\nq = " ++ show q ++ "\ndiff = " ++ show diff
         -- get initial guess from Adams-Bashforth
@@ -396,6 +434,6 @@ gearPred f reduceVect tolabs tolrel maxFPSteps hmin h !t0 !p0 !p1 !p2 !p3 !p4 = 
 fixedPoint3 :: (Vector Double v) => Double -> Double -> Int -> (v -> v) -> (v -> v) -> v -> Maybe v
 fixedPoint3 tolabs tolrel maxSteps reduceVect f !x
   | maxSteps < 0 = Nothing
-  | norm (x +> (-1) |> x') < tolabs = Just x'
+  | norm (x +> (-1) |> x') < tolabs + tolrel * norm x = Just x'
   | otherwise = fixedPoint3 tolabs tolrel (maxSteps - 1) reduceVect f x'
   where !x' = f $ reduceVect x

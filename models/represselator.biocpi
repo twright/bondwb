@@ -1,0 +1,24 @@
+species MLacl = decay + transcribe -> Lacl;
+species MTetR = decay + transcribe -> TetR;
+species MCl = decay + transcribe -> MCl;
+
+species TetR = activateCl -> (TetR | MLacl);
+
+species Lacl = activateTetR -> (Lacl | MTetR);
+
+species Cl = activateLacl -> (Cl | MLacl);
+
+kinetic law Hill(k,K,n; x) = k/(K + x^n);
+
+affinity network Aff(a, b, n) = {
+  decay at rate MA(1);
+  transcribe at rate MA(b);
+  activateCl at rate Hill(a, 1, n);
+  activateTetR at rate Hill(a, 1, n);
+  activateLacl at rate Hill(a, 1, n);
+}
+
+process Repressilator = [0] Laccl || [2] MLacl
+                     || [0] TetR  || [0]  MTetR
+                     || [0] Cl    || [0]  MCl
+                     with affinity network Aff(10, 10, 2);

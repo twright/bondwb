@@ -1,0 +1,13 @@
+species S =  s -> P;
+
+species P = 0;
+
+species E = e -> E;
+
+kinetic law MichaelisMenten(k, K; C, S) = k*C*S/(K + S);
+
+affinity network M(v,k) = {
+  e, s at rate MichaelisMenten(v, k);
+}
+
+process Pi = [0.1] E || [1.0] S with network M(1.0, 2.0);

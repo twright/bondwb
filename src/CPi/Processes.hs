@@ -1,35 +1,124 @@
 {-# LANGUAGE  FlexibleInstances, BangPatterns, MultiParamTypeClasses, FlexibleContexts #-}
 
-module CPi.Processes (Process(..), Affinity(..), ConcreteAffinityNetwork,
-  P, D, concretifyModel, partial, conc, direct, react, hide,
-  networkSites, actions, dPdt, partial', dPdt', tracesGivenNetwork) where
+module CPi.Processes (Process(..), Affinity(..), ProcessVect,
+  ConcreteAffinityNetwork, P, D, P', D', concretifyModel, partial, conc,
+  direct, react, hide, networkSites, actions, dPdt, partial', dPdt',
+  tracesGivenNetwork, speciesVar) where
 
 import Prelude hiding ((*>), (<*))
 import CPi.AST
+import CPi.Base
 import CPi.Transitions
 import qualified Data.List as L
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
 import CPi.Vector
+import CPi.Symbolic (SymbolicExpr, var, val)
 import Data.Maybe
 import Data.Bifunctor
 -- import Debug.Trace
-trace :: String -> b -> b 
-trace _ b = b
+trace :: String -> a -> a
+trace _ = id
 
 instance Nullable Conc where
-  isnull = (<1e-12)
+  isnull = (<1e-16)
+
+type SymbConc = SymbolicExpr
+
+instance Nullable SymbConc where
+  isnull = (== val 0)
+
+-- Process vectors over k
+type ProcessVect k = Vect Species k
+-- Interaction vectors over k
+type InteractionVect k = Vect (Tensor (Tensor Species Abstraction) [Prefix]) k
+-- Direction vectors over k
+type DirectionVect k = Vect (Tensor Species Abstraction) k
 
 -- Process space
-type P = Vect Species Conc
+type P = ProcessVect Conc
 -- Potential interaction space
-type D = Vect (Tensor (Tensor Species Abstraction) [Prefix]) Conc
+type D = InteractionVect Conc
+
+-- Process space
+type P' = ProcessVect SymbConc
+-- Potential interaction space
+type D' = InteractionVect SymbConc
 
 data Process = Mixture [(Conc, Species)]
              | React ConcreteAffinityNetwork Process
 
 -- A CPi model with all of the variables looked up
 type ConcreteModel = (Env, M.Map String (ConcreteAffinityNetwork, P))
+
+powerset :: [a] -> [[a]]
+powerset []     = [[]]
+powerset (x:xs) = powerset xs ++ map (x:) (powerset xs)
+
+-- Core process semantics
+
+conc :: (Vector k (InteractionVect k)) => [Prefix] -> InteractionVect k -> k
+conc s (Vect v) = norm $ Vect $ H.filterWithKey atS v
+  where atS (_ :* _ :* t) _ = s == t
+
+direct :: (Vector k (InteractionVect k), Vector k (DirectionVect k)) => [Prefix] -> InteractionVect k -> Vect (Tensor Species Abstraction) k
+direct l v = normalize (direct' >< v)
+  where direct' (s :* s' :* m) = fromInteger (delta l m) |> vect (s :* s')
+
+hide :: (Vector k (InteractionVect k)) => [[Prefix]] -> InteractionVect k -> InteractionVect k
+hide toHide (Vect v) = Vect $ H.filterWithKey shouldHide v
+  where shouldHide (_ :* _ :* sites) _ = sites `notElem` toHide
+
+primes :: Species -> [Species]
+primes (Par _ _ ss) = L.concatMap primes ss
+primes s = [s]
+
+embed :: Species -> P
+embed spec = fromList $ map (\s -> (1, s)) $ filter (/=Nil) $ primes $ normalForm spec
+
+react :: [Vect (Tensor Species Abstraction) Conc] -> P
+-- it is very important that reactions ignore zero vectors, otherwise we get
+-- 0 (when we should just get the reaction of those actions which are present)
+react = multilinear react' <$> filter (/=vectZero)
+  where react' xs = embed (concretify $
+                    foldl (<|>) (mkAbsBase Nil) (map target xs)) +>
+                    (-1.0) |> foldl (+>) vectZero (map (embed.source) xs)
+        source (spec :* _) = spec
+        target (_ :* spec') = spec'
+
+actions :: ConcreteAffinityNetwork -> D -> P
+actions network !potential = L.foldl' (+>) vectZero [
+  let concs   = map (`conc` potential') sites'
+      directs = map (`direct` potential') sites'
+      sites'  = map (L.sort . map Unlocated) sites
+      magnitude = law concs
+      effect  = react directs
+  in trace(show magnitude ++ " * " ++ (show $ zip3 sites' concs directs) ++ " : " ++ pretty effect) $ if not $ isnull magnitude then magnitude |> effect else vectZero
+  --  if any (not.isnull) concs then law concs |> react directs else vectZero
+  | ConcreteAffinity law sites <- network ]
+  where Vect h     = potential
+        potential' = Vect $ H.filter ((>1e-12).abs) h
+
+partial' :: (Species -> MTS) -> P -> D
+partial' tr = (partial'' ><)
+  where partial'' spec = fromList [(1, s :* s' :* L.sort a)
+                           | Trans s a s' <- simplify $ tr spec]
+
+dPdt' :: (Species -> MTS) -> ConcreteAffinityNetwork -> P -> P
+dPdt' tr network p = trace ("part = " ++ pretty part ++ ", acts = " ++ pretty acts)
+                           acts
+  where acts = actions network part
+        part = partial' tr p
+
+-- Helpers for handling models
+
+tracesGivenNetwork :: ConcreteAffinityNetwork -> Env -> Species -> MTS
+tracesGivenNetwork network = trace ("prefLists = " ++ show prefLists) (transFiltered validPref)
+  where
+    prefLists = L.nub $ L.sort $ map (L.sort . map prefName) $ L.concatMap (map (map Unlocated) . cAffSites) network
+    prefListSubsets = L.nub $ L.sort $ L.concatMap powerset prefLists
+    validPref :: PrefixFilter
+    validPref x = trace ("testing potential " ++ show x) (L.sort x `elem` prefListSubsets)
 
 concretifyAffSpec :: CPiModel -> AffinityNetworkSpec
                               -> Either String ConcreteAffinityNetwork
@@ -51,7 +140,7 @@ concretifyAffSpec model@(Defs _ a _ _) (AffinityNetworkAppl name rates)
 
 applyAff :: CPiModel -> Affinity -> [String] -> [Rate] -> Either String ConcreteAffinity
 applyAff model (Affinity rls sites) params rates
-  = second (`ConcreteAffinity` sites) $ applyRateLawSpec model rls params rates
+  = second (`ConcreteAffinity` (map L.sort sites)) $ applyRateLawSpec model rls params rates
 
 applyRateLawSpec :: CPiModel -> RateLawSpec -> [String] -> [Rate]
                              -> Either String RateLaw
@@ -87,20 +176,8 @@ concretifyModel model@(Defs env _ _ p)
         cprocs    = M.toList $ fmap (concretifyProcess model) p
         errors    = [(name, e) | (name, Left e) <- cprocs]
 
-conc :: [Prefix] -> D -> Conc
-conc s (Vect v) = norm $ Vect $ H.filterWithKey atS v
-  where atS (_ :* _ :* t) _ = s == t
-
-direct :: [Prefix] -> D -> Vect (Tensor Species Abstraction) Conc
-direct l v = normalize (direct' >< v)
-  where direct' (s :* s' :* m) = fromInteger (delta l m) |> vect (s :* s')
-
 networkSites :: ConcreteAffinityNetwork -> [[Prefix]]
 networkSites = L.concatMap (map (map Unlocated) . cAffSites)
-
-hide :: [[Prefix]] -> D -> D
-hide toHide (Vect v) = Vect $ H.filterWithKey shouldHide v
-  where shouldHide (_ :* _ :* sites) _ = sites `notElem` toHide
 
 partial :: Env -> Process -> D
 partial env (Mixture ((c,spec):xs)) = fromList
@@ -110,55 +187,8 @@ partial env (Mixture ((c,spec):xs)) = fromList
 partial env (React network p) = hide (networkSites network) $ partial env p
 partial _ (Mixture []) = vectZero
 
-powerset :: [a] -> [[a]]
-powerset []     = [[]]
-powerset (x:xs) = powerset xs ++ map (x:) (powerset xs)
-
-tracesGivenNetwork :: ConcreteAffinityNetwork -> Env -> Species -> MTS
-tracesGivenNetwork network = trace ("prefLists = " ++ show prefLists) (transFiltered validPref)
-  where
-    prefLists = L.nub $ L.sort $ map (L.sort . map prefName) $ L.concatMap (map (map Unlocated) . cAffSites) network
-    prefListSubsets = L.nub $ L.sort $ L.concatMap powerset prefLists
-    validPref :: PrefixFilter
-    validPref x = trace ("testing potential " ++ show x) (L.sort x `elem` prefListSubsets)
-
-primes :: Species -> [Species]
-primes (Par _ _ ss) = L.concatMap primes ss
-primes s = [s]
-
-embed :: Species -> P
-embed spec = fromList $ map (\s -> (1, s)) $ filter (/=Nil) $ primes $ normalForm spec
-
-react :: [Vect (Tensor Species Abstraction) Conc] -> P
-react = multilinear react'
-  where react' xs = embed (concretify $
-                    foldl (<|>) (mkAbsBase Nil) (map target xs)) +>
-                    (-1.0) |> foldl (+>) vectZero (map (embed.source) xs)
-        source (spec :* _) = spec
-        target (_ :* spec') = spec'
-
-actions :: ConcreteAffinityNetwork -> D -> P
-actions network !potential = L.foldl' (+>) vectZero [
-  let concs      = map (`conc` potential') sites'
-      directs    = map (`direct` potential') sites'
-      sites'     = map (L.sort . map Unlocated) sites
-  in if maximum (map abs concs) > 1e-12
-     then law concs |> react directs
-     else vectZero
-  | ConcreteAffinity law sites <- network ]
-  where Vect h     = potential
-        potential' = Vect $ H.filter ((>1e-12).abs) h
-
-partial' :: (Species -> MTS) -> P -> D
-partial' tr = (partial'' ><)
-  where partial'' spec = fromList [(1, s :* s' :* a)
-                           | Trans s a s' <- simplify $ tr spec]
-
-dPdt' :: (Species -> MTS) -> ConcreteAffinityNetwork -> P -> P
-dPdt' tr network p = trace ("part = " ++ show part ++ ", acts = " ++ show acts)
-                           acts
-  where acts = actions network part
-        part = partial' tr p
+speciesVar :: Species -> SymbolicExpr
+speciesVar s = var $ "[" ++ pretty (normalForm s) ++ "]"
 
 embedProcess :: Process -> P
 embedProcess (Mixture ps) = fromList ps
@@ -167,5 +197,6 @@ dPdt :: Env -> Process -> P
 dPdt _ (Mixture _) = vectZero
 dPdt env (React network p) = dPdt' tr network pro
   where pro = embedProcess p
-        tr  = tracesGivenNetwork network env
+        -- tr  = trans env
+        tr = tracesGivenNetwork network env
 -- TODO: nested Mixtures inside Reacts

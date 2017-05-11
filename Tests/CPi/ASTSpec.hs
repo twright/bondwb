@@ -1,6 +1,7 @@
 module CPi.ASTSpec (spec) where
 
 import Test.Hspec
+import CPi.Base
 import Test.QuickCheck
 import CPi.AST
 import qualified Data.List as L

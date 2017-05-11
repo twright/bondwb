@@ -1,0 +1,13 @@
+species Cell(;l) = birth -> (Cell(;l) | Cell(;l))
+                 + mutate -> (Cell(;l) | Mutated(;l))
+                 + death -> 0;
+
+species Mutated(;l) = birth -> (Mutated(;l) | Mutated(;l));
+
+affinity network Aff = {
+  birth at rate MA(1.0);
+  mutate at rate MA(0.1);
+  death at rate MA(2.0);
+}
+
+process P = [1.0] new l in Cell(;l) with network Aff;

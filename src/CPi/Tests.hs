@@ -1,6 +1,6 @@
 -- (C) Copyright Chris Banks 2011-2012
 
--- This file is part of The Continuous Pi-calculus Workbench (CPiWB). 
+-- This file is part of The Continuous Pi-calculus Workbench (CPiWB).
 
 --     CPiWB is free software: you can redistribute it and/or modify
 --     it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 --     You should have received a copy of the GNU General Public License
 --     along with CPiWB.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns -w #-}
 
 module CPi.Tests where
 
@@ -137,7 +137,7 @@ tTrans'2 = trans [tcSpecP0] (MTS []) tcSum1TauP
 -- Test trans of Sum of Tau.P() + Tau.Q()
 tTrans'3 = trans [tcSpecP0,tcSpecQ0] (MTS []) tcSum2TauPQ
 
-tLookupDef = lookupDef [tcSpecP0] (tcP) 
+tLookupDef = lookupDef [tcSpecP0] (tcP)
 
 -- Test tensor:
 tTensor = do env <- tEnzDefs
@@ -212,7 +212,7 @@ tNPs = do env <- tEnv "models/ddos.cpi"
 
 tFixmts = do env <- tEnv "models/ddos.cpi"
              let pi = tProc env "Pi"
-             return $ processMTS env pi                 
+             return $ processMTS env pi
 -}
 -----------------------------------
 -- ODE solver tests
@@ -280,9 +280,9 @@ mcts = (1000,(0,100))
 tF1 = Pos (0,10) (ValLT (Conc (Def "S" ["s"])) (R 0.1))
 
 -- F{5}(S<0.4 AND (F{5} (S<0.1)))
-tF1b = Pos (0,5) 
-       (Conj 
-        (ValLT (Conc (Def "S" ["s"])) (R 0.4)) 
+tF1b = Pos (0,5)
+       (Conj
+        (ValLT (Conc (Def "S" ["s"])) (R 0.4))
         (Pos (0,5)
          (ValLT (Conc (Def "S" ["s"])) (R 0.1))))
 
@@ -403,7 +403,7 @@ tPlotEnzwithJac = do env <- tEnv "models/testEnzyme.cpi"
                          soln = solveODE' odes jacob inits ts
                          ss = speciesIn env dpdt
                      plotTimeSeries ts soln ss
-                            
+
 tPlotEnzwithoutJac = do env <- tEnv "models/testEnzyme.cpi"
                         let pi = tProc env "Pi"
                             mts = processMTS env pi

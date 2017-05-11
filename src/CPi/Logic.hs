@@ -1,6 +1,6 @@
 -- (C) Copyright Chris Banks 2011-2013
 
--- This file is part of The Continuous Pi-calculus Workbench (CPiWB). 
+-- This file is part of The Continuous Pi-calculus Workbench (CPiWB).
 
 --     CPiWB is free software: you can redistribute it and/or modify
 --     it under the terms of the GNU General Public License as published by
@@ -15,7 +15,9 @@
 --     You should have received a copy of the GNU General Public License
 --     along with CPiWB.  If not, see <http://www.gnu.org/licenses/>.
 
-module CPi.Logic 
+{-# OPTIONS_GHC -w #-}
+
+module CPi.Logic
     (Formula(..),
      Val(..),
      Trace,
@@ -35,7 +37,7 @@ module CPi.Logic
      constructP
     )where
 
-import CPi.Lib 
+import CPi.Lib
 import qualified CPi.ODE as ODE
 import CPi.Semantics
 
@@ -110,7 +112,7 @@ modelCheckRec :: Env                   -- Environment
               -> (Int,(Double,Double)) -- Time points: (points,(t0,tn))
               -> Formula               -- Formula to check
               -> Bool
-modelCheckRec env solver trace p tps f 
+modelCheckRec env solver trace p tps f
     | (trace == Nothing)
         = modelCheck' (solve env solver tps p) f
     | otherwise
@@ -129,21 +131,21 @@ modelCheckRec env solver trace p tps f
       modelCheck' ts (Disj x y) = modelCheck' ts x || modelCheck' ts y
       modelCheck' ts (Impl x y) = not(modelCheck' ts x) || modelCheck' ts y
       modelCheck' ts (Neg x) = not $ modelCheck' ts x
-      modelCheck' (t@(t',_,_):ts) (Until (t0,tn) x y) 
+      modelCheck' (t@(t',_,_):ts) (Until (t0,tn) x y)
           | t' < t0
               = modelCheck' ts (Until (t0,tn) x y)
           | otherwise
               = (t' <= tn) && (modelCheck' (t:ts) y ||
-                                    (modelCheck' (t:ts) x && 
+                                    (modelCheck' (t:ts) x &&
                                      modelCheck' ts (Until (t0,tn) x y)))
       modelCheck' ts (Rels i x y)
           = modelCheck' ts (Neg (Until i (Neg x) (Neg y)))
-      modelCheck' ts (Pos (t0,tn) x) 
+      modelCheck' ts (Pos (t0,tn) x)
           = modelCheck' ts (Until (t0,tn) T x)
-      modelCheck' ts (Nec (t0,tn) x) 
+      modelCheck' ts (Nec (t0,tn) x)
           = modelCheck' ts (Neg (Pos (t0,tn) (Neg x)))
-      modelCheck' ts (Gtee p' x) 
-          = modelCheck' (solve env solver tps (compose (constructP p ts) 
+      modelCheck' ts (Gtee p' x)
+          = modelCheck' (solve env solver tps (compose (constructP p ts)
                                                (maybe err id (lookupProcName env p'))
                                               )) x
             where
@@ -158,7 +160,7 @@ modelCheckDP :: Env                   -- Environment
              -> (Int,(Double,Double)) -- Time points: (points,(t0,tn))
              -> Formula               -- Formula to check
              -> Bool
-modelCheckDP env solver trace p tps f 
+modelCheckDP env solver trace p tps f
     | (trace == Nothing)
         = modelCheckDP' (reverse(solve env solver tps p)) (fPostOrd f') f'
     | otherwise
@@ -172,7 +174,7 @@ modelCheckDP env solver trace p tps f
       satTs (t:ts) fs = do prev <- S.get
                            S.put $ satSubs t [] prev fs
                            satTs ts fs
-      satSubs :: State -> [Formula] -> [Formula] -> [Formula] 
+      satSubs :: State -> [Formula] -> [Formula] -> [Formula]
               -> [Formula]
       -- TODO: erk! this needs cleaning up!
       satSubs _ lbls _ [] = lbls
@@ -243,17 +245,17 @@ modelCheckDP env solver trace p tps f
           | otherwise
               = satSubs t lbls prev fs
       satSubs t lbls prev (f@(Gtee q a):fs)
-          | (modelCheckDP env solver Nothing (compose (constructP p [t]) 
-                                              (maybe err id (lookupProcName env q))) 
+          | (modelCheckDP env solver Nothing (compose (constructP p [t])
+                                              (maybe err id (lookupProcName env q)))
              tps a)
               = satSubs t (f:lbls) prev fs
           | otherwise
               = satSubs t lbls prev fs
           where
-            err = X.throw $ 
+            err = X.throw $
                   CpiException $ q ++ " not a defined process."
       satSubs _ _ _ _
-          = X.throw $ 
+          = X.throw $
             CpiException $ "DP model checker only checks "
                              ++ "Until (not F, G, or R)"
 -- The hybrid model checking function
@@ -266,10 +268,10 @@ modelCheckHy :: Env                   -- Environment
              -> Bool
 modelCheckHy env solver trace p tps f
     | trace == Nothing
-        = maybe err id $ Map.lookup f' $ 
+        = maybe err id $ Map.lookup f' $
           hyEval (reverse (fPostOrd f')) (solve env solver tps p)
     | otherwise
-        = maybe err id $ Map.lookup f' $ 
+        = maybe err id $ Map.lookup f' $
           hyEval (reverse (fPostOrd f')) ((\(Just x)->x) trace)
     where
       f' = rewriteU f
@@ -308,14 +310,14 @@ modelCheckHy env solver trace p tps f
                       | otherwise
                           = False
                   eval' (Gtee q x)
-                      = modelCheckHy env solver Nothing 
-                        (compose 
-                         (maybe err id (lookupProcName env q)) 
+                      = modelCheckHy env solver Nothing
+                        (compose
+                         (maybe err id (lookupProcName env q))
                          (constructP p [t])) tps x
                             where
-                              err = X.throw $ 
+                              err = X.throw $
                                     CpiException $ q ++" not a defined process."
-                  eval' _ = X.throw $ 
+                  eval' _ = X.throw $
                             CpiException $ "Hybrid model checker only checks "
                                              ++"Until (not F, G, or R)"
 
@@ -329,10 +331,10 @@ modelCheckHy2 :: Env                   -- Environment
               -> Bool
 modelCheckHy2 env solver trace p tps f
     | trace == Nothing
-        = maybe err id $ Map.lookup f' $ 
+        = maybe err id $ Map.lookup f' $
           hyEval (fPostOrd f') (solve env solver tps p)
     | otherwise
-        = maybe err id $ Map.lookup f' $ 
+        = maybe err id $ Map.lookup f' $
           hyEval (fPostOrd f') ((\(Just x)->x) trace)
     where
       f' = rewriteU f
@@ -372,15 +374,15 @@ modelCheckHy2 env solver trace p tps f
                       | otherwise
                           = False
                   eval' (Gtee q x)
-                      = modelCheckHy env solver Nothing 
-                        (compose 
-                         (maybe err id (lookupProcName env q)) 
+                      = modelCheckHy env solver Nothing
+                        (compose
+                         (maybe err id (lookupProcName env q))
                          (constructP p [t])) tps x
                             where
-                              err = X.throw $ 
+                              err = X.throw $
                                     CpiException $ q ++ " not a defined process."
-                  eval' _ 
-                      = X.throw $ 
+                  eval' _
+                      = X.throw $
                         CpiException $ "Hybrid model checker only checks "
                                          ++"Until (not F, G, or R)"
 
@@ -484,29 +486,29 @@ modelCheckFR env solver trace p tps f
             gamma t v (Disj a b) = Disj (gamma t v a) (gamma t v b)
             gamma t v u@(Until (t0,tn) a b)
                 | t0 > 0 && v <= tn
-                    = Conj 
-                       (gamma t v a) 
+                    = Conj
+                       (gamma t v a)
                        (Until ((max (t0-v) 0),tn-v) a b)
                 | t0 == 0 && v <= tn
-                    = Disj 
-                      (gamma t v b) 
-                      (Conj 
-                        (gamma t v a) 
+                    = Disj
+                      (gamma t v b)
+                      (Conj
+                        (gamma t v a)
                         (Until (0,tn-v) a b))
                 | t0 == 0 && v > tn
                     = gamma t v b
                 | t0 > 0 && v > tn
                     = F
             gamma t v r@(Rels (t0,tn) a b)
-                | t0 > 0 && v <= tn 
-                    = Conj 
-                      (gamma t v b) 
+                | t0 > 0 && v <= tn
+                    = Conj
+                      (gamma t v b)
                       (Rels ((max (t0-v) 0),tn-v) a b)
                 | t0 == 0 && v <= tn
-                    = Conj 
-                      (gamma t v b) 
-                      (Disj 
-                       (gamma t v a) 
+                    = Conj
+                      (gamma t v b)
+                      (Disj
+                       (gamma t v a)
                        (Rels (0,tn-v) a b))
                 | v > tn
                     = gamma t v b
@@ -514,13 +516,13 @@ modelCheckFR env solver trace p tps f
                 | checkContext = T
                 | otherwise = F
                 where
-                  checkContext = modelCheckFR env solver Nothing 
-                                 (compose 
-                                  (maybe err id (lookupProcName env q)) 
+                  checkContext = modelCheckFR env solver Nothing
+                                 (compose
+                                  (maybe err id (lookupProcName env q))
                                   (constructP p [t])) tps f
                                      where
-                                       err = X.throw $ 
-                                             CpiException $ 
+                                       err = X.throw $
+                                             CpiException $
                                              q++" not a defined process."
             gamma _ _ _ = X.throw $ CpiException $
                           "Rewriting model cheker not defined for formula: "
@@ -562,12 +564,12 @@ traceLength (_:tr) = 1 + traceLength tr
 
 -- Take a process and get a trace from the solver:
 solve :: Env -> ODE.Solver -> (Int,(Double,Double)) -> Process -> Trace
-solve env solver (r,(t0,tn)) p 
+solve env solver (r,(t0,tn)) p
     | (t0,tn) == (0,0)
-        = [(0, 
+        = [(0,
              Map.fromList(zip ss (ODE.initials env p' dpdt)),
              Map.fromList(zip ss (repeat 0)))]
-    | otherwise 
+    | otherwise
         = ODE.timeSeries ts soln deriv ss
     where
       ts = ODE.timePoints (r,(t0,tn))
@@ -576,11 +578,11 @@ solve env solver (r,(t0,tn)) p
       dpdt = ODE.dPdt env mts p'
       soln = solver env p mts dpdt (r,(t0,tn))
       deriv = ODE.derivs env dpdt (r,(t0,tn)) soln
-      ss = ODE.speciesIn env dpdt 
+      ss = ODE.speciesIn env dpdt
 
 -- Construct a process from the initial time-point of a trace:
 constructP :: Process -> Trace -> Process
-constructP (Process scs net) ((_,map,_):_) = Process (Map.toList map) net 
+constructP (Process scs net) ((_,map,_):_) = Process (Map.toList map) net
 constructP _ [] = Process [] (AffNet [])
 
 -- the post-order flattening of a formula
@@ -661,17 +663,17 @@ simTime _ = 0
 reconcileSpecs :: Env -> Formula -> Formula
 reconcileSpecs env T = T
 reconcileSpecs env F = F
-reconcileSpecs env (ValGT v1 v2) 
+reconcileSpecs env (ValGT v1 v2)
     = ValGT (reconcileVal env v1) (reconcileVal env v2)
-reconcileSpecs env (ValGE v1 v2) 
+reconcileSpecs env (ValGE v1 v2)
     = ValGE (reconcileVal env v1) (reconcileVal env v2)
-reconcileSpecs env (ValLT v1 v2) 
+reconcileSpecs env (ValLT v1 v2)
     = ValLT (reconcileVal env v1) (reconcileVal env v2)
-reconcileSpecs env (ValLE v1 v2) 
+reconcileSpecs env (ValLE v1 v2)
     = ValLE (reconcileVal env v1) (reconcileVal env v2)
-reconcileSpecs env (ValEq v1 v2) 
+reconcileSpecs env (ValEq v1 v2)
     = ValEq (reconcileVal env v1) (reconcileVal env v2)
-reconcileSpecs env (ValNEq v1 v2) 
+reconcileSpecs env (ValNEq v1 v2)
     = ValNEq (reconcileVal env v1) (reconcileVal env v2)
 reconcileSpecs env (Conj f1 f2)
     = Conj (reconcileSpecs env f1) (reconcileSpecs env f2)
@@ -679,15 +681,15 @@ reconcileSpecs env (Disj f1 f2)
     = Disj (reconcileSpecs env f1) (reconcileSpecs env f2)
 reconcileSpecs env (Impl f1 f2)
     = Impl (reconcileSpecs env f1) (reconcileSpecs env f2)
-reconcileSpecs env (Neg f) 
+reconcileSpecs env (Neg f)
     = Neg (reconcileSpecs env f)
-reconcileSpecs env (Until i f1 f2) 
+reconcileSpecs env (Until i f1 f2)
     = Until i (reconcileSpecs env f1) (reconcileSpecs env f2)
-reconcileSpecs env (Rels i f1 f2) 
+reconcileSpecs env (Rels i f1 f2)
     = Rels i (reconcileSpecs env f1) (reconcileSpecs env f2)
-reconcileSpecs env (Nec i f) 
+reconcileSpecs env (Nec i f)
     = Nec i (reconcileSpecs env f)
-reconcileSpecs env (Pos i f) 
+reconcileSpecs env (Pos i f)
     = Pos i (reconcileSpecs env f)
 reconcileSpecs env (Gtee p f)
     = Gtee p (reconcileSpecs env f)
@@ -731,25 +733,25 @@ instance Pretty Formula where
             = parens x z ++ " U " ++ parens y z
         | (t0 == 0)
             = parens x z ++ " U{" ++ show tn ++ "} " ++ parens y z
-        | otherwise 
+        | otherwise
             = parens x z ++ " U{" ++ show t0 ++ "," ++ show tn ++ "} " ++ parens y z
     pretty z@(Rels (t0,tn) x y)
         | (t0 == 0) && (tn == infty)
             = parens x z ++ " R " ++ parens y z
         | (t0 == 0)
             = parens x z ++ " R{" ++ show tn ++ "} " ++ parens y z
-        | otherwise 
+        | otherwise
             = parens x z ++ " R{" ++ show t0 ++ "," ++ show tn ++ "} " ++ parens y z
     pretty z@(Gtee p y) = p ++ " |> " ++ parens y z
     pretty z@(Neg x) = "!" ++ parens x z
-    pretty z@(Nec (t0,tn) x) 
+    pretty z@(Nec (t0,tn) x)
         | (t0 == 0) && (tn == infty)
             = "G" ++ parens x z
         | (t0 == 0)
             = "G{" ++ show tn ++ "}" ++ parens x z
         | otherwise
             = "G{" ++ show t0 ++ "," ++ show tn ++ "}" ++ parens x z
-    pretty z@(Pos (t0,tn) x) 
+    pretty z@(Pos (t0,tn) x)
         | (t0 == 0) && (tn == infty)
             = "F" ++ parens x z
         | (t0 == 0)
