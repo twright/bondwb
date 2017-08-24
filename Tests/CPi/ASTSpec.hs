@@ -162,7 +162,7 @@ spec = do
     it "is idempotent on abstractions" $
       property $ \x -> normalForm (normalForm x) === normalForm (x :: Abstraction)
     it "lowers the maximum index in a complex expression" $
-       simplify (mkAbs 1 (mkPar [mkSum [(Located "x" 1,mkAbsBase Nil)],mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 1,mkAbsBase Nil),(Located "r" 1,mkAbsBase Nil)]))]])) `shouldBe` mkAbs 0 (mkPar [mkSum [(Located "x" 0,mkAbsBase Nil)], mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 0,mkAbsBase Nil),(Located "r" 0,mkAbsBase Nil)]))]])
+       simplify (mkAbs 1 (mkPar [mkSum [(Located "x" 1,mkAbsBase Nil)],mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 1,mkAbsBase Nil),(Located "r" 1,mkAbsBase Nil)]))]])) `shouldBe` mkAbs 0 (mkPar [mkSum [(Unlocated "s",mkAbsBase (mkSum [(Located "p" 0,mkAbsBase Nil),(Located "r" 0,mkAbsBase Nil)]))], mkSum [(Located "x" 0,mkAbsBase Nil)]])
     it "removes unused binders" $
       shouldBe
         (normalForm $ new [1] $ mkSum [(Located "x" 0, mkAbsBase Nil)])

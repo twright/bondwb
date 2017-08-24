@@ -11,11 +11,7 @@ import qualified Data.Map as M
 import CPi.Vector
 import CPi.Symbolic
 
-massAction :: RateLawFamily
-massAction [k] xs = k * product xs
-massAction _ _ = error "Mass action takes only one parameter"
-
-enzymeAffinityNetwork :: ConcreteAffinityNetwork
+enzymeAffinityNetwork :: ConcreteAffinityNetwork Conc
 enzymeAffinityNetwork =
   [ ConcreteAffinity (massAction [1]) [["e"], ["s"]]
   , ConcreteAffinity (massAction [2]) [["x", "r"]]
@@ -97,9 +93,9 @@ spec :: SpecWith ()
 spec = do
   describe "partial" $ do
     it "finds no partial interactions for the empty process" $
-      partial M.empty (Mixture []) `shouldBe` vectZero
+      partial M.empty (Mixture []) `shouldBe` (vectZero :: InteractionVect Conc)
     it "finds no partial interactions for the empty species" $
-      partial M.empty (Mixture [(0.0, Nil)]) `shouldBe` vectZero
+      partial M.empty (Mixture [(0.0, Nil)]) `shouldBe` (vectZero :: InteractionVect Conc)
     it "finds the partial interactions for E" $
       partial enzymeDefs (Mixture [(2.0, Def "E" [] [])])
         `shouldBe` partialE
@@ -133,8 +129,8 @@ spec = do
       direct [Unlocated "e"] (partialS +> partialE)
         `shouldBe` vect (Def "E" [] []) *> vect (simplify $ mkAbs 0 enzymeEbound)
     it "finds the direction of s in symbolic MM interactions" $
-      simplify (direct [Unlocated "s"] partialEnzymeMM)
-        `shouldBe` simplify (vect (Def "S" [] [] :* mkAbsBase (Def "P" [] [])))
+      toList (simplify (direct [Unlocated "s"] partialEnzymeMM))
+        `shouldBe` toList (simplify ((var "[S]" / abs (var "[S]")) |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] []))))
   describe "hide" $ do
     it "hides some sites in an interaction vector" $
       hide [[Unlocated "e"]] (partialS +> partialE) `shouldBe` partialS
