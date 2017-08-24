@@ -16,7 +16,7 @@ import Data.Bifunctor
 import CPi.AST hiding ((<|>))
 import CPi.Symbolic
 
-parseFile :: String -> String -> Either (ParseError Char Dec) CPiModel
+parseFile :: String -> String -> Either (ParseError Char Dec) (CPiModel Conc)
 parseFile = runParser model
 
 -- Species:
@@ -283,7 +283,7 @@ kineticLawDef = do
   else fail $ "Definition of " ++ name ++ " which binds "
               ++ show (params ++ args) ++ " contains unbound variables."
 
-concreteKineticLawDef :: Parser (String, RateLawFamily)
+concreteKineticLawDef :: Parser (String, RateLawFamily Conc)
 concreteKineticLawDef = second concretifyKineticLaw <$> kineticLawDef
 
 processDef :: Parser (String, AbstractProcess)
@@ -351,7 +351,7 @@ speciesDef = do
   else fail $ "Definition of " ++ name ++ " which binds " ++ show locs
               ++ " contains unbound locations."
 
-definition :: Parser CPiModel
+definition :: Parser (CPiModel Conc)
 definition = sDef <|> pDef <|> aDef <|> kDef
   where -- we use a real empty model, rather than the default template as we
         -- will combine with this as unit later
@@ -361,5 +361,5 @@ definition = sDef <|> pDef <|> aDef <|> kDef
         kDef = (\(n,x) -> addKineticLawDef n x z) <$> concreteKineticLawDef
         aDef = (\(n,x) -> addAffinityNetworkDef n x z) <$> affinityNetworkDef
 
-model :: Parser CPiModel
+model :: Parser (CPiModel Conc)
 model = foldl combineModels emptyCPiModel <$> many definition

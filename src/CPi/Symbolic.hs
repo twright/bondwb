@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTSyntax, TypeSynonymInstances, FlexibleInstances #-}
 
-module CPi.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicExpr, var, val, simplify) where
+module CPi.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicExpr, var, val, simplify, sumToList, prodToList, applyVar) where
 
 import qualified Data.Map as M
 import CPi.Base
@@ -8,6 +8,7 @@ import CPi.Base
 -- import Data.Foldable
 import qualified Data.List as L
 import Data.Bifunctor
+import Data.Maybe
 
 data Atom = Var String
           | Const Double
@@ -39,6 +40,11 @@ data Expr a where
 type ExprEnv = M.Map String Double
 type SymbolicExpr = Expr Atom
 
+applyVar :: M.Map String Atom -> SymbolicExpr -> SymbolicExpr
+applyVar m = fmap f
+  where f (Var name) = fromMaybe (Var name) (M.lookup name m)
+        f x = x
+
 var :: String -> SymbolicExpr
 var = Atom . Var
 
@@ -52,6 +58,9 @@ instance Num SymbolicExpr where
   abs           = Abs
   fromInteger a = val (fromIntegral a)
   signum        = Sign
+
+instance Nullable SymbolicExpr where
+  isnull = (== val 0)
 
 instance Fractional SymbolicExpr where
   a / b          = a * (b ** fromInteger (-1))
@@ -164,6 +173,14 @@ instance Symbolic SymbolicExpr where
   eval env (Abs x) = second abs $ eval env x
   eval env (Sign x) = second signum $ eval env x
 
+sumToList :: SymbolicExpr -> [SymbolicExpr]
+sumToList (a `Sum` b) = sumToList a ++ sumToList b
+sumToList a = [a]
+
+prodToList :: SymbolicExpr -> [SymbolicExpr]
+prodToList (a `Prod` b) = prodToList a ++ prodToList b
+prodToList a = [a]
+
 instance Expression SymbolicExpr where
   simplify s | s == s' = s
              | otherwise = simplify s'
@@ -172,6 +189,11 @@ instance Expression SymbolicExpr where
           genSimProd a b
             | a' > b' = b' * a'
             | otherwise = a' * b'
+            where a' = simplify a
+                  b' = simplify b
+          genSimSum a b
+            | a' > b' = b' + a'
+            | otherwise = a' + b'
             where a' = simplify a
                   b' = simplify b
 
@@ -200,11 +222,11 @@ instance Expression SymbolicExpr where
           simp (Atom(Const 0.0) `Sum` a) = a
           simp (a `Sum` Atom(Const 0.0)) = a
           simp (Atom(Const a) `Sum` Atom(Const b)) = val (a+b)
-          simp (Sum a b)
-            | a' > b' = b' + a'
-            | otherwise = a' + b'
-            where a' = simplify a
-                  b' = simplify b
+          simp ((a `Prod` (c `Pow` Atom(Const (-1))))
+            `Sum` (b `Prod` (d `Pow` Atom(Const (-1)))))
+            | c == d && simplify (a + b) == c = val 1.0
+            | otherwise = genSimSum a b
+          simp (Sum a b) = genSimSum a b
 
           simp (_ `Pow` Atom(Const 0.0)) = val 1.0
           simp (a `Pow` Atom(Const 1.0)) = a

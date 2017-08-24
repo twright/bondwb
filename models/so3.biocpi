@@ -1,0 +1,23 @@
+species SO3 = bindSO32m(l) -> SO32m(l);
+
+species SO3Bound = unbindSO32m(l) -> SO32m(l);
+
+species SO3DoubleBound = unbind(l) -> SO32m(l);
+
+species SO32m = new l in SO3(l) | em(l) | em(l);
+
+species S2O32m = new l in S(l) | SO3(l) | em(l) | em(l);
+
+species S4O62m = new l in S(l) | S(l) | SO3(l) | SO3(l) | em(l) | em(l);
+
+species S = bindS(l) -> SBound(l);
+
+species SBound(l) = unbindS@l -> S;
+
+species SO3Bound(l) = unbindSO3@l -> SO3;
+
+species SO3 = bindSO3(l) -> SO3Bound;
+
+species em = reactE(l).emBound(l);
+
+species emBound(l) = unbindem@l -> emBound(l);

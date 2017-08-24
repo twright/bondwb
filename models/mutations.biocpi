@@ -1,0 +1,7 @@
+species Stage(;l) = mutate@l(m) -> (left@l -> Stage(;l)
+                                  | right@l -> Stage(;m))
+                  + birth -> (Stage(;l) | Stage(;l));
+                  + death -> 0;
+                  + undo@l -> Stage(;l);
+
+species Cell(;l) = birth -> Cell(;l)

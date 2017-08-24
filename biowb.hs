@@ -43,7 +43,7 @@ prompt = "BioWB:> "
 
 -- Our environment will be a stack of the Haskeline,
 -- State transformer (of CPi Definitions), and IO monads:
-type Environment = InputT (StateT CPiModel IO)
+type Environment = InputT (StateT (CPiModel Conc) IO)
 
 -- Main function:
 main :: IO ()
@@ -216,11 +216,11 @@ helpTextPlot = ("plot <process> <start> <end> <points>","Plots the time series o
 say = outputStrLn
 
 -- Get the Environment state:
-getEnv :: Environment CPiModel
+getEnv :: Environment (CPiModel Conc)
 getEnv = lift get
 
 -- Write the Environment state:
-putEnv :: CPiModel -> Environment ()
+putEnv :: CPiModel Conc -> Environment ()
 putEnv = lift . put
 
 -- Add to the Environment state:

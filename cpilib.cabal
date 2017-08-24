@@ -21,7 +21,7 @@ library
                        CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions,
                        CPi.Processes, CPi.Simulation, CPi.Vector,
                        CPi.ParserNew, CPi.NumericalMethods, CPi.Symbolic,
-                       CPi.Base
+                       CPi.Base, CPi.Examples
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
   build-depends:       base >=4.7, parsec >=3.1,
@@ -29,10 +29,10 @@ library
                        process >=1.2, colour >=2.3,
                        data-accessor >=0.2,
                        hmatrix-gsl, hmatrix <= 0.18.0.0, haskeline,
-                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class, QuickCheck, unordered-containers,
+                       Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class, QuickCheck, unordered-containers,cairo == 0.13.3.1,
                        hashable, megaparsec, scientific
   default-language:    Haskell2010
--- CPi.Examples, 
+-- CPi.Examples,
 test-suite spec
   type: exitcode-stdio-1.0
   main-is: Spec.hs
@@ -41,7 +41,8 @@ test-suite spec
   ghc-options:      -Wall -O2 -fprof-auto -rtsopts -fwarn-tabs
   build-depends:    base >=4.7, hspec, containers>=0.5, cpilib, QuickCheck,
                     hashable, hspec-megaparsec, megaparsec
-  other-modules:    CPi.ASTSpec, CPi.ParserNewSpec, CPi.SymbolicSpec
+  other-modules:    CPi.ASTSpec, CPi.ParserNewSpec, CPi.SymbolicSpec,
+                    CPi.VectorSpec
   default-language: Haskell2010
 
 benchmark signal-bench

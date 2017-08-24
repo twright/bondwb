@@ -3,7 +3,6 @@ module CPi.ProcessesSpec (spec) where
 import Prelude hiding ((*>))
 
 import Test.Hspec
-import Test.QuickCheck
 import CPi.AST
 import CPi.Base
 import CPi.Processes
@@ -13,7 +12,7 @@ import CPi.Vector
 import CPi.Symbolic
 
 massAction :: RateLawFamily
-massAction [k] xs = k * (product xs)
+massAction [k] xs = k * product xs
 massAction _ _ = error "Mass action takes only one parameter"
 
 enzymeAffinityNetwork :: ConcreteAffinityNetwork
@@ -35,11 +34,21 @@ enzymeSbound :: Species
 enzymeSbound = mkSum [(Located "r" 0, mkAbsBase (Def "S" [] [])),
                      (Located "p" 0, mkAbsBase (Def "P" [] []))]
 
+enzymeS'bound :: Species
+enzymeS'bound = mkSum [(Located "r" 0, mkAbsBase (Def "S'" [] [])),
+                       (Located "p" 0, mkAbsBase (Def "P" [] []))]
+
 enzymeS :: SpeciesDefinition
 enzymeS = SpeciesDef [] [] $ mkSum [(Unlocated "s", mkAbs 0 enzymeSbound)]
 
+enzymeS' :: SpeciesDefinition
+enzymeS' = SpeciesDef [] [] $ mkSum [(Unlocated "s", mkAbs 0 enzymeS'bound)]
+
 enzymeDefs :: Env
 enzymeDefs = M.fromList [("E", enzymeE), ("S", enzymeS), ("P", enzymeP)]
+
+enzymeDefs2 :: Env
+enzymeDefs2 = M.fromList [("E", enzymeE), ("S", enzymeS), ("S'", enzymeS'), ("P", enzymeP)]
 
 -- enzymeES :: Species
 -- enzymeES = Def "E" [] [] <|> Def "S" [] []
@@ -109,15 +118,6 @@ spec = do
         `shouldBe` vectZero
     it "finds the partial interaction for an enzyme" $
       partial enzymeDefs (Mixture [(4.0, enzymeC)]) `shouldBe` (4 |> partialC)
-    -- it "should only be zero for Nil" $
-    --   property $ \x -> normalForm x == Nil || partial enzymeDefs (Mixture [(4.0, x)]) /= vectZero
-  describe "norm" $ do
-    it "finds the l1 norm of 2.0<1| -3.0<2| + 1.5<3|" $
-      norm (2.0 |> vect (1::Integer) +> (-3.0) |> vect 2 +> 1.5 |> vect 3) `shouldBe` (6.5::Double)
-    it "finds the l1 norm of a symbolic vector" $
-      simplify (norm $ var "a" |> vect (1::Integer) +> var "b" |> vect 2
-                                +> var "c" |> vect 3)
-      `shouldBe` abs(var "a") + abs(var "b") + abs(var "c")
   describe "conc" $ do
     it "finds the concentration of a site s in partial E||S" $
       conc [Unlocated "s"] (partialS +> partialE) `shouldBe` 3.0
@@ -145,44 +145,43 @@ spec = do
                                                  :* [Unlocated "s"])
              +> var "[P]" |> vect (Def "P" [] [] :* mkAbsBase (Def "P" [] [])
                                                  :* [Unlocated "p"])))
-  describe "multilinear" $ do
-    it "extends a simple function to a multilinear one" $
-      let f :: [Integer] -> Vect (Tensor Integer Integer) Double
-          f [x, y] = vect ((x + 1) :* (y + 1))
-          f _ = error "partially defined"
-      in multilinear f [3 |> vect 1 +> 4 |> vect 2, 5 |> vect 6 +> 7 |> vect 8]
-        `shouldBe` 15 |> vect (2 :* 7) +> 21 |> vect (2 :* 9)
-          +> 20 |> vect (3 :* 7) +> 28 |> vect (3 :* 9)
-    it "gives the correct result on basis elements" $
-      let f :: [Integer] -> Vect (Tensor Integer Integer) Double
-          f [x, y] = vect ((x + 1) :* (y + 1))
-          f _ = error "partially defined"
-      in multilinear f [vect 1, vect 6] `shouldBe` vect (2 :* 7)
-    it "has the linear extension as a special case" $
-      let f :: [Integer] -> Vect Integer Double
-          f [x] = vect (x + 1)
-          f _ = error "partially defined"
-      in multilinear f [3 |> vect 1 +> 2 |> vect 6]
-        `shouldBe` 3 |> vect 2 +> 2 |> vect 7
-    it "gives linearity in first argument" $
-      let f :: [Integer] -> Vect (Tensor Integer Integer) Double
-          f [x, y] = vect ((x + 1) :* (y + 1))
-          f _ = error "partially defined"
-      in multilinear f [3 |> vect 1 +> 4 |> vect 2, vect 6]
-        `shouldBe` 3 |> vect (2 :* 7) +> 4 |> vect (3 :* 7)
-    it "gives linearity in second argument" $
-      let f :: [Integer] -> Vect (Tensor Integer Integer) Double
-          f [x, y] = vect ((x + 1) :* (y + 1))
-          f _ = error "partially defined"
-      in multilinear f [vect 6, 3 |> vect 1 +> 4 |> vect 2]
-        `shouldBe` 3 |> vect (7 :* 2) +> 4 |> vect (7 :* 3)
   describe "react" $ do
     it "can react an enzyme and a substrate" $
-      react [vect (Def "S" [] []) *> vect (mkAbs 0 enzymeSbound),
+      react [(vect (Def "S" [] []) :: ProcessVect Conc) *> vect (mkAbs 0 enzymeSbound),
              vect (Def "E" [] []) *> vect (mkAbs 0 enzymeEbound)]
         `shouldBe` vect (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
           +> (-1.0) |> vect (Def "S" [] []) +> (-1.0) |> vect (Def "E" [] [])
-  describe "actions" $ do
+    it "can react a symbolic enzyme and substrate" $
+      simplify (react [(var "[S]" / (var "[S]" + var "[S']"))
+               |> vect (Def "S" [] []) *> vect (mkAbs 0 enzymeSbound)
+          +> (var "[S']" / (var "[S]" + var "[S']"))
+               |> vect (Def "S'" [] []) *> vect (mkAbs 0 enzymeS'bound),
+              val 1 |> vect (Def "E" [] []) *> vect (mkAbs 0 enzymeEbound)])
+        `shouldBe`
+        simplify (
+        (var "[S]" / (var "[S]" + var "[S']"))
+          |> (vect (new [0] (enzymeSbound <|> enzymeEbound))
+          +> val (-1.0) |> vect (Def "S" [] []))
+     +> (var "[S']" / (var "[S]" + var "[S']"))
+          |> (vect (new [0] (enzymeS'bound <|> enzymeEbound))
+          +> val (-1.0) |> vect (Def "S'" [] []))
+     +> val (-1.0) |> vect (Def "E" [] []))
+    it "can react a symbolic enzyme and substrate, upto pretty printing" $
+      pretty (simplify (react [(var "[S]" / (var "[S]" + var "[S']"))
+               |> vect (Def "S" [] []) *> vect (mkAbs 0 enzymeSbound)
+          +> (var "[S']" / (var "[S]" + var "[S']"))
+               |> vect (Def "S'" [] []) *> vect (mkAbs 0 enzymeS'bound),
+              val 1 |> vect (Def "E" [] []) *> vect (mkAbs 0 enzymeEbound)]))
+        `shouldBe`
+        pretty (simplify (
+        (var "[S]" / (var "[S]" + var "[S']"))
+          |> (vect (new [0] (enzymeSbound <|> enzymeEbound))
+          +> val (-1.0) |> vect (Def "S" [] []))
+     +> (var "[S']" / (var "[S]" + var "[S']"))
+          |> (vect (new [0] (enzymeS'bound <|> enzymeEbound))
+          +> val (-1.0) |> vect (Def "S'" [] []))
+     +> val (-1.0) |> vect (Def "E" [] [])))
+  describe "actions" $
     it "finds the actions when reacting substrate and enzyme" $
       shouldBe
         (6.0 |> vect (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))

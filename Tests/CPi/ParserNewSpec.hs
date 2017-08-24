@@ -7,7 +7,6 @@ import Test.QuickCheck
 import CPi.AST
 import CPi.ParserNew
 import Data.Hashable (hash)
-import qualified Data.Map as M
 import CPi.Examples (rabbitSource, rabbitModel)
 import CPi.Symbolic
 

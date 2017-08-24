@@ -1,0 +1,13 @@
+species A = a -> P;
+species B = b -> Q;
+species E = e -> E;
+species P = p -> P;
+species Q = q -> Q;
+
+kinetic law PingPong(Vmax, KA, KB; A, B, E) = Vmax * A * B /(KA*B + KB*A + A*B);
+
+affinity network M = {
+	a,b,e at rate PingPong(1,2,2);
+}
+
+process P = [1.0] E || [5.0] A || [5.0] B with network M;

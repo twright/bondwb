@@ -51,7 +51,8 @@ module CPi.AST
   emptyCPiModel,
   combineModels,
   concretifyKineticLaw,
-  prefLoc
+  prefLoc,
+  massAction
   ) where
 
 import qualified Data.List as L
@@ -77,8 +78,8 @@ type Conc = Double
 type Rate = Double
 
 -- Rate laws
-type RateLaw = [Conc] -> Rate
-type RateLawFamily = [Double] -> RateLaw
+type RateLaw k = [k] -> k
+type RateLawFamily k = [Rate] -> RateLaw k
 
 class (Pretty a, Expression a) => Syntax a where
   relocate :: Location -> Location -> a -> a
@@ -122,23 +123,23 @@ prefLoc (Unlocated _) = Nothing
 type PrefixSpecies = (Prefix, Abstraction)
 
 data RateLawParam = RateLawParamVar String
-                  | RateLawParamVal Double
-                  deriving (Eq, Ord, Show)
+                    | RateLawParamVal Rate
+                    deriving (Eq, Ord, Show)
 
 data RateLawSpec = RateLawAppl String [RateLawParam]
                 --  | RateLawFn RateLaw
                  deriving (Eq, Ord, Show)
 
 data Affinity = Affinity { affRateLaw :: RateLawSpec
-                         , affSites   :: [[Name]] }
+                           , affSites   :: [[Name]] }
                 deriving (Eq, Ord, Show)
 
-data ConcreteAffinity = ConcreteAffinity { cAffRateLaw :: RateLaw
+data ConcreteAffinity k = ConcreteAffinity { cAffRateLaw :: RateLaw k
                                          , cAffSites   :: [[Name]] }
 
 type AffinityNetwork = [Affinity]
 
-type ConcreteAffinityNetwork = [ConcreteAffinity]
+type ConcreteAffinityNetwork k = [ConcreteAffinity k]
 
 data AffinityNetworkSpec = AffinityNetworkAppl String [Rate]
                          | AffinityNetworkSpec AffinityNetwork
@@ -164,49 +165,49 @@ data KineticLawDefinition = KineticLawDef
   , kinBody :: Symb.SymbolicExpr }
   deriving (Eq, Ord, Show)
 
-concretifyKineticLaw :: KineticLawDefinition -> RateLawFamily
+concretifyKineticLaw :: KineticLawDefinition  -> RateLawFamily Conc
 concretifyKineticLaw (KineticLawDef params args body) params' args'
   = case Symb.eval env body of
       Left err -> error $ concat err
       Right x  -> x
   where env = M.fromList $ (params ++ args) `zip` (params' ++ args')
 
-data CPiModel = Defs
+data CPiModel k = Defs
   { speciesDefs         :: Env
   , affinityNetworkDefs :: Map String AffinityNetworkDefinition
-  , kineticLawDefs      :: Map String RateLawFamily
+  , kineticLawDefs      :: Map String (RateLawFamily k)
   , processDefs         :: Map String AbstractProcess }
 
-instance Show CPiModel where
+instance (Show k) => Show (CPiModel k) where
   show (Defs s a _ p) = "Defs " ++ show s ++ " "
                                 ++ show a ++ " "
                                 ++ " M.empty "
                                 ++ show p
 
-addSpeciesDef :: String -> SpeciesDefinition -> CPiModel -> CPiModel
+addSpeciesDef :: String -> SpeciesDefinition -> CPiModel k -> CPiModel k
 addSpeciesDef name def (Defs s a k p) = Defs (M.insert name def s) a k p
 
-addAffinityNetworkDef :: String -> AffinityNetworkDefinition -> CPiModel
-                         -> CPiModel
+addAffinityNetworkDef :: String -> AffinityNetworkDefinition -> CPiModel k
+                         -> CPiModel k
 addAffinityNetworkDef name def (Defs s a k p) = Defs s (M.insert name def a) k p
 
-addKineticLawDef :: String -> RateLawFamily -> CPiModel -> CPiModel
+addKineticLawDef :: String -> RateLawFamily k -> CPiModel k -> CPiModel k
 addKineticLawDef name def (Defs s a k p) = Defs s a (M.insert name def k) p
 
-addProcessDef :: String -> AbstractProcess -> CPiModel -> CPiModel
+addProcessDef :: String -> AbstractProcess -> CPiModel k -> CPiModel k
 addProcessDef name def (Defs s a k p) = Defs s a k (M.insert name def p)
 
-combineModels :: CPiModel -> CPiModel -> CPiModel
+combineModels :: CPiModel k -> CPiModel k -> CPiModel k
 combineModels (Defs s1 a1 k1 p1) (Defs s2 a2 k2 p2) = Defs (s1 `M.union` s2)
                                                            (a1 `M.union` a2)
                                                            (k1 `M.union` k2)
                                                            (p1 `M.union` p2)
 
-massAction :: RateLawFamily
-massAction [k] xs = k * product xs
-massAction _ _ = error "Wrong number of parameters provided to mass action kninetic law"
+massAction :: (Num k, DoubleExpression k) => RateLawFamily k
+massAction [m] xs = product (fromFloat m:xs)
+massAction _ _ = error "Wrong number of parameters provided to mass action kinetic law"
 
-emptyCPiModel :: CPiModel
+emptyCPiModel :: (Num k, DoubleExpression k) => CPiModel k
 emptyCPiModel = Defs { speciesDefs = M.empty
                      , kineticLawDefs = M.fromList [("MA", massAction)]
                      , affinityNetworkDefs = M.empty

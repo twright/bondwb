@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveFunctor, GeneralizedNewtypeDeriving, FlexibleContexts, FunctionalDependencies, UndecidableInstances #-}
 
-module CPi.Vector (Tensor(..), Vector(..), Vect(..), Nullable(..), (><), vect, (*>), delta, toList, fromList, multilinear) where
+module CPi.Vector (Tensor(..), Vector(..), Vect(..), (><), vect, (*>), delta, toList, fromList, multilinear) where
 
 import Prelude hiding ((*>))
 import CPi.Base
@@ -55,9 +55,6 @@ instance (Show a, Show b) => Show (Tensor a b) where
 
 instance (Pretty a, Pretty b) => Pretty (Tensor a b) where
   pretty (a :* b) = pretty a ++ "; " ++ pretty b
-
-class Nullable a where
-  isnull :: a -> Bool
 
 -- instance {-# OVERLAPPABLE #-} (Eq k, Num k, Fractional k, Eq i, Hashable i) => Nullable (Vect i k) where
 --   isnull = (==0) . norm

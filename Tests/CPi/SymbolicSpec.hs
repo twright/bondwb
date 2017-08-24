@@ -83,3 +83,9 @@ spec = do
     it "can fully simplify complex expression with exp log" $
       simplify(var "x" * exp(val (-1.0) * log (val 1.0 * var "x")))
         `shouldBe` val 1.0
+    it "simplifies fractions" $
+      simplify (var "x" / var "x") `shouldBe` val 1.0
+    it "can simplify separated fractions" $
+      simplify (var "x" / (var "x" + var "y")
+              + var "y" / (var "x" + var "y"))
+        `shouldBe`val 1.0

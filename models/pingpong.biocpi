@@ -1,0 +1,26 @@
+species E = e(l) -> EB(;l);
+species EB(;l) = eb@l -> EPB(;l) + ebb@l -> E;
+species EP = ep(l) -> EPB(;l);
+species EPB(;l) = epb@l -> EB(;l) + epbb@l -> EP;
+species A = a(l) -> AB(;l);
+species AB(;l) = ab@l -> PB(;l);
+species B = b(l) -> BB(;l);
+species BB(;l) = bb@l -> QB(;l);
+species P = p -> P;
+species PB(;l) = pb@l -> AB(;l) + pbb@l -> P;
+species Q = p -> Q;
+species QB(;l) = qb@l -> BB(;l) + qbb@l -> Q;
+
+affinity network M = {
+	a, e at rate MA(1);
+	eb+ab at rate MA(2);
+	epb+pb at rate MA(1);
+	epbb+pbb at rate MA(3);
+
+	b, ep at rate MA(1);
+	epb+bb at rate MA(2);
+	eb+qb at rate MA(1);
+	ebb+qbb at rate MA(3);
+}
+
+process P = [1.0] E || [5.0] A || [5.0] B with network M;
