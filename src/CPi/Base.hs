@@ -22,4 +22,4 @@ class Nullable a where
   isnull :: a -> Bool
 
 instance Nullable Double where
-  isnull = (<1e-16)
+  isnull = (<1e-16).abs

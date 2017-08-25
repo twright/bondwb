@@ -39,6 +39,9 @@ spec = do
         in ((u :: Vect Integer Double) == v) === ((w <> w) == 0)
     it "does not think a one element vector is null" $
       1.0 |> vect (1::Integer) `shouldNotBe` (vectZero :: Vect Integer Double)
+    it "can tell two clearly different vectors are different" $
+      (0.0 :: Double) |> vect (1::Integer) +> (-3.0) |> vect 2
+        `shouldNotBe` (-1.0) |> vect 1 +> (- 2.0) |> vect 2
   describe "multilinear" $ do
     it "extends a simple function to a multilinear one" $
       let f :: [Integer] -> Vect (Tensor Integer Integer) Double

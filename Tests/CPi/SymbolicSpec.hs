@@ -96,3 +96,9 @@ spec = do
       simplify (2.0 * (var "x" / (var "x" + var "y"))
               + 2.0 * (var "y" / (var "x" + var "y")))
         `shouldBe` val 2.0
+    it "should not simplify this expr to zero" $
+      simplify (Prod (Prod (Prod (Atom (Const 1.0)) (Atom (Const 2.0))) (Sum (Atom (Const 0.0)) (Abs (Prod (Prod (Prod (Atom (Const 1.0)) (Atom (Const 1.0))) (Prod (Prod (Atom (Const 1.0)) (Atom (Const 1.0))) (Atom (Const 1.0)))) (Atom (Var "[S]")))))) (Sum (Atom (Const 0.0)) (Abs (Prod (Prod (Prod (Atom (Const 1.0)) (Atom (Const 1.0))) (Prod (Prod (Atom (Const 1.0)) (Atom (Const 1.0))) (Atom (Const 1.0)))) (Atom (Var "[E]"))))))
+        `shouldNotBe` val 0.0
+    it "should not simplify this simpler expr to zero" $
+      simplify (Prod (val 2.0) (Sum (val 0.0) (val 3.0)))
+        `shouldBe` val 6.0

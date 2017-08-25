@@ -51,6 +51,9 @@ var = Atom . Var
 val :: Double -> SymbolicExpr
 val = Atom . Const
 
+instance DoubleExpression SymbolicExpr where
+  fromFloat = val
+
 instance Num SymbolicExpr where
   a + b         = Sum a b
   a * b         = Prod a b
@@ -206,7 +209,7 @@ instance Expression SymbolicExpr where
           simp (Atom(Const a) `Prod` Atom(Const b)) = val (a*b)
           simp (y `Prod` Log x) = Log (x**y)
           simp (Log x `Prod` y) = Log (x**y)
-          simp (a `Prod` (b `Sum` c)) = (a*b) + (b*c)
+          simp (a `Prod` (b `Sum` c)) = (a*b) + (a*c)
           simp ((a `Sum` b) `Prod` c) = (a*c) + (b*c)
           simp (l@(x `Pow` a) `Prod` r@(y `Pow` b))
             | x == y = x**(a + b)

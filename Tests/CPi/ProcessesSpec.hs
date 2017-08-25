@@ -11,11 +11,14 @@ import qualified Data.Map as M
 import CPi.Vector
 import CPi.Symbolic
 
-enzymeAffinityNetwork :: ConcreteAffinityNetwork Conc
-enzymeAffinityNetwork =
-  [ ConcreteAffinity (massAction [1]) [["e"], ["s"]]
-  , ConcreteAffinity (massAction [2]) [["x", "r"]]
-  , ConcreteAffinity (massAction [3]) [["x", "p"]] ]
+enzymeAffinityNetwork :: (Num k, DoubleExpression k) => ConcreteAffinityNetwork k
+enzymeAffinityNetwork = [ ConcreteAffinity (massAction [1]) [["e"], ["s"]] , ConcreteAffinity (massAction [2]) [["x", "r"]] , ConcreteAffinity (massAction [3]) [["x", "p"]] ]
+
+-- enzymeAffinityNetwork' :: ConcreteAffinityNetwork SymbConc
+-- enzymeAffinityNetworkS =
+--   [ ConcreteAffinity (massAction [1]) [["e"], ["s"]]
+--   , ConcreteAffinity (massAction [2]) [["x", "r"]]
+--   , ConcreteAffinity (massAction [3]) [["x", "p"]] ]
 
 enzymeEbound :: Species
 enzymeEbound = mkSum [(Located "x" 0, mkAbsBase (Def "E" [] []))]
@@ -58,6 +61,14 @@ partialS = 3.0 |> vect (Def "S" [] [])
 
 partialE :: D
 partialE = 2.0 |> vect (Def "E" [] [])
+           *> vect (simplify $ mkAbs 0 enzymeEbound) *> vect [Unlocated "e"]
+
+partialS' :: D'
+partialS' = var "[S]" |> vect (Def "S" [] [])
+           *> vect (simplify $ mkAbs 0 enzymeSbound) *> vect [Unlocated "s"]
+
+partialE' :: D'
+partialE' = var "[E]" |> vect (Def "E" [] [])
            *> vect (simplify $ mkAbs 0 enzymeEbound) *> vect [Unlocated "e"]
 
 partialC :: D
@@ -108,7 +119,7 @@ spec = do
            `shouldBe`(partialS +> partialE)
     it "should return no interactions after hiding" $
       partial enzymeDefs
-              (React enzymeAffinityNetwork
+              (React (enzymeAffinityNetwork :: ConcreteAffinityNetwork Conc)
                     (Mixture [(2.0, Def "E" [] []),
                               (3.0, Def "S" [] [])]))
         `shouldBe` vectZero
@@ -176,20 +187,24 @@ spec = do
           |> (vect (new [0] (enzymeS'bound <|> enzymeEbound))
           +> val (-1.0) |> vect (Def "S'" [] []))
      +> val (-1.0) |> vect (Def "E" [] [])))
-  describe "actions" $
+  describe "actions" $ do
     it "finds the actions when reacting substrate and enzyme" $
       shouldBe
         (6.0 |> vect (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
           +> (-6.0) |> vect (Def "S" [] []) +> (-6.0) |> vect (Def "E" [] []))
         (actions enzymeAffinityNetwork (partialS +> partialE))
+    it "can find the actions from a symbolic enzyme and substrate" $
+      actions enzymeAffinityNetwork (partialS' +> partialE')
+        `shouldBe`
+        vectZero
   describe "dPdt" $ do
     it "gives correct dPdt for reacting substrate and enzyme" $
       shouldBe
         (6.0 |> vect (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
           +> (-6.0) |> vect (Def "S" [] []) +> (-6.0) |> vect (Def "E" [] []))
-        (dPdt enzymeDefs (React enzymeAffinityNetwork
+        (dPdt enzymeDefs (React (enzymeAffinityNetwork :: ConcreteAffinityNetwork Conc)
           (Mixture [(3.0, Def "S" [] []), (2.0, Def "E" [] [])])))
     it "gives correct dPdt for enzyme substrate complex" $
       shouldBe
-        (dPdt enzymeDefs (React enzymeAffinityNetwork (Mixture [(4.0, enzymeC)])))
+        (dPdt enzymeDefs (React (enzymeAffinityNetwork :: ConcreteAffinityNetwork Conc) (Mixture [(4.0, enzymeC)])))
         (12 |> vect (Def "P" [] []) +> 8 |> vect (Def "S" [] []) +> 20 |> vect (Def "E" [] []) +> (-20.0) |> vect (simplify enzymeC))
