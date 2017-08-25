@@ -89,3 +89,10 @@ spec = do
       simplify (var "x" / (var "x" + var "y")
               + var "y" / (var "x" + var "y"))
         `shouldBe`val 1.0
+    it "can bring coefficients inside fractions" $
+      simplify (var "z" * (var "x" / var "y"))
+        `shouldBe` simplify ((var "z" * var "x") / var "y")
+    it "can simplify separated fractions with coefficients" $
+      simplify (2.0 * (var "x" / (var "x" + var "y"))
+              + 2.0 * (var "y" / (var "x" + var "y")))
+        `shouldBe` val 2.0

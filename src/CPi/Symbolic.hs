@@ -217,11 +217,22 @@ instance Expression SymbolicExpr where
           simp (l@(x `Pow` a) `Prod` y)
             | x == y = x**(a + val 1)
             | otherwise = genSimProd l y
+          simp ((a `Prod` (c `Pow` Atom(Const (-1)))) `Prod` b)
+            = simplify $ simplify (b * a) / c
+          simp (b `Prod` (a `Prod` (c `Pow` Atom(Const (-1)))))
+            = simplify $ simplify (b * a) / c
           simp (a `Prod` b) = genSimProd a b
 
           simp (Atom(Const 0.0) `Sum` a) = a
           simp (a `Sum` Atom(Const 0.0)) = a
           simp (Atom(Const a) `Sum` Atom(Const b)) = val (a+b)
+          simp (((e `Prod ` a) `Prod` (c `Pow` Atom(Const (-1))))
+            `Sum` ((f `Prod` b) `Prod` (d `Pow` Atom(Const (-1)))))
+            | c == d && e == f && simplify (a + b) == c = e
+            | c == d && a == b && simplify (e + f) == c = a
+            | c == d && e == b && simplify (a + f) == c = e
+            | c == d && a == f && simplify (b + b) == c = a
+            | otherwise = genSimSum a b
           simp ((a `Prod` (c `Pow` Atom(Const (-1))))
             `Sum` (b `Prod` (d `Pow` Atom(Const (-1)))))
             | c == d && simplify (a + b) == c = val 1.0

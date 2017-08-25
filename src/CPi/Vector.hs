@@ -91,8 +91,9 @@ fromList kvs = Vect $ H.fromListWith (+) $ L.map (\(i,v) -> (v,i)) kvs
 toList :: (Num k, Hashable i, Ord i) => Vect i k -> [(k,i)]
 toList (Vect v) = sortWith snd $ fmap (\(x,y) -> (y,x)) (H.toList v)
 
-instance (Eq k, Num k, Fractional k, Expression k, Expression i, Eq i, Hashable i, Nullable k) => Eq (Vect i k) where
-  x == y = isnull $ simplify $ x +> (-1) |> y
+instance (Eq k, Ord i, Num k, Fractional k, Expression k, Expression i, Eq i, Hashable i, Nullable k) => Eq (Vect i k) where
+  x == y = kvs x == kvs y
+    where kvs w = L.filter (not.isnull.fst) $ toList $ fmap simplify w
 
 vect :: (Eq k, Num k, Fractional k, Eq i, Hashable i) => i -> Vect i k
 vect i = Vect $ singleton i 1

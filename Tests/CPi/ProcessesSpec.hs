@@ -129,18 +129,18 @@ spec = do
       direct [Unlocated "e"] (partialS +> partialE)
         `shouldBe` vect (Def "E" [] []) *> vect (simplify $ mkAbs 0 enzymeEbound)
     it "finds the direction of s in symbolic MM interactions" $
-      toList (simplify (direct [Unlocated "s"] partialEnzymeMM))
-        `shouldBe` toList (simplify ((var "[S]" / abs (var "[S]")) |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] []))))
+      direct [Unlocated "s"] partialEnzymeMM
+        `shouldBe` (var "[S]" / abs (var "[S]")) |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] []))
   describe "hide" $ do
     it "hides some sites in an interaction vector" $
       hide [[Unlocated "e"]] (partialS +> partialE) `shouldBe` partialS
     it "hides a site in the symbolic interaction vector for MM enzymes" $
-      toList (simplify (hide [[Unlocated "e"]] partialEnzymeMM))
+      hide [[Unlocated "e"]] partialEnzymeMM
       `shouldBe`
-      toList (simplify (var "[S]" |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] [])
+      var "[S]" |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] [])
                                                  :* [Unlocated "s"])
              +> var "[P]" |> vect (Def "P" [] [] :* mkAbsBase (Def "P" [] [])
-                                                 :* [Unlocated "p"])))
+                                                 :* [Unlocated "p"])
   describe "react" $ do
     it "can react an enzyme and a substrate" $
       react [(vect (Def "S" [] []) :: ProcessVect Conc) *> vect (mkAbs 0 enzymeSbound),
@@ -154,8 +154,7 @@ spec = do
                |> vect (Def "S'" [] []) *> vect (mkAbs 0 enzymeS'bound),
               val 1 |> vect (Def "E" [] []) *> vect (mkAbs 0 enzymeEbound)])
         `shouldBe`
-        simplify (
-        (var "[S]" / (var "[S]" + var "[S']"))
+        simplify ((var "[S]" / (var "[S]" + var "[S']"))
           |> (vect (new [0] (enzymeSbound <|> enzymeEbound))
           +> val (-1.0) |> vect (Def "S" [] []))
      +> (var "[S']" / (var "[S]" + var "[S']"))

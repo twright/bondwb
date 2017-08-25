@@ -1,6 +1,6 @@
 {-# LANGUAGE  FlexibleInstances, BangPatterns, MultiParamTypeClasses, FlexibleContexts #-}
 
-module CPi.Processes (Process(..), Affinity(..), ProcessVect,
+module CPi.Processes (Process(..), Affinity(..), ProcessVect, InteractionVect, DirectionVect,
   ConcreteAffinityNetwork, P, D, P', D', concretifyModel, partial, conc,
   direct, react, hide, networkSites, actions, dPdt, partial', dPdt',
   tracesGivenNetwork, speciesVar) where
