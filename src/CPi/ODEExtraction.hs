@@ -1,0 +1,205 @@
+module CPi.ODEExtraction
+  (IVP(..), matlabExpr, sympyExpr, matlabODE, vectorFieldToODEs, extractIVP, sympyODE, solveODEPython) where
+
+import CPi.Symbolic
+import CPi.Processes
+import CPi.Vector
+import CPi.AST (pretty)
+import qualified CPi.AST as AST
+import CPi.Simulation (Trace)
+
+-- import qualified Control.Exception as X
+import qualified Data.Map as M
+import qualified Data.List as L
+import Data.Maybe
+
+--import qualified Numeric.LinearAlgebra as LA
+
+import System.IO.Unsafe
+-- import qualified System.Process as OS
+import System.Process (readProcess)
+-- import Data.Maybe
+
+newtype IVP = IVP ([String], [SymbolicExpr], [Double]) deriving (Show, Eq)
+newtype ODE = ODE ([String], [SymbolicExpr])
+
+-------------------------------
+-- MATLAB script output:
+-------------------------------
+
+extractIVP :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> IVP
+extractIVP env network p = fromODEToIVP odes
+  where odes = vectorFieldToODEs p'
+        p'   = dPdt' tr network p
+        tr   = tracesGivenNetwork network env
+
+vectorFieldToODEs :: P' -> ODE
+vectorFieldToODEs v = ODE (vars, rhss)
+  where
+    vars = map (pretty.snd) kis
+    rhss = map (simplify.fst) kis
+    kis = toList v
+
+fromODEToIVP :: ODE -> [Double] -> IVP
+fromODEToIVP (ODE (x,y)) z = IVP (x, y, z)
+
+-- modelToIVP :: CPiModel SymbolicExpr -> IVP
+
+matlabODE :: IVP -> (Int,(Double,Double)) -> Either String String
+matlabODE ivp (n,(t0,tn)) =
+  if any isNothing eqns
+  then Left "An ODE equation has an unbound variable"
+  else Right $
+  "init = [" ++ L.intercalate ";" (map show inits) ++ "];\n" ++
+    "t = linspace(" ++ show t0 ++ "," ++ show tn ++ "," ++ show n ++ ");\n" ++
+    "function xdot = f(x,t) \n\n" ++
+    L.intercalate ";\n" (catMaybes eqns) ++
+    ";\nendfunction;\n\n" ++
+    -- Need new support for calculating jacobian
+    -- "function jac = jj(x,t)\n\n" ++
+    -- matlabJac env p' ++ ";\nendfunction;\n\n" ++
+    "x = lsode(f, init, t);\n" ++
+    "save (\"-ascii\", \"-\", \"x\");"
+      where
+        xdots = ["xdot(" ++ show i ++ ")" | i <- [(1::Integer)..]]
+        xvars = ["x(" ++ show i ++ ")" | i <- [(1::Integer)..]]
+        varmap = M.fromList $ zip vars xvars
+        IVP (vars,rhss,inits) = ivp
+        eqns = [fmap (\y -> xdot ++ " = " ++ y) (matlabExpr varmap rhs)
+               | (xdot,rhs) <- zip xdots rhss]
+
+sympyODE :: IVP -> (Int,(Double,Double)) -> Either String String
+sympyODE ivp (n,(t0,tn)) =
+  if any isNothing eqns
+  then Left "An ODE equation has an unbound variable"
+  else Right $
+  "import sympy as sym\n" ++
+  "import numpy as np\n" ++
+  "from sympy.abc import t\n" ++
+  "from scipy.integrate import odeint\n" ++
+  "from sys import stdout\n\n" ++
+  "xs = sym.symbols('" ++ unwords vars ++ "')\n" ++
+  "xts = [x(t) for x in xs]\n" ++
+  "odes = [" ++ L.intercalate ", " (catMaybes eqns) ++ "]\n" ++
+  "y0 = [" ++ L.intercalate ", " (map show inits) ++ "]\n" ++
+  "ts = np.linspace(" ++ show t0 ++ "," ++ show tn ++ "," ++ show n ++ ")\n" ++
+  "rhss = [eqn.rhs for eqn in odes]\n" ++
+  "Jac = sym.Matrix(rhss).jacobian(xts)\n" ++
+  "f = sym.lambdify((xts, t), rhss, modules='numpy')\n" ++
+  "J = sym.lambdify((xts, t), Jac, modules='numpy')\n" ++
+  -- Try to solve ODEs using symbolic Jacobian
+  "try: ys = odeint(f, y0, ts, (), J)\n" ++
+  -- Fallback to using method without Jacobian
+  "except NameError: ys = odeint(f, y0, ts, ())\n" ++
+  -- "print(ys)\n" ++
+  "print('\\n'.join([' '.join([('%.18e' % y).replace('nan', '0') for y in ysa]) for ysa in ys]))"
+    where
+      xvars = ["xts[" ++ show i ++ "]" | i <- [(0::Integer)..]]
+      xdots = [xvar ++ ".diff()" | xvar <- xvars]
+      varmap = M.fromList $ zip vars xvars
+      IVP (vars,rhss,inits) = ivp
+      mkeqn xdot y = "sym.Eq(" ++ xdot ++ ", " ++ y ++ ")"
+      eqns = [fmap (mkeqn xdot) (sympyExpr varmap rhs)
+             | (xdot,rhs) <- zip xdots rhss]
+
+matlabExpr :: M.Map String String -> SymbolicExpr -> Maybe String
+matlabExpr mp (Atom (Var x)) = M.lookup x mp
+matlabExpr _ (Atom (Const x)) = return $ show x
+matlabExpr mp (x `Sum` y) = do
+  x' <- matlabExpr mp x
+  y' <- matlabExpr mp y
+  return $ x' ++ " .+ " ++ y'
+matlabExpr mp (x `Prod` y) = do
+  x' <- matlabExpr mp x
+  y' <- matlabExpr mp y
+  return $ "(" ++ x' ++ ") .* (" ++ y' ++ ")"
+matlabExpr mp (x `Pow` y) = do
+  x' <- matlabExpr mp x
+  y' <- matlabExpr mp y
+  return $ "(" ++ x' ++ ") .** (" ++ y' ++ ")"
+matlabExpr mp (Abs x) = do
+  x' <- matlabExpr mp x
+  return $ "abs(" ++ x' ++ ")"
+
+
+sympyExpr :: M.Map String String -> SymbolicExpr -> Maybe String
+sympyExpr mp (Atom (Var x)) = M.lookup x mp
+sympyExpr _ (Atom (Const x)) = return $ show x
+sympyExpr mp (x `Sum` y) = do
+  x' <- sympyExpr mp x
+  y' <- sympyExpr mp y
+  return $ x' ++ " + " ++ y'
+sympyExpr mp (x `Prod` y) = do
+  x' <- sympyExpr mp x
+  y' <- sympyExpr mp y
+  return $ "(" ++ x' ++ ") * (" ++ y' ++ ")"
+sympyExpr mp (x `Pow` y) = do
+  x' <- sympyExpr mp x
+  y' <- sympyExpr mp y
+  return $ "(" ++ x' ++ ") ** (" ++ y' ++ ")"
+sympyExpr mp (Abs x) = do
+  x' <- sympyExpr mp x
+  return $ "abs(" ++ x' ++ ")"
+sympyExpr mp (Sin x) = do
+  x' <- sympyExpr mp x
+  return $ "sin(" ++ x' ++ ")"
+sympyExpr mp (Cos x) = do
+  x' <- sympyExpr mp x
+  return $ "sin(" ++ x' ++ ")"
+sympyExpr mp (Tan x) = do
+  x' <- sympyExpr mp x
+  return $ "tan(" ++ x' ++ ")"
+sympyExpr mp (Exp x) = do
+  x' <- sympyExpr mp x
+  return $ "exp(" ++ x' ++ ")"
+sympyExpr mp (Log x) = do
+  x' <- sympyExpr mp x
+  return $ "log(" ++ x' ++ ")"
+
+---------------------------------------
+-- Using Octave to execute the scripts
+---------------------------------------
+
+runPython :: String -> IO String
+runPython = readProcess "python3" ["-q"]
+
+callSolveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> (Int, (Double, Double)) -> IO String
+callSolveODEPython env network p inits tr = case sympyODE (extractIVP env network p inits) tr of
+  Right script -> do
+    putStrLn $ "Python script:\n\n" ++ script
+    writeFile "script.py" script
+    runPython script
+  Left _ -> undefined
+
+
+solveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> (Int, (Double, Double)) -> Trace
+solveODEPython env network p inits tr@(n,(t0,tn))
+  = let raw = unsafePerformIO (callSolveODEPython env network p inits tr)
+        ts = [t0 + fromIntegral i*(tn-t0)/fromIntegral n | i <- [0..n]]
+        yss = (map (map read.words) $ lines raw) :: [[Double]]
+        ys = [fromList (xs `zip` pbasis) | xs <- yss]
+        pbasis = map snd $ toList p
+    in ts `zip` ys
+
+-- callOctave env p mts p' ts = let
+--     script = matlabODE env (wholeProc env p mts) p' ts
+--   in do
+--     putStrLn $ "Octave Script: \n" ++ script
+--     OS.readProcess
+--       "octave" ["-q", "--eval", script] []
+
+-- | Solver which calculates the symbolic Jacobian, writes MATLAB code, and executes it with GNU Octave. (General purpose, deals with stiff systems, uses LSODE.)
+-- solveODEoctave :: Solver
+-- solveODEoctave env p mts p' ts@(n,(t0,tn))
+--     = let raw = unsafePerformIO (callOctave env p mts p' ts)
+--       in (n>< Map.size p') $ map s2d $ words raw
+
+
+-- Return the MATLAB script for ODEs
+-- matlabScript :: Env
+--              -> Process
+--              -> MTS
+--              -> P'
+--              -> (Int, (Double, Double))
+--              -> String
+-- matlabScript env p mts = matlabODE env (wholeProc env p mts)

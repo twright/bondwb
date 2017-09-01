@@ -22,10 +22,10 @@ import qualified Data.HashMap.Strict as H
 
 type Trace = [(Double, P)]
 
-toProcess :: P -> Process Conc
+toProcess :: P -> Process
 toProcess (Vect v) = Mixture [(abs x, spec) | (spec, x) <- H.toList v]
 
-simulate :: Env -> ConcreteAffinityNetwork Conc -> Double -> Double -> P -> Trace
+simulate :: Env -> ConcreteAffinityNetwork -> Double -> Double -> P -> Trace
 simulate env network h !t !p0 = (t, p0) : simulate env network h t' p'
   where p    = toProcess p0
         t'   = t + h
@@ -43,7 +43,7 @@ uptoEpsilon epsilon (Vect v) = fromList $ map (\(a, b) -> (b, a))
         uptoEpsilon' _  [] = []
         key (_, s) = s
 
-simulateMaxSpecies :: Int -> Env -> ConcreteAffinityNetwork Conc -> Double -> Double -> Double -> Double -> Double -> Double ->  P -> Trace
+simulateMaxSpecies :: Int -> Env -> ConcreteAffinityNetwork -> Double -> Double -> Double -> Double -> Double -> Double ->  P -> Trace
 simulateMaxSpecies n env network tolabs tolrel h hmin hmax t0 p0
   =
   adaptiveAM3 f (maxSpecies n) tolabs tolrel hmin hmax h t0 p0 p1 p2
@@ -58,7 +58,7 @@ simulateMaxSpecies n env network tolabs tolrel h hmin hmax t0 p0
         tr = trans env
           -- tracesGivenNetwork network env
 
-simulateUptoEpsilon :: Double -> Env -> ConcreteAffinityNetwork Conc -> Double -> Double -> Double -> Double -> Double -> Double -> P -> Trace
+simulateUptoEpsilon :: Double -> Env -> ConcreteAffinityNetwork -> Double -> Double -> Double -> Double -> Double -> Double -> P -> Trace
 simulateUptoEpsilon epsilon env network tolabs tolrel h hmin hmax t0 p0
   = --simA3Adaptive f (uptoEpsilon epsilon) 1e-6 (h/100) h t0 p0 p1 p2
   --  adaptiveAM3 f (uptoEpsilon epsilon) tol hmin h t0 p0 p1 p2

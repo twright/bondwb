@@ -4,6 +4,7 @@ import Test.Hspec
 -- import Test.QuickCheck
 import qualified Data.Map as M
 import Data.Either
+import Data.Bifunctor
 
 import CPi.Symbolic
 
@@ -29,7 +30,8 @@ spec = do
       freeVars (var "x" * (val 1 + tan(var "y" + var "z")))
         `shouldBe` ["x", "y", "z"]
   describe "eval" $ do
-    let env = M.fromList [("x", 1.0), ("y", 2.0), ("z", 3.0)]
+    let env = M.fromList [("x", 1.0 :: Double), ("y", 2.0), ("z", 3.0)]
+        envsymb = M.fromList [("x", var "a"), ("y", var "b"), ("z", val 3.0)]
     it "evaluates a constant atom" $
       eval env (Const 2) `shouldBe` Right 2
     it "evaluates a variable atom" $
@@ -50,6 +52,10 @@ spec = do
       eval env (var "x" + val 5) `shouldBe` Right 6
     it "propogates errors from sums" $
       eval env (val 2 + var "w") `shouldSatisfy` isLeft
+    it "evaluates using a symbolic environment" $
+      second simplify (eval envsymb ((var "x" + var "y") * var "z"))
+        `shouldBe`
+        Right (simplify $ val 3.0 * (var "a" + var "b"))
   describe "simplify" $ do
     it "disregards constant left multiples" $
       simplify (val 1 * var "a") `shouldBe` var "a"

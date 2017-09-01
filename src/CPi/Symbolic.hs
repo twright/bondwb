@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTSyntax, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE GADTSyntax, TypeSynonymInstances, FlexibleInstances, RankNTypes #-}
 
 module CPi.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicExpr, var, val, simplify, sumToList, prodToList, applyVar) where
 
@@ -37,7 +37,7 @@ data Expr a where
   Sign  :: Expr a -> Expr a
   deriving (Show, Eq, Ord)
 
-type ExprEnv = M.Map String Double
+type ExprEnv k = M.Map String k
 type SymbolicExpr = Expr Atom
 
 applyVar :: M.Map String Atom -> SymbolicExpr -> SymbolicExpr
@@ -91,13 +91,13 @@ instance Floating SymbolicExpr where
 
 class Symbolic a where
   freeVars :: a -> [String]
-  eval :: ExprEnv -> a -> Either [String] Double
+  eval :: forall k . (DoubleExpression k) => ExprEnv k -> a -> Either [String] k
 
 instance Symbolic Atom where
   freeVars (Const _) = []
   freeVars (Var x) = [x]
 
-  eval _ (Const x) = Right x
+  eval _ (Const x) = Right (fromFloat x)
   eval env (Var v) = case M.lookup v env of
                        Just x -> Right x
                        Nothing -> Left ["Variable " ++ v ++ " used but not defined."]
@@ -229,17 +229,17 @@ instance Expression SymbolicExpr where
           simp (Atom(Const 0.0) `Sum` a) = a
           simp (a `Sum` Atom(Const 0.0)) = a
           simp (Atom(Const a) `Sum` Atom(Const b)) = val (a+b)
-          simp (((e `Prod ` a) `Prod` (c `Pow` Atom(Const (-1))))
-            `Sum` ((f `Prod` b) `Prod` (d `Pow` Atom(Const (-1)))))
+          simp (l@((e `Prod ` a) `Prod` (c `Pow` Atom(Const (-1))))
+            `Sum` r@((f `Prod` b) `Prod` (d `Pow` Atom(Const (-1)))))
             | c == d && e == f && simplify (a + b) == c = e
             | c == d && a == b && simplify (e + f) == c = a
             | c == d && e == b && simplify (a + f) == c = e
-            | c == d && a == f && simplify (b + b) == c = a
-            | otherwise = genSimSum a b
-          simp ((a `Prod` (c `Pow` Atom(Const (-1))))
-            `Sum` (b `Prod` (d `Pow` Atom(Const (-1)))))
+            | c == d && a == f && simplify (e + b) == c = a
+            | otherwise = genSimSum l r
+          simp (l@(a `Prod` (c `Pow` Atom(Const (-1))))
+            `Sum` r@(b `Prod` (d `Pow` Atom(Const (-1)))))
             | c == d && simplify (a + b) == c = val 1.0
-            | otherwise = genSimSum a b
+            | otherwise = genSimSum l r
           simp (Sum a b) = genSimSum a b
 
           simp (_ `Pow` Atom(Const 0.0)) = val 1.0

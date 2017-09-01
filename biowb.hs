@@ -21,6 +21,7 @@ import CPi.AST
 import CPi.Processes
 import CPi.Simulation
 import CPi.ParserNew (parseFile)
+import CPi.ODEExtraction (solveODEPython)
 
 import System.Console.Haskeline
 import Control.Monad.Trans.State.Strict
@@ -43,7 +44,7 @@ prompt = "BioWB:> "
 
 -- Our environment will be a stack of the Haskeline,
 -- State transformer (of CPi Definitions), and IO monads:
-type Environment = InputT (StateT (CPiModel Conc) IO)
+type Environment = InputT (StateT CPiModel IO)
 
 -- Main function:
 main :: IO ()
@@ -97,6 +98,9 @@ commands = [("help",
              CmdRec {cmdFn = transCmd,
                      cmdHelp = helpTextTrans}),
             ("plot",
+             CmdRec {cmdFn = plotPythonCmd,
+                     cmdHelp = helpTextPlot}),
+            ("plotn",
              CmdRec {cmdFn = plotCmd,
                      cmdHelp = helpTextPlot}),
             ("plotUptoEpsilon",
@@ -128,6 +132,23 @@ plotCmd x = do
         Just (network, p) -> do
           let simulator = simulateMaxSpecies n env network tolabs tolrel h hmin hmax start p
               res       = takeWhile ((<=end).fst) simulator
+          lift $ lift $ plotTrace res
+        Nothing -> say $ "Process " ++ name ++ " not defined!"
+    Left err -> say $ "Error in model: " ++ err
+
+plotPythonCmd :: String -> Environment ()
+plotPythonCmd x = do
+  abstractModel <- getEnv
+  let args    = words x
+  let name    = args!!1
+      start   = read(args!!2) :: Double
+      end     = read(args!!3) :: Double
+      n       = read(args!!4) :: Int
+  case symbolifyModel abstractModel of
+    Right (env, defs) ->
+      case M.lookup name defs of
+        Just (network, p, inits) -> do
+          let res = solveODEPython env network p inits (n, (start, end))
           lift $ lift $ plotTrace res
         Nothing -> say $ "Process " ++ name ++ " not defined!"
     Left err -> say $ "Error in model: " ++ err
@@ -216,11 +237,11 @@ helpTextPlot = ("plot <process> <start> <end> <points>","Plots the time series o
 say = outputStrLn
 
 -- Get the Environment state:
-getEnv :: Environment (CPiModel Conc)
+getEnv :: Environment CPiModel
 getEnv = lift get
 
 -- Write the Environment state:
-putEnv :: CPiModel Conc -> Environment ()
+putEnv :: CPiModel -> Environment ()
 putEnv = lift . put
 
 -- Add to the Environment state:

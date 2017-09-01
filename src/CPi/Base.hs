@@ -1,5 +1,6 @@
+{-# LANGUAGE ExistentialQuantification, RankNTypes #-}
 module CPi.Base
-  (Expression(..), Pretty(..), Nullable(..), DoubleExpression(..)) where
+  (Expression(..), Pretty(..), Nullable(..), DoubleExpression(..), AnyDoubleExpression(..)) where
 
 -- Pretty printing
 class (Show a) => Pretty a where
@@ -10,8 +11,10 @@ class Expression a where
   simplify :: a -> a
   simplify = id
 
-class (Expression a) => DoubleExpression a where
+class (Num a, Floating a, Expression a) => DoubleExpression a where
   fromFloat :: Double -> a
+
+data AnyDoubleExpression = forall a . (DoubleExpression a) => DoubleExp a
 
 instance Expression Double where
 instance Expression Integer where

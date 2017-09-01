@@ -11,94 +11,7 @@ import qualified Data.Map as M
 import CPi.Vector
 import CPi.Symbolic
 
-enzymeAffinityNetwork :: (Num k, DoubleExpression k) => ConcreteAffinityNetwork k
-enzymeAffinityNetwork = [ ConcreteAffinity (massAction [1]) [["e"], ["s"]] , ConcreteAffinity (massAction [2]) [["x", "r"]] , ConcreteAffinity (massAction [3]) [["x", "p"]] ]
-
--- enzymeAffinityNetwork' :: ConcreteAffinityNetwork SymbConc
--- enzymeAffinityNetworkS =
---   [ ConcreteAffinity (massAction [1]) [["e"], ["s"]]
---   , ConcreteAffinity (massAction [2]) [["x", "r"]]
---   , ConcreteAffinity (massAction [3]) [["x", "p"]] ]
-
-enzymeEbound :: Species
-enzymeEbound = mkSum [(Located "x" 0, mkAbsBase (Def "E" [] []))]
-
-enzymeE :: SpeciesDefinition
-enzymeE = SpeciesDef [] [] $ mkSum [(Unlocated "e", mkAbs 0 enzymeEbound)]
-
-enzymeP :: SpeciesDefinition
-enzymeP = SpeciesDef [] [] $ mkSum [(Unlocated "d", mkAbsBase (Def "P" [] []))]
-
-enzymeSbound :: Species
-enzymeSbound = mkSum [(Located "r" 0, mkAbsBase (Def "S" [] [])),
-                     (Located "p" 0, mkAbsBase (Def "P" [] []))]
-
-enzymeS'bound :: Species
-enzymeS'bound = mkSum [(Located "r" 0, mkAbsBase (Def "S'" [] [])),
-                       (Located "p" 0, mkAbsBase (Def "P" [] []))]
-
-enzymeS :: SpeciesDefinition
-enzymeS = SpeciesDef [] [] $ mkSum [(Unlocated "s", mkAbs 0 enzymeSbound)]
-
-enzymeS' :: SpeciesDefinition
-enzymeS' = SpeciesDef [] [] $ mkSum [(Unlocated "s", mkAbs 0 enzymeS'bound)]
-
-enzymeDefs :: Env
-enzymeDefs = M.fromList [("E", enzymeE), ("S", enzymeS), ("P", enzymeP)]
-
-enzymeDefs2 :: Env
-enzymeDefs2 = M.fromList [("E", enzymeE), ("S", enzymeS), ("S'", enzymeS'), ("P", enzymeP)]
-
--- enzymeES :: Species
--- enzymeES = Def "E" [] [] <|> Def "S" [] []
-
-enzymeC :: Species
-enzymeC = new [0] $ enzymeEbound <|> enzymeSbound
-
-partialS :: D
-partialS = 3.0 |> vect (Def "S" [] [])
-           *> vect (simplify $ mkAbs 0 enzymeSbound) *> vect [Unlocated "s"]
-
-partialE :: D
-partialE = 2.0 |> vect (Def "E" [] [])
-           *> vect (simplify $ mkAbs 0 enzymeEbound) *> vect [Unlocated "e"]
-
-partialS' :: D'
-partialS' = var "[S]" |> vect (Def "S" [] [])
-           *> vect (simplify $ mkAbs 0 enzymeSbound) *> vect [Unlocated "s"]
-
-partialE' :: D'
-partialE' = var "[E]" |> vect (Def "E" [] [])
-           *> vect (simplify $ mkAbs 0 enzymeEbound) *> vect [Unlocated "e"]
-
-partialC :: D
-partialC = vect (normalForm enzymeC
-                :* normalForm (mkAbsBase (Def "E" [] [] <|> Def "S" [] []))
-                :* [Unlocated "r", Unlocated "x"]) +>
-             vect (normalForm enzymeC
-                  :* normalForm (mkAbsBase (Def "E" [] [] <|> Def "P" [] []))
-                  :* [Unlocated "p", Unlocated "x"]) +>
-             vect (normalForm enzymeC
-                  :* normalForm (mkAbsBase (Def "E" [] []
-                                          <|> new [0] enzymeSbound))
-                  :* [Unlocated "x"]) +>
-             vect (normalForm enzymeC
-                  :* normalForm (mkAbsBase (new [0] enzymeEbound
-                                          <|> Def "S" [] []))
-                  :* [Unlocated "r"]) +>
-             vect (normalForm enzymeC
-                  :* normalForm (mkAbsBase (new [0] enzymeEbound
-                                          <|> Def "P" [] []))
-                  :* [Unlocated "p"])
-
-partialEnzymeMM :: D'
-partialEnzymeMM
-  =  var "[S]" |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] [])
-                                      :* [Unlocated "s"])
-  +> var "[P]" |> vect (Def "P" [] [] :* mkAbsBase (Def "P" [] [])
-                                      :* [Unlocated "p"])
-  +> var "[E]" |> vect (Def "E" [] [] :* mkAbsBase (Def "E" [] [])
-                                      :* [Unlocated "e"])
+import CPi.Examples
 
 spec :: SpecWith ()
 spec = do
@@ -119,7 +32,7 @@ spec = do
            `shouldBe`(partialS +> partialE)
     it "should return no interactions after hiding" $
       partial enzymeDefs
-              (React (enzymeAffinityNetwork :: ConcreteAffinityNetwork Conc)
+              (React affinityNetworkEnzyme
                     (Mixture [(2.0, Def "E" [] []),
                               (3.0, Def "S" [] [])]))
         `shouldBe` vectZero
@@ -192,19 +105,28 @@ spec = do
       shouldBe
         (6.0 |> vect (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
           +> (-6.0) |> vect (Def "S" [] []) +> (-6.0) |> vect (Def "E" [] []))
-        (actions enzymeAffinityNetwork (partialS +> partialE))
+        (actions affinityNetworkEnzyme (partialS +> partialE))
     it "can find the actions from a symbolic enzyme and substrate" $
-      actions enzymeAffinityNetwork (partialS' +> partialE')
-        `shouldBe`
+      actions affinityNetworkEnzyme (partialS' +> partialE')
+        `shouldNotBe`
         vectZero
+    it "can find the S component from symbolic enzyme and substrate" $
+      simplify (vect (Def "S" [] []) <> actions affinityNetworkEnzyme (partialS' +> partialE'))
+        `shouldBe`
+        0
   describe "dPdt" $ do
     it "gives correct dPdt for reacting substrate and enzyme" $
       shouldBe
         (6.0 |> vect (simplify $ new [0] (enzymeSbound <|>  enzymeEbound))
           +> (-6.0) |> vect (Def "S" [] []) +> (-6.0) |> vect (Def "E" [] []))
-        (dPdt enzymeDefs (React (enzymeAffinityNetwork :: ConcreteAffinityNetwork Conc)
+        (dPdt enzymeDefs (React affinityNetworkEnzyme
           (Mixture [(3.0, Def "S" [] []), (2.0, Def "E" [] [])])))
     it "gives correct dPdt for enzyme substrate complex" $
       shouldBe
-        (dPdt enzymeDefs (React (enzymeAffinityNetwork :: ConcreteAffinityNetwork Conc) (Mixture [(4.0, enzymeC)])))
+        (dPdt enzymeDefs (React affinityNetworkEnzyme (Mixture [(4.0, enzymeC)])))
         (12 |> vect (Def "P" [] []) +> 8 |> vect (Def "S" [] []) +> 20 |> vect (Def "E" [] []) +> (-20.0) |> vect (simplify enzymeC))
+  describe "dPdt'" $ do
+    it "gives nonzero dPdt for enzymes" $
+      let tr = tracesGivenNetwork affinityNetworkEnzyme enzymeDefs
+      in dPdt' tr affinityNetworkEnzyme enzymeProc
+         `shouldNotBe` vectZero
