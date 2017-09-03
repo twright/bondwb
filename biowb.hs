@@ -21,11 +21,8 @@ import CPi.AST
 import CPi.Processes
 import CPi.Simulation
 import CPi.ParserNew (parseFile)
-<<<<<<< Updated upstream
-import CPi.ODEExtraction (solveODEPython)
-=======
 import CPi.ODEExtraction (solveODEPython, printODEPython, PrintStyle(..))
->>>>>>> Stashed changes
+import CPi.Vector (basis)
 
 import System.Console.Haskeline
 import Control.Monad.Trans.State.Strict
@@ -104,12 +101,9 @@ commands = [("help",
             ("plot",
              CmdRec {cmdFn = plotPythonCmd,
                      cmdHelp = helpTextPlot}),
-<<<<<<< Updated upstream
-=======
             ("odes",
              CmdRec {cmdFn = extractODECmd,
                      cmdHelp = helpTextPlot}),
->>>>>>> Stashed changes
             ("plotn",
              CmdRec {cmdFn = plotCmd,
                      cmdHelp = helpTextPlot}),
@@ -139,7 +133,7 @@ plotCmd x = do
   case concretifyModel abstractModel of
     Right (env, defs) ->
       case M.lookup name defs of
-        Just (network, p) -> do
+        Just (network, _, p) -> do
           let simulator = simulateMaxSpecies n env network tolabs tolrel h hmin hmax start p
               res       = takeWhile ((<=end).fst) simulator
           lift $ lift $ plotTrace res
@@ -157,14 +151,12 @@ plotPythonCmd x = do
   case symbolifyModel abstractModel of
     Right (env, defs) ->
       case M.lookup name defs of
-        Just (network, p, inits) -> do
+        Just (network, _, p, inits) -> do
           let res = solveODEPython env network p inits (n, (start, end))
           lift $ lift $ plotTrace res
         Nothing -> say $ "Process " ++ name ++ " not defined!"
     Left err -> say $ "Error in model: " ++ err
 
-<<<<<<< Updated upstream
-=======
 extractODECmd :: String -> Environment ()
 extractODECmd x = do
   abstractModel <- getEnv
@@ -173,13 +165,12 @@ extractODECmd x = do
   case symbolifyModel abstractModel of
     Right (env, defs) ->
       case M.lookup name defs of
-        Just (network, p, _) -> do
+        Just (network, _, p, _) -> do
           let res = printODEPython env network p Pretty
           say res
         Nothing -> say $ "Process " ++ name ++ " not defined!"
     Left err -> say $ "Error in model: " ++ err
 
->>>>>>> Stashed changes
 plotEpsilonCmd :: String -> Environment ()
 plotEpsilonCmd x = do
   abstractModel <- getEnv
@@ -197,7 +188,7 @@ plotEpsilonCmd x = do
   case concretifyModel abstractModel of
     Right (env, defs) ->
       case M.lookup name defs of
-        Just (network, p) -> do
+        Just (network, _, p) -> do
           let simulator = simulateUptoEpsilon epsilon env network tolabs tolrel h hmin hmax start p
               res       = takeWhile ((<=end).fst) simulator
           lift $ lift $ plotTrace res

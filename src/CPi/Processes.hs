@@ -44,8 +44,8 @@ data Process = Mixture [(Conc, Species)]
              | React ConcreteAffinityNetwork Process
 
 -- A CPi model with all of the variables looked up
-type ConcreteModel = (Env, M.Map String (ConcreteAffinityNetwork, P))
-type SymbolicModel = (Env, M.Map String (ConcreteAffinityNetwork, P', [Double]))
+type ConcreteModel = (Env, M.Map String (ConcreteAffinityNetwork, Species -> MTS, P))
+type SymbolicModel = (Env, M.Map String (ConcreteAffinityNetwork, Species -> MTS, P', [Double]))
 
 powerset :: [a] -> [[a]]
 powerset []     = [[]]
@@ -109,6 +109,15 @@ dPdt' tr network p = trace ("part = " ++ pretty part ++ ", acts = " ++ pretty ac
   where acts = actions network part
         part = partial' tr p
 
+-- Extends the support of a process vector to the closure,
+-- which contains all the support of potentially reachable processes
+closure :: (Species -> MTS) -> ConcreteAffinityNetwork -> ProcessVect BoolConc -> ProcessVect BoolConc
+closure tr network v
+  | u == v    = v
+  | otherwise = closure tr network u
+  where v' = dPdt' tr network v
+        u  = v +> v'
+
 -- Helpers for handling models
 
 tracesGivenNetwork :: ConcreteAffinityNetwork -> Env -> Species -> MTS
@@ -155,28 +164,35 @@ applyRateLawSpec (Defs _ _ m _) (RateLawAppl name params) affParams rates
           applyRate (RateLawParamVar n) = L.lookup n vals
           args = map applyRate params
 
-concretifyProcess :: CPiModel -> AbstractProcess
-                     -> Either String (ConcreteAffinityNetwork, P)
-concretifyProcess model (Process affSpec concSpecs)
+concretifyProcess :: CPiModel -> Env -> AbstractProcess
+                     -> Either String (ConcreteAffinityNetwork, Species -> MTS, P)
+concretifyProcess model env (Process affSpec concSpecs)
   = case networkOrError of
-      Right network -> Right (network, p)
+      Right network -> Right (network, tracesGivenNetwork network env, p)
       Left err    -> Left err
   where p              = fromList [(c, normalForm s) | (c,s) <- concSpecs]
         networkOrError = concretifyAffSpec model affSpec
 
-symbolifyProcess :: CPiModel -> AbstractProcess -> Either String (ConcreteAffinityNetwork, P', [Double])
-symbolifyProcess model (Process affSpec concSpecs)
+symbolifyProcess :: CPiModel -> Env -> AbstractProcess -> Either String (ConcreteAffinityNetwork, Species -> MTS, P', [Double])
+symbolifyProcess model env (Process affSpec concSpecs)
   = case networkOrError of
-      Right network -> Right (network, p, inits)
+      Right network -> Right (network, tr, p, inits)
+        where
+          p0 = fromList concSpecs
+          reach = closure tr network (support p0)
+          concSpecs' = [(getInit i, i) | (NonZero,i) <- toList reach]
+          p     = fromList $ map (\(_,x,y) -> (x,y)) ress
+          tr = tracesGivenNetwork network env
+          ress  = sortWith (\(_,_,x) -> x)
+                           [let nf = normalForm x
+                                name = var (pretty nf)
+                            in (x0, name, nf) | (x0,x) <- concSpecs']
+          inits = map (\(x,_,_) -> x) ress
       Left err    -> Left err
   -- This code takes some care to keep the lists/vector bases in a consistient
   -- order, matching the ordering on basis elements (prime species)
-  where p     = fromList $ map (\(_,x,y) -> (x,y)) ress
-        ress  = sortWith (\(_,_,x) -> x)
-                         [let nf = normalForm x
-                              name = var (pretty nf)
-                          in (x0, name, nf) | (x0,x) <- concSpecs]
-        inits = map (\(x,_,_) -> x) ress
+  where initmap = map (\(x,y) -> (y,x)) concSpecs
+        getInit i = fromMaybe 0.0 (lookup i initmap)
         networkOrError = concretifyAffSpec model affSpec
 
 symbolifyModel :: CPiModel -> Either String SymbolicModel
@@ -186,7 +202,7 @@ symbolifyModel model@(Defs env _ _ p)
       ((name, e):_) -> Left $ "Error found in process definition " ++ name
                                ++ ":\n" ++ e
   where processes = M.fromList [ (name, process) | (name, Right process) <- cprocs]
-        cprocs    = M.toList $ fmap (symbolifyProcess model) p
+        cprocs    = M.toList $ fmap (symbolifyProcess model env) p
         errors    = [(name, e) | (name, Left e) <- cprocs]
 
 concretifyModel :: CPiModel -> Either String ConcreteModel
@@ -197,7 +213,7 @@ concretifyModel model@(Defs env _ _ p)
                                ++ ":\n" ++ e
   where processes = M.fromList [ (name,  process)
                     | (name, Right process) <- cprocs]
-        cprocs    = M.toList $ fmap (concretifyProcess model) p
+        cprocs    = M.toList $ fmap (concretifyProcess model env) p
         errors    = [(name, e) | (name, Left e) <- cprocs]
 
 networkSites :: ConcreteAffinityNetwork -> [[Prefix]]

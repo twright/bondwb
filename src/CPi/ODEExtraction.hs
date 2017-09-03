@@ -6,6 +6,7 @@ import CPi.Processes
 import CPi.Vector
 import CPi.AST (pretty)
 import qualified CPi.AST as AST
+import qualified Data.HashMap.Strict as H
 import CPi.Simulation (Trace)
 
 -- import qualified Control.Exception as X
@@ -29,7 +30,12 @@ newtype ODE = ODE ([String], [SymbolicExpr])
 
 extractODE :: AST.Env -> ConcreteAffinityNetwork -> P' -> ODE
 extractODE env network p = vectorFieldToODEs p'
-  where p' = dPdt' tr network p
+  where -- p' must be expressed in the same basis of p
+        -- otherwise the variable order becomes
+        -- inconsistient, and we get extra variables
+        p' = fromList [(p'coeff i, i) | (_,i) <- toList p]
+        p'coeff i = fromMaybe 0.0 (H.lookup i v)
+        Vect v = dPdt' tr network p
         tr = tracesGivenNetwork network env
 
 extractIVP :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> IVP

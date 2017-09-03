@@ -56,10 +56,56 @@ instance DoubleExpression SymbolicExpr where
   fromFloat = val
 
 instance Num SymbolicExpr where
+  Atom (Const 0.0) + a = a
+  a + Atom (Const 0.0) = a
+  Atom (Const a) + Atom (Const b) = val (a + b)
+  l@(Atom (Const a) `Prod` x) + r@(Atom (Const b) `Prod` y)
+    | x == y = val (a + b) * x
+    | otherwise = Sum l r
+  l@(x `Prod` Atom (Const a)) + r@(Atom (Const b) `Prod` y)
+    | x == y = val (a + b) * x
+    | otherwise = Sum l r
+  l@(Atom (Const a) `Prod` x) + r@(y `Prod` Atom (Const b))
+    | x == y = val (a + b) * x
+    | otherwise = Sum l r
+  l@(x `Prod` Atom (Const a)) + r@(y `Prod` Atom (Const b))
+    | x == y = x * val (a + b)
+    | otherwise = Sum l r
+  l@((e `Prod` a) `Frac` c) + r@((f `Prod` b) `Frac` d)
+    | c == d && e == f && simplify (a + b) == simplify c = e
+    | c == d && a == b && simplify (e + f) == simplify c = a
+    | c == d && e == b && simplify (a + f) == simplify c = e
+    | c == d && a == f && simplify (e + b) == simplify c = a
+    | otherwise = Sum l r
+  l@(a `Frac` c) + r@(b `Frac` d)
+    | c == d && simplify (a + b) == simplify c = val 1.0
+    | otherwise = Sum l r
   a + b         = Sum a b
+  Atom(Const 1.0) * a = a
+  a * Atom(Const 1.0) = a
+  Atom(Const 0.0) * _ = val 0.0
+  _ * Atom(Const 0.0) = val 0.0
+  Atom(Const a) * Atom(Const b) = val (a*b)
+  y * Log x = Log (x**y)
+  Log x * y = Log (x**y)
+  a * (b `Sum` c) = (a*b) + (a*c)
+  (a `Sum` b) * c = (a*c) + (b*c)
+  l@(x `Pow` a) * r@(y `Pow` b)
+    | x == y = x**(a + b)
+    | otherwise = Prod l r
+  x * r@(y `Pow` b)
+    | x == y = x**(val 1 + b)
+    | otherwise = Prod x r
+  l@(x `Pow` a) * y
+    | x == y = x**(a + val 1)
+    | otherwise = Prod l y
+  b * (a `Frac` c) = (a * b) / c
+  (a `Frac` c) * b = (b * a) / c
   a * b         = Prod a b
+  negate (Atom (Const a)) = val (-a)
   negate a      = val (-1) * a
-  abs           = Abs
+  abs (Atom (Const a)) = val (abs a)
+  abs a  = Abs a
   fromInteger a = val (fromIntegral a)
   signum        = Sign
 
@@ -67,15 +113,22 @@ instance Nullable SymbolicExpr where
   isnull = (== val 0)
 
 instance Fractional SymbolicExpr where
-  a / b          = Frac a b
+  Atom (Const a) / Atom (Const b) = val (a/b)
+  Atom (Const 0.0) / _ = val 0.0
+  a / Atom (Const 1.0) = a
+  a / b
+   | a == b    = val 1.0
+   | otherwise = Frac a b
   recip        = Frac 1
   fromRational a = val (fromRational a)
 
 instance Floating SymbolicExpr where
   pi     = val pi
   a ** b = a `Pow` b
-  exp    = Exp
-  log    = Log
+  exp (Log x) = x
+  exp  x  = Exp x
+  log (Exp x) = x
+  log  x = Log x
   sqrt a = a ** fromRational (1/2)
   sin    = Sin
   asin   = ASin

@@ -1,0 +1,42 @@
+species Rabbit(reproduce,beRabbit,beEaten;) =
+    reproduce -> (Rabbit(reproduce,beRabbit,beEaten;)
+                    |Rabbit(reproduce,beRabbit,beEaten;))
+  + beRabbit -> Rabbit(reproduce,beRabbit,beEaten;)
+  + beEaten;
+
+species Fox(eat,enter,leave;) =
+    eat -> (Fox(eat,enter,leave;)|Fox(eat,enter,leave;))
+  + leave -> 0
+  + enter -> (Fox(eat,enter,leave;)|Fox(eat,enter,leave;))
+  + die;
+
+affinity network MassActionRabbits = {
+  reproduceRed,consumeResources at rate MA(2.0);
+  reproduceBlue,consumeResources at rate MA(2.01);
+  eat, beEaten at rate MA(0.5);
+  die at rate MA(0.8);
+}
+
+kinetic law Logistic (b, k; r, s) = b*r*(1 - s/k);
+
+kinetic law Functional (beta, h; f, r) = beta*f*r/(1 + beta*h*r);
+
+kinetic law Migrate(D, theta, h; leave, bePrey, enter)
+  = D * ((1 + theta * h * bePrey)/(1 + h * bePrey)) * leave;
+
+affinity network TwoPatch = {
+  reproduce1,beRabbit1 at rate Logistic(2, 200);
+  reproduce2,beRabbit2 at rate Logistic(2, 100);
+  eat1, beEaten1 at rate Functional(0.08, 0.8);
+  eat2, beEaten2 at rate Functional(0.08, 0.8);
+  leave1, beRabbit1, enter2 at rate Migrate(0.1,1,1);
+  leave2, beRabbit2, enter1 at rate Migrate(0.01,1,1);
+  die at rate MA(0.8);
+}
+
+process TwoPatch
+  =  [10.0] Rabbit(reproduce1,beRabbit1,beEaten1;)
+  || [250.0] Rabbit(reproduce2,beRabbit2,beEaten2;)
+  || [10.0] Fox(eat1,enter1,leave1;)
+  || [10.0] Fox(eat2,enter2,leave2;)
+  with network TwoPatch;

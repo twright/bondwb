@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveFunctor, GeneralizedNewtypeDeriving, FlexibleContexts, FunctionalDependencies, UndecidableInstances #-}
 
-module CPi.Vector (Tensor(..), Vector(..), Vect(..), (><), vect, (*>), delta, toList, fromList, multilinear) where
+module CPi.Vector (Tensor(..), Vector(..), Vect(..), (><), vect, (*>), delta, toList, fromList, multilinear, support) where
 
 import Prelude hiding ((*>))
 import CPi.Base
@@ -39,6 +39,13 @@ class (Eq k, Num k, Fractional k, Nullable k) => Vector k v | v -> k where
   normalize  :: v -> v
   vectZero   :: v
   (<>)       :: v -> v -> k
+
+-- Map a vector to an overapproximation of its support set,
+-- represented as a 'vector' over boolean concentrations
+-- (technically, Vect i BoolConc is a module rather than
+-- a vector space)
+support :: (Vector k (Vect i k), Hashable i, Ord i) => Vect i k -> Vect i BoolConc
+support v = fromList [(NonZero, i) | (k,i) <- toList v, not (isnull k)]
 
 -- A fancified tuple for forming cartesian products of basis elements
 data Tensor a b =  a :* b
