@@ -10,4 +10,4 @@ affinity network M = {
 	a,b,e at rate PingPong(1,2,2);
 }
 
-process Pi = [1.0] E || [5.0] A || [5.0] B || [0.0000001] P || [0.0000001] Q with network M;
+process Pi = [1.0] E || [5.0] A || [5.0] B || [0.0] P || [0.0] Q with network M;

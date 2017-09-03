@@ -29,6 +29,7 @@ data Expr a where
   ACosH :: Expr a -> Expr a
   Tan   :: Expr a -> Expr a
   TanH  :: Expr a -> Expr a
+  Frac  :: Expr a -> Expr a -> Expr a
   ATan  :: Expr a -> Expr a
   ATanH :: Expr a -> Expr a
   Exp   :: Expr a -> Expr a
@@ -66,8 +67,8 @@ instance Nullable SymbolicExpr where
   isnull = (== val 0)
 
 instance Fractional SymbolicExpr where
-  a / b          = a * (b ** fromInteger (-1))
-  recip a        = a ** fromInteger (-1)
+  a / b          = Frac a b
+  recip        = Frac 1
   fromRational a = val (fromRational a)
 
 instance Floating SymbolicExpr where
@@ -106,6 +107,7 @@ instance Foldable Expr where
   foldMap f (Atom x) = f x
   foldMap f (Sum x y) = foldMap f x `mappend` foldMap f y
   foldMap f (Prod x y) = foldMap f x `mappend` foldMap f y
+  foldMap f (Frac x y) = foldMap f x `mappend` foldMap f y
   foldMap f (Exp x) = foldMap f x
   foldMap f (Log x) = foldMap f x
   foldMap f (Sin x) = foldMap f x
@@ -128,6 +130,7 @@ instance Functor Expr where
   fmap f (Atom x) = Atom $ f x
   fmap f (Sum x y) = fmap f x `Sum` fmap f y
   fmap f (Prod x y) = fmap f x `Prod` fmap f y
+  fmap f (Frac x y) = fmap f x `Frac` fmap f y
   fmap f (Exp x) = Exp $ fmap f x
   fmap f (Log x) = Log $ fmap f x
   fmap f (Sin x) = Sin $ fmap f x
@@ -158,6 +161,7 @@ instance Symbolic SymbolicExpr where
   eval env (Atom x) = eval env x
   eval env (Sum x y) = eitherOp (+) (eval env x) (eval env y)
   eval env (Prod x y) = eitherOp (*) (eval env x) (eval env y)
+  eval env (Frac x y) = eitherOp (/) (eval env x) (eval env y)
   eval env (Pow x y) = eitherOp (**) (eval env x) (eval env y)
   eval env (Exp x) = second exp $ eval env x
   eval env (Log x) = second log $ eval env x
@@ -201,6 +205,8 @@ instance Expression SymbolicExpr where
                   b' = simplify b
 
           simp (Atom x) = Atom x
+
+          simp (Frac a b) = simplify a / simplify b
 
           simp (Atom(Const 1.0) `Prod` a) = a
           simp (a `Prod` Atom(Const 1.0)) = a

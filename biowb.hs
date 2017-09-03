@@ -21,7 +21,11 @@ import CPi.AST
 import CPi.Processes
 import CPi.Simulation
 import CPi.ParserNew (parseFile)
+<<<<<<< Updated upstream
 import CPi.ODEExtraction (solveODEPython)
+=======
+import CPi.ODEExtraction (solveODEPython, printODEPython, PrintStyle(..))
+>>>>>>> Stashed changes
 
 import System.Console.Haskeline
 import Control.Monad.Trans.State.Strict
@@ -100,6 +104,12 @@ commands = [("help",
             ("plot",
              CmdRec {cmdFn = plotPythonCmd,
                      cmdHelp = helpTextPlot}),
+<<<<<<< Updated upstream
+=======
+            ("odes",
+             CmdRec {cmdFn = extractODECmd,
+                     cmdHelp = helpTextPlot}),
+>>>>>>> Stashed changes
             ("plotn",
              CmdRec {cmdFn = plotCmd,
                      cmdHelp = helpTextPlot}),
@@ -153,6 +163,23 @@ plotPythonCmd x = do
         Nothing -> say $ "Process " ++ name ++ " not defined!"
     Left err -> say $ "Error in model: " ++ err
 
+<<<<<<< Updated upstream
+=======
+extractODECmd :: String -> Environment ()
+extractODECmd x = do
+  abstractModel <- getEnv
+  let args    = words x
+  let name    = args!!1
+  case symbolifyModel abstractModel of
+    Right (env, defs) ->
+      case M.lookup name defs of
+        Just (network, p, _) -> do
+          let res = printODEPython env network p Pretty
+          say res
+        Nothing -> say $ "Process " ++ name ++ " not defined!"
+    Left err -> say $ "Error in model: " ++ err
+
+>>>>>>> Stashed changes
 plotEpsilonCmd :: String -> Environment ()
 plotEpsilonCmd x = do
   abstractModel <- getEnv

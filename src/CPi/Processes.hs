@@ -16,10 +16,10 @@ import CPi.Vector
 import CPi.Symbolic (SymbolicExpr, var)
 import Data.Maybe
 import Data.Bifunctor
-import Debug.Trace
+-- import Debug.Trace
 import GHC.Exts (sortWith)
--- trace :: String -> a -> a
--- trace _ = id
+trace :: String -> a -> a
+trace _ = id
 
 type SymbConc = SymbolicExpr
 

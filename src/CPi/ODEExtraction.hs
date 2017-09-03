@@ -1,5 +1,5 @@
 module CPi.ODEExtraction
-  (IVP(..), matlabExpr, sympyExpr, matlabODE, vectorFieldToODEs, extractIVP, sympyODE, solveODEPython) where
+  (IVP(..), PrintStyle(..), matlabExpr, sympyExpr, matlabODE, vectorFieldToODEs, extractIVP, sympyODE, solveODEPython, printODEPython) where
 
 import CPi.Symbolic
 import CPi.Processes
@@ -27,11 +27,13 @@ newtype ODE = ODE ([String], [SymbolicExpr])
 -- MATLAB script output:
 -------------------------------
 
+extractODE :: AST.Env -> ConcreteAffinityNetwork -> P' -> ODE
+extractODE env network p = vectorFieldToODEs p'
+  where p' = dPdt' tr network p
+        tr = tracesGivenNetwork network env
+
 extractIVP :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> IVP
-extractIVP env network p = fromODEToIVP odes
-  where odes = vectorFieldToODEs p'
-        p'   = dPdt' tr network p
-        tr   = tracesGivenNetwork network env
+extractIVP env network p = fromODEToIVP (extractODE env network p)
 
 vectorFieldToODEs :: P' -> ODE
 vectorFieldToODEs v = ODE (vars, rhss)
@@ -77,8 +79,10 @@ sympyODE ivp (n,(t0,tn)) =
   "import numpy as np\n" ++
   "from sympy.abc import t\n" ++
   "from scipy.integrate import odeint\n" ++
-  "from sys import stdout\n\n" ++
-  "xs = sym.symbols('" ++ unwords vars ++ "')\n" ++
+  "import sys\n" ++
+  "sys.setrecursionlimit(100000)\n\n" ++
+  "xs = [" ++ L.intercalate ","
+    ["sym.Function('" ++ show x ++ "')" | x <- vars ] ++ "]\n" ++
   "xts = [x(t) for x in xs]\n" ++
   "odes = [" ++ L.intercalate ", " (catMaybes eqns) ++ "]\n" ++
   "y0 = [" ++ L.intercalate ", " (map show inits) ++ "]\n" ++
@@ -98,7 +102,39 @@ sympyODE ivp (n,(t0,tn)) =
       xdots = [xvar ++ ".diff()" | xvar <- xvars]
       varmap = M.fromList $ zip vars xvars
       IVP (vars,rhss,inits) = ivp
-      mkeqn xdot y = "sym.Eq(" ++ xdot ++ ", " ++ y ++ ")"
+      mkeqn xdot y = "sym.Eq(" ++ xdot ++ ", sym.simplify(" ++ y ++ "))"
+      eqns = [fmap (mkeqn xdot) (sympyExpr varmap rhs)
+             | (xdot,rhs) <- zip xdots rhss]
+
+data PrintStyle = Plain | Pretty | LaTeX | MathML
+
+sympyODEPrint :: ODE -> PrintStyle -> Either String String
+sympyODEPrint ode style =
+  if any isNothing eqns
+  then Left "An ODE equation has an unbound variable"
+  else Right $
+  "import sympy as sym\n" ++
+  "import numpy as np\n" ++
+  "from sympy.abc import t\n" ++
+  "import sys\n" ++
+  "sys.setrecursionlimit(100000)\n\n" ++
+  -- "sym.init_printing(" ++ printingoptions ++ ")\n\n" ++
+  "xs = [" ++ L.intercalate ","
+    ["sym.Function('" ++ show x ++ "')" | x <- vars ] ++ "]\n" ++
+  "xts = [x(t) for x in xs]\n" ++
+  "odes = [" ++ L.intercalate ", " (catMaybes eqns) ++ "]\n" ++
+  "rhss = [eqn.rhs for eqn in odes]\n" ++
+  case style of
+    Pretty -> "for ode in odes: print(sym.pretty(ode))\n"
+    Plain -> "for ode in odes: print(ode)\n"
+    LaTeX -> "print(sym.latex(odes))\n"
+    MathML -> "from sympy.printing import print_mathml\nprint_mathml(odes)\n"
+    where
+      xvars = ["xts[" ++ show i ++ "]" | i <- [(0::Integer)..]]
+      xdots = [xvar ++ ".diff()" | xvar <- xvars]
+      varmap = M.fromList $ zip vars xvars
+      ODE (vars,rhss) = ode
+      mkeqn xdot y = "sym.Eq(" ++ xdot ++ ", sym.simplify(" ++ y ++ "))"
       eqns = [fmap (mkeqn xdot) (sympyExpr varmap rhs)
              | (xdot,rhs) <- zip xdots rhss]
 
@@ -133,13 +169,18 @@ sympyExpr mp (x `Prod` y) = do
   x' <- sympyExpr mp x
   y' <- sympyExpr mp y
   return $ "(" ++ x' ++ ") * (" ++ y' ++ ")"
+sympyExpr mp (x `Frac` y) = do
+  x' <- sympyExpr mp x
+  y' <- sympyExpr mp y
+  return $ "(" ++ x' ++ ") / (" ++ y' ++ ")"
 sympyExpr mp (x `Pow` y) = do
   x' <- sympyExpr mp x
   y' <- sympyExpr mp y
   return $ "(" ++ x' ++ ") ** (" ++ y' ++ ")"
 sympyExpr mp (Abs x) = do
   x' <- sympyExpr mp x
-  return $ "abs(" ++ x' ++ ")"
+  return $ x'
+  -- return $ "abs(" ++ x' ++ ")"
 sympyExpr mp (Sin x) = do
   x' <- sympyExpr mp x
   return $ "sin(" ++ x' ++ ")"
@@ -171,6 +212,13 @@ callSolveODEPython env network p inits tr = case sympyODE (extractIVP env networ
     runPython script
   Left _ -> undefined
 
+callPrintODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> PrintStyle -> IO String
+callPrintODEPython env network p style = case sympyODEPrint (extractODE env network p) style of
+  Right script -> do
+    -- putStrLn $ "Python script:\n\n" ++ script
+    writeFile "print_script.py" script
+    runPython script
+  Left _ -> undefined
 
 solveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> (Int, (Double, Double)) -> Trace
 solveODEPython env network p inits tr@(n,(t0,tn))
@@ -181,6 +229,10 @@ solveODEPython env network p inits tr@(n,(t0,tn))
         pbasis = map snd $ toList p
     in ts `zip` ys
 
+printODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> PrintStyle -> String
+printODEPython env network p style
+  = let raw = unsafePerformIO (callPrintODEPython env network p style)
+    in raw
 -- callOctave env p mts p' ts = let
 --     script = matlabODE env (wholeProc env p mts) p' ts
 --   in do
