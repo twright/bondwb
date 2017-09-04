@@ -8,6 +8,7 @@ import CPi.AST (pretty)
 import qualified CPi.AST as AST
 import qualified Data.HashMap.Strict as H
 import CPi.Simulation (Trace)
+import Data.String.Utils
 
 -- import qualified Control.Exception as X
 import qualified Data.Map as M
@@ -112,7 +113,7 @@ sympyODE ivp (n,(t0,tn)) =
       eqns = [fmap (mkeqn xdot) (sympyExpr varmap rhs)
              | (xdot,rhs) <- zip xdots rhss]
 
-data PrintStyle = Plain | Pretty | LaTeX | MathML
+data PrintStyle = Plain | Pretty | LaTeX | MathML deriving (Eq)
 
 sympyODEPrint :: ODE -> PrintStyle -> Either String String
 sympyODEPrint ode style =
@@ -125,15 +126,16 @@ sympyODEPrint ode style =
   "import sys\n" ++
   "sys.setrecursionlimit(100000)\n\n" ++
   -- "sym.init_printing(" ++ printingoptions ++ ")\n\n" ++
-  "xs = [" ++ L.intercalate ","
-    ["sym.Function('" ++ show x ++ "')" | x <- vars ] ++ "]\n" ++
+  "names = [" ++ L.intercalate "," ["'[" ++ (if style == LaTeX then replace "->" "\\\\rightarrow " (replace " " "\\\\ " x) else x) ++ "]'" | x <- vars] ++ "]\n" ++
+  "xs = list(map(sym.Function, names))\n" ++
   "xts = [x(t) for x in xs]\n" ++
   "odes = [" ++ L.intercalate ", " (catMaybes eqns) ++ "]\n" ++
   "rhss = [eqn.rhs for eqn in odes]\n" ++
   case style of
     Pretty -> "for ode in odes: print(sym.pretty(ode))\n"
     Plain -> "for ode in odes: print(ode)\n"
-    LaTeX -> "print(sym.latex(odes))\n"
+    -- print system of odes as latex (formatted for use in an align environment)
+    LaTeX -> "print(sym.latex(odes)[8:-8].replace('=', '& =').replace(', \\\\quad', '\\\\\\\\\\n').replace('{\\\\left (t \\\\right )}', ''))\n"
     MathML -> "from sympy.printing import print_mathml\nprint_mathml(odes)\n"
     where
       xvars = ["xts[" ++ show i ++ "]" | i <- [(0::Integer)..]]

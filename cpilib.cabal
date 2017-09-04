@@ -30,7 +30,7 @@ library
                        data-accessor >=0.2,
                        hmatrix-gsl, hmatrix <= 0.18.0.0, haskeline,
                        Chart, Chart-gtk == 1.8, gtk, Chart-cairo, lens, data-default-class, QuickCheck, unordered-containers,cairo == 0.13.3.1,
-                       hashable, megaparsec, scientific
+                       hashable, megaparsec, scientific, MissingH
   default-language:    Haskell2010
 -- CPi.Examples,
 test-suite spec

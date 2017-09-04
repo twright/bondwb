@@ -22,7 +22,6 @@ import CPi.Processes
 import CPi.Simulation
 import CPi.ParserNew (parseFile)
 import CPi.ODEExtraction (solveODEPython, printODEPython, PrintStyle(..))
-import CPi.Vector (basis)
 
 import System.Console.Haskeline
 import Control.Monad.Trans.State.Strict
@@ -102,7 +101,10 @@ commands = [("help",
              CmdRec {cmdFn = plotPythonCmd,
                      cmdHelp = helpTextPlot}),
             ("odes",
-             CmdRec {cmdFn = extractODECmd,
+             CmdRec {cmdFn = extractODECmd Pretty,
+                     cmdHelp = helpTextPlot}),
+            ("odeslatex",
+             CmdRec {cmdFn = extractODECmd LaTeX,
                      cmdHelp = helpTextPlot}),
             ("plotn",
              CmdRec {cmdFn = plotCmd,
@@ -157,8 +159,8 @@ plotPythonCmd x = do
         Nothing -> say $ "Process " ++ name ++ " not defined!"
     Left err -> say $ "Error in model: " ++ err
 
-extractODECmd :: String -> Environment ()
-extractODECmd x = do
+extractODECmd :: PrintStyle -> String -> Environment ()
+extractODECmd style x = do
   abstractModel <- getEnv
   let args    = words x
   let name    = args!!1
@@ -166,7 +168,7 @@ extractODECmd x = do
     Right (env, defs) ->
       case M.lookup name defs of
         Just (network, _, p, _) -> do
-          let res = printODEPython env network p Pretty
+          let res = printODEPython env network p style
           say res
         Nothing -> say $ "Process " ++ name ++ " not defined!"
     Left err -> say $ "Error in model: " ++ err
