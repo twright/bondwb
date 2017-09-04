@@ -4,11 +4,14 @@ species Rabbit(reproduce,beRabbit,beEaten;) =
   + beRabbit -> Rabbit(reproduce,beRabbit,beEaten;)
   + beEaten;
 
-species Fox(eat,enter,leave;) =
-    eat -> (Fox(eat,enter,leave;)|Fox(eat,enter,leave;))
+species Fox(eat,leave;) =
+    eat -> (Fox(eat,leave;)|Fox(eat,leave;))
   + leave -> 0
-  + enter -> (Fox(eat,enter,leave;)|Fox(eat,enter,leave;))
   + die;
+
+species Place(supportRabbit,eat,enter,leave;) =
+    enter -> (Place(supportRabbit,eat,enter,leave;)|Fox(eat,leave;))
+  + supportRabbit -> Place(supportRabbit,eat,enter,leave);
 
 affinity network MassActionRabbits = {
   reproduceRed,consumeResources at rate MA(2.0);
@@ -17,7 +20,7 @@ affinity network MassActionRabbits = {
   die at rate MA(0.8);
 }
 
-kinetic law Logistic (b, k; r, s) = b*r*(1 - s/k);
+kinetic law Logistic (b; k, r, s) = b*r*(1 - s/k);
 
 kinetic law Functional (beta, h; f, r) = beta*f*r/(1 + beta*h*r);
 
@@ -25,8 +28,8 @@ kinetic law Migrate(D, theta, h; leave, bePrey, enter)
   = D * ((1 + theta * h * bePrey)/(1 + h * bePrey)) * leave;
 
 affinity network TwoPatch = {
-  reproduce1,beRabbit1 at rate Logistic(2, 200);
-  reproduce2,beRabbit2 at rate Logistic(2, 100);
+  supportRabbit1,reproduce1,beRabbit1 at rate Logistic(2);
+  supportRabbit2,reproduce2,beRabbit2 at rate Logistic(2);
   eat1, beEaten1 at rate Functional(0.08, 0.8);
   eat2, beEaten2 at rate Functional(0.08, 0.8);
   leave1, beRabbit1, enter2 at rate Migrate(0.1,1,1);
@@ -35,8 +38,54 @@ affinity network TwoPatch = {
 }
 
 process TwoPatch
-  =  [10.0] Rabbit(reproduce1,beRabbit1,beEaten1;)
-  || [250.0] Rabbit(reproduce2,beRabbit2,beEaten2;)
-  || [10.0] Fox(eat1,enter1,leave1;)
-  || [10.0] Fox(eat2,enter2,leave2;)
+  =  [10] Rabbit(reproduce1,beRabbit1,beEaten1;)
+  || [250] Rabbit(reproduce2,beRabbit2,beEaten2;)
+  || [10] Fox(eat1,leave1;)
+  || [10] Fox(eat2,leave2;)
+  || [200] Place(supportRabbit1,eat1,enter1,leave1;)
+  || [100] Place(supportRabbit2,eat2,enter2,leave2;)
   with network TwoPatch;
+
+affinity network ManyPatch = {
+  supportRabbit1,reproduce1,beRabbit1 at rate Logistic(2);
+  supportRabbit2,reproduce2,beRabbit2 at rate Logistic(2);
+  supportRabbit3,reproduce3,beRabbit3 at rate Logistic(2);
+  supportRabbit4,reproduce4,beRabbit4 at rate Logistic(2);
+  supportRabbit5,reproduce5,beRabbit5 at rate Logistic(2);
+  supportRabbit6,reproduce6,beRabbit6 at rate Logistic(2);
+  eat1, beEaten1 at rate Functional(0.08, 0.8);
+  eat2, beEaten2 at rate Functional(0.08, 0.8);
+  eat3, beEaten3 at rate Functional(0.08, 0.8);
+  eat4, beEaten4 at rate Functional(0.08, 0.8);
+  eat5, beEaten5 at rate Functional(0.08, 0.8);
+  eat6, beEaten6 at rate Functional(0.08, 0.8);
+  leave1, beRabbit1, enter2 at rate Migrate(0.1,1,1);
+  leave2, beRabbit2, enter1 at rate Migrate(0.1,1,1);
+  leave1, beRabbit1, enter3 at rate Migrate(0.1,1,1);
+  leave3, beRabbit3, enter1 at rate Migrate(0.1,1,1);
+  leave2, beRabbit2, enter4 at rate Migrate(0.1,1,1);
+  leave4, beRabbit4, enter2 at rate Migrate(0.1,1,1);
+  leave4, beRabbit4, enter5 at rate Migrate(0.1,1,1);
+  leave5, beRabbit5, enter4 at rate Migrate(0.1,1,1);
+  leave4, beRabbit4, enter6 at rate Migrate(0.1,1,1);
+  leave6, beRabbit6, enter4 at rate Migrate(0.1,1,1);
+  leave5, beRabbit5, enter1 at rate Migrate(0.1,1,1);
+  leave1, beRabbit1, enter5 at rate Migrate(0.1,1,1);
+  die at rate MA(0.8);
+}
+
+process ManyPatch
+  =  [50] Rabbit(reproduce1,beRabbit1,beEaten1;)
+  || [50] Rabbit(reproduce2,beRabbit2,beEaten2;)
+  || [50] Rabbit(reproduce3,beRabbit3,beEaten3;)
+  || [50] Rabbit(reproduce4,beRabbit4,beEaten4;)
+  || [50] Rabbit(reproduce5,beRabbit5,beEaten5;)
+  || [50] Rabbit(reproduce6,beRabbit6,beEaten6;)
+  || [10.0] Fox(eat1,leave1;)
+  || [100] Place(supportRabbit1,eat1,enter1,leave1;)
+  || [150] Place(supportRabbit2,eat2,enter2,leave2;)
+  || [50] Place(supportRabbit3,eat3,enter3,leave3;)
+  || [200] Place(supportRabbit4,eat4,enter4,leave4;)
+  || [250] Place(supportRabbit5,eat5,enter5,leave5;)
+  || [150] Place(supportRabbit6,eat6,enter6,leave6;)
+  with network ManyPatch;
