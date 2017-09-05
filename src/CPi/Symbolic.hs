@@ -9,6 +9,7 @@ import CPi.Base
 import qualified Data.List as L
 import Data.Bifunctor
 import Data.Maybe
+-- import Debug.Trace
 
 data Atom = Var String
           | Const Double
@@ -246,6 +247,9 @@ prodToList :: SymbolicExpr -> [SymbolicExpr]
 prodToList (a `Prod` b) = prodToList a ++ prodToList b
 prodToList a = [a]
 
+msetIntersect :: (Eq a) => [a] -> [a] -> [a]
+msetIntersect xs ys = concat [zipWith (curry fst) (filter (==x) xs) (filter (==x) ys) | x <- L.nub (xs `L.intersect` ys)]
+
 factors :: SymbolicExpr -> (Double, [SymbolicExpr])
 factors (a `Prod` b) = (a0*b0, as ++ bs)
   where (a0, as) = factors a
@@ -255,14 +259,15 @@ factors x@(a `Pow` Atom (Const n))
   | otherwise = (1.0, [x])
   where m = floor n
         (a0,as) = factors a
-factors (a `Sum` b) = if a0 == b0
+factors x@(a `Sum` b) = if commonCoeff
     then (a0, res)
-    else (1.0, res)
+    else (1.0, if null cf then [x] else res)
   where (a0, as) = factors a
         (b0, bs) = factors b
-        as' = L.sort (if a0 == b0 then as else val a0:as)
-        bs' = L.sort (if a0 == b0 then bs else val b0:bs)
-        cf = as `L.intersect` bs
+        commonCoeff = (a0 == b0) && (a0 /= 1.0)
+        as' = L.sort (if commonCoeff || (a0 == 1.0) then as else val a0:as)
+        bs' = L.sort (if commonCoeff || (b0 == 1.0) then bs else val b0:bs)
+        cf = as `msetIntersect` bs
         a' = product (as' L.\\ cf)
         b' = product (bs' L.\\ cf)
         res = (a' + b'):cf

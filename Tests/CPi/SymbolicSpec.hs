@@ -5,6 +5,7 @@ import Test.Hspec
 import qualified Data.Map as M
 import Data.Either
 import Data.Bifunctor
+import CPi.ODEExtraction (sympyExpr)
 
 import CPi.Symbolic
 
@@ -130,6 +131,12 @@ spec = do
     it "simplifies multiplications of powers into powers" $
       simplify(var "a" ** 2 * var "a" ** 3)
         `shouldBe` var "a" ** 5
+    it "simplifies fractions with multiplication" $
+      simplify( (var "a" + var "b" + var "c")*(var "d" * var "f" + var "e" * var "f") / (var "a" + var "b" + var "c") / var "f" )
+        `shouldBe` var "d" + var "e"
+    it "simplifies repressilator Cl expression" $
+      sympyExpr (M.fromList [("x" ++ show i, "x" ++ show i) | i <- [0..5]]) (simplify (((val 10.0 * (var "x5" + var "x0" + var "x1")) * (var "x1" * val (-1.0))) / (var "x5" + var "x0" + var "x1") + (val 10.0 * (var "x3" + var "x4" + var "x2") * (var "x4")) / (var "x4" + var "x3" + var "x2")))
+        `shouldBe` Just "x"
   describe "factors" $ do
     it "finds factors of a product" $
       factors (var "a" * var "b" * var "c") `shouldBe`
@@ -140,3 +147,19 @@ spec = do
     it "finds common factors of a longer sum" $
       factors (var "a" * var "b" + var "c" * var "a" + var "a" * var "d") `shouldBe`
         (1.0, [var "b" + var "c" + var "d", var "a"])
+    it "finds common factors from sum including coff" $
+      factors (var "a" * val 2.0 + val 2.0 * var "b" * var "a")
+        `shouldBe`
+        (2.0, [val 1 + var "b", var "a"])
+    it "finds common factors in product avoiding incomplete match" $
+      factors ((var "a" + var "b")*var "a")
+        `shouldBe`
+        (1.0, [var "a" + var "b", var "a"])
+    it "finds common factors in sum avoiding incomplete match" $
+      factors (var "a" * var "b" + var "b" * var "c" + var "a" * var "c")
+        `shouldBe`
+        (1.0, [var "a" * var "b" + var "b" * var "c" + var "a" * var "c"])
+    it "finds common factors in sum with repeated terms" $
+      factors (var "C" * var "C" * 10 + var "T" * var "C" * 10)
+        `shouldBe`
+        (10, [var "C", var "C" + var "T"])
