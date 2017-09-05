@@ -21,7 +21,8 @@ library
                        CPi.Semantics, CPi.Tests, CPi.AST, CPi.Transitions,
                        CPi.Processes, CPi.Simulation, CPi.Vector,
                        CPi.ParserNew, CPi.NumericalMethods, CPi.Symbolic,
-                       CPi.Base, CPi.Examples, CPi.ODEExtraction
+                       CPi.Base, CPi.Examples, CPi.ODEExtraction,
+                       CPi.StochPyExtraction
   other-extensions:    DeriveDataTypeable, TypeSynonymInstances,
                        FlexibleInstances, PatternGuards
   build-depends:       base >=4.7, parsec >=3.1,
