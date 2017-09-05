@@ -33,7 +33,7 @@ spec = do
     it "translates absolute value" $
       matlabExpr (M.fromList [("x", "a"), ("y", "b")])
                  (var "x" * abs(var "y"))
-        `shouldBe` Just "(a) .* (abs(b))"
+        `shouldBe` Just "(a) .* (b)"
   describe "sympyExpr" $ do
     it "translates including variables" $
       sympyExpr (M.fromList [("x", "y"), ("y","z")]) ((var "x" + var "y") * var "x")
@@ -46,7 +46,7 @@ spec = do
     it "translates absolute value" $
       sympyExpr (M.fromList [("x", "a"), ("y", "b")])
                  (var "x" * abs(var "y"))
-        `shouldBe` Just "(a) .* (abs(b))"
+        `shouldBe` Just "(a) * (b)"
   describe "extractIVP" $ do
     it "extracts the correct IVP for rabbitModel" $
       let Defs env _ _ _ = rabbitModel
@@ -80,7 +80,7 @@ spec = do
     it "translates a simple ODE to python code" $
       sympyODE ode (5, (0.0, 1.0))
       `shouldBe`
-      Right "import sympy as sym\nimport numpy as np\nfrom sympy.abc import t\nfrom scipy.integrate import odeint\nfrom sys import stdout\n\nxs = sym.symbols('R F')\nxts = [x(t) for x in xs]\nodes = [sym.Eq(xts[0].diff(), xts[0] + (-1.0) * ((xts[1]) * (xts[0]))), sym.Eq(xts[1].diff(), (xts[1]) * (xts[0]) + (-1.0) * (xts[1]))]\ny0 = [2.0, 1.0]\nts = np.linspace(0.0,1.0,5)\nrhss = [eqn.rhs for eqn in odes]\nJac = sym.Matrix(rhss).jacobian(xts)\nf = sym.lambdify((xts, t), rhss, modules='numpy')\nJ = sym.lambdify((xts, t), Jac, modules='numpy')\nys = odeint(f, y0, ts, (), J)\nnp.savetxt(stdout, ys)"
+      Right "import sympy as sym\nimport numpy as np\nfrom sympy.abc import t\nfrom scipy.integrate import odeint\nimport sys\nsys.setrecursionlimit(100000)\n\nxs = [sym.Function('\"R\"'),sym.Function('\"F\"')]\nxts = [x(t) for x in xs]\nodes = [sym.Eq(xts[0].diff(), sym.simplify(xts[0] + (-1.0) * ((xts[1]) * (xts[0])))), sym.Eq(xts[1].diff(), sym.simplify((xts[1]) * (xts[0]) + (-1.0) * (xts[1])))]\ny0 = [2.0, 1.0]\nts = np.linspace(0.0,1.0,5)\nrhss = [eqn.rhs for eqn in odes]\nJac = sym.Matrix(rhss).jacobian(xts)\nf = sym.lambdify((xts, t), rhss, modules='numpy')\nJ = sym.lambdify((xts, t), Jac, modules='numpy')\ntry: ys = odeint(f, y0, ts, (), J)\nexcept NameError: ys = odeint(f, y0, ts, ())\nprint('\\n'.join([' '.join([('%.18e' % y).replace('nan', '0') for y in ysa]) for ysa in ys]))"
     it "translates rabbit model to sympy code" $
       let Defs env _ _ _ = rabbitModel
           Right network = concretifyAffSpec

@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTSyntax, TypeSynonymInstances, FlexibleInstances, RankNTypes #-}
 
-module CPi.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicExpr, var, val, simplify, sumToList, prodToList, applyVar) where
+module CPi.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicExpr, var, val, simplify, sumToList, prodToList, applyVar,factors) where
 
 import qualified Data.Map as M
 import CPi.Base
@@ -88,8 +88,8 @@ instance Num SymbolicExpr where
   Atom(Const a) * Atom(Const b) = val (a*b)
   y * Log x = Log (x**y)
   Log x * y = Log (x**y)
-  a * (b `Sum` c) = (a*b) + (a*c)
-  (a `Sum` b) * c = (a*c) + (b*c)
+  -- a * (b `Sum` c) = (a*b) + (a*c)
+  -- (a `Sum` b) * c = (a*c) + (b*c)
   l@(x `Pow` a) * r@(y `Pow` b)
     | x == y = x**(a + b)
     | otherwise = Prod l r
@@ -99,12 +99,15 @@ instance Num SymbolicExpr where
   l@(x `Pow` a) * y
     | x == y = x**(a + val 1)
     | otherwise = Prod l y
+  (Frac a b) * (Frac c d) = (a * c) / (b * d)
   b * (a `Frac` c) = (a * b) / c
   (a `Frac` c) * b = (b * a) / c
   a * b         = Prod a b
   negate (Atom (Const a)) = val (-a)
   negate a      = val (-1) * a
   abs (Atom (Const a)) = val (abs a)
+  -- We assume variables are positive
+  abs x@(Atom (Var _)) = x
   abs a  = Abs a
   fromInteger a = val (fromIntegral a)
   signum        = Sign
@@ -115,6 +118,8 @@ instance Nullable SymbolicExpr where
 instance Fractional SymbolicExpr where
   Atom (Const a) / Atom (Const b) = val (a/b)
   Atom (Const 0.0) / _ = val 0.0
+  Frac a b / Frac c d = (a * d) / (b * c)
+  Frac a b / c = a / (b * c)
   a / Atom (Const 1.0) = a
   a / b
    | a == b    = val 1.0
@@ -241,6 +246,29 @@ prodToList :: SymbolicExpr -> [SymbolicExpr]
 prodToList (a `Prod` b) = prodToList a ++ prodToList b
 prodToList a = [a]
 
+factors :: SymbolicExpr -> (Double, [SymbolicExpr])
+factors (a `Prod` b) = (a0*b0, as ++ bs)
+  where (a0, as) = factors a
+        (b0, bs) = factors b
+factors x@(a `Pow` Atom (Const n))
+  | abs(n - fromIntegral m) < 1e-16 = (a0**fromIntegral m, take (m*length as) (cycle as))
+  | otherwise = (1.0, [x])
+  where m = floor n
+        (a0,as) = factors a
+factors (a `Sum` b) = if a0 == b0
+    then (a0, res)
+    else (1.0, res)
+  where (a0, as) = factors a
+        (b0, bs) = factors b
+        as' = L.sort (if a0 == b0 then as else val a0:as)
+        bs' = L.sort (if a0 == b0 then bs else val b0:bs)
+        cf = as `L.intersect` bs
+        a' = product (as' L.\\ cf)
+        b' = product (bs' L.\\ cf)
+        res = (a' + b'):cf
+factors (Atom (Const x)) = (x, [])
+factors x = (1.0, [x])
+
 instance Expression SymbolicExpr where
   simplify s | s == s' = s
              | otherwise = simplify s'
@@ -248,18 +276,34 @@ instance Expression SymbolicExpr where
 
           genSimProd a b
             | a' > b' = b' * a'
+            | a' == b' = a' ** 2
             | otherwise = a' * b'
             where a' = simplify a
                   b' = simplify b
           genSimSum a b
             | a' > b' = b' + a'
+            | a' == b' = 2.0 * a'
             | otherwise = a' + b'
             where a' = simplify a
                   b' = simplify b
 
           simp (Atom x) = Atom x
 
-          simp (Frac a b) = simplify a / simplify b
+          simp (Atom (Const a) `Frac` Atom (Const b)) = val (a/b)
+          simp (Atom (Const 0.0) `Frac` _) = val 0.0
+          simp (Frac a b `Frac` Frac c d) = (a * d) / (b * c)
+          simp (Frac a b `Frac` c) = a / (b * c)
+          simp (a `Frac` Atom (Const 1.0)) = a
+          simp (Frac a b) = simplify a' / simplify b'
+            where (a0,as) = factors a
+                  (b0,bs) = factors b
+                  as' = L.sort (val (a0/b0):as)
+                  bs' = L.sort bs
+                  as'' = as' L.\\ bs'
+                  bs'' = bs' L.\\ as'
+                  a' = product as''
+                  b' = product bs''
+          -- simp (Frac a b) = simplify a / simplify b
 
           simp (Atom(Const 1.0) `Prod` a) = a
           simp (a `Prod` Atom(Const 1.0)) = a
@@ -280,9 +324,9 @@ instance Expression SymbolicExpr where
             | x == y = x**(a + val 1)
             | otherwise = genSimProd l y
           simp ((a `Prod` (c `Pow` Atom(Const (-1)))) `Prod` b)
-            = simplify $ simplify (b * a) / c
+            = simplify (b * a) / c
           simp (b `Prod` (a `Prod` (c `Pow` Atom(Const (-1)))))
-            = simplify $ simplify (b * a) / c
+            = simplify (b * a) / c
           simp (a `Prod` b) = genSimProd a b
 
           simp (Atom(Const 0.0) `Sum` a) = a

@@ -187,8 +187,8 @@ sympyExpr mp (x `Pow` y) = do
   return $ "(" ++ x' ++ ") ** (" ++ y' ++ ")"
 sympyExpr mp (Abs x) = do
   x' <- sympyExpr mp x
-  return $ x'
-  -- return $ "abs(" ++ x' ++ ")"
+  -- return $ x'
+  return $ "abs(" ++ x' ++ ")"
 sympyExpr mp (Sin x) = do
   x' <- sympyExpr mp x
   return $ "sin(" ++ x' ++ ")"

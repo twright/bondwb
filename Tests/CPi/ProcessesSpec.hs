@@ -113,7 +113,7 @@ spec = do
     it "can find the S component from symbolic enzyme and substrate" $
       simplify (vect (Def "S" [] []) <> actions affinityNetworkEnzyme (partialS' +> partialE'))
         `shouldBe`
-        0
+        - (var "[E]" * var "[S]")
   describe "dPdt" $ do
     it "gives correct dPdt for reacting substrate and enzyme" $
       shouldBe

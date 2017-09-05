@@ -25,7 +25,7 @@ spec = do
     it "finds the l1 norm of a symbolic vector" $
       simplify (norm $ var "a" |> vect (1::Integer) +> var "b" |> vect 2
                                 +> var "c" |> vect 3)
-      `shouldBe` abs(var "a") + abs(var "b") + abs(var "c")
+      `shouldBe` simplify(abs(var "a") + abs(var "b") + abs(var "c"))
     -- it "should only be zero for Nil" $
     --   property $ \x -> normalForm x == Nil || partial enzymeDefs (Mixture [(4.0, x)]) /= vectZero
   describe "eq" $ do

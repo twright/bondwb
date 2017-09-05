@@ -14,7 +14,7 @@ spec = do
     it "implements +" $
       var "a" + val 2 `shouldBe` var "a" `Sum` val 2
     it "implements -" $
-      var "a" - val 2 `shouldBe` var "a" `Sum` (val (-1) `Prod` val 2)
+      var "a" - val 2 `shouldBe` var "a" `Sum` val (-2)
     it "implements *" $
       var "a" * val 2 `shouldBe` var "a" `Prod` val 2
   describe "freeVars" $ do
@@ -108,3 +108,35 @@ spec = do
     it "should not simplify this simpler expr to zero" $
       simplify (Prod (val 2.0) (Sum (val 0.0) (val 3.0)))
         `shouldBe` val 6.0
+    it "should handle dividing fractions" $
+      simplify ((var "a" / var "b") / var "c")
+        `shouldBe` simplify(var "a" / (var "b" * var "c"))
+    it "should cancel fractions" $
+      simplify ((var "a" * var "b" * var "c")/(var "d" * var "a" * var "c"))
+        `shouldBe` var "b" / var "d"
+    it "can simplify complex fraction (from ping-pong law)" $
+      simplify ((var "E" * (var "A" * var "B")) / ((2.0 * var "A") * var "E" + (2.0 * var "B") * var "E" + (var "A" * var "B") * var "E"))
+        `shouldBe`
+        simplify ((var "A" * var "B") / (2.0 * var "A" + 2.0 * var "B" + var "A" * var "B"))
+    it "simplifies dividing by an even power" $
+      simplify(var "a"/(var "b" * var "a" ** 2))
+        `shouldBe` val 1 / (var "a" * var "b")
+    it "simplifies dividing by an odd power" $
+      simplify(var "a"/(var "b" * var "a" ** 3))
+        `shouldBe` val 1 / (var "b" * var "a" ** 2)
+    it "simplifies multiplications into powers" $
+      simplify(var "a" * var "a" * var "a")
+        `shouldBe` var "a" ** 3
+    it "simplifies multiplications of powers into powers" $
+      simplify(var "a" ** 2 * var "a" ** 3)
+        `shouldBe` var "a" ** 5
+  describe "factors" $ do
+    it "finds factors of a product" $
+      factors (var "a" * var "b" * var "c") `shouldBe`
+        (1.0, [var "a", var "b", var "c"])
+    it "finds common factors of a sum" $
+      factors (var "a" * var "b" + var "c" * var "a") `shouldBe`
+        (1.0, [var "b" + var "c", var "a"])
+    it "finds common factors of a longer sum" $
+      factors (var "a" * var "b" + var "c" * var "a" + var "a" * var "d") `shouldBe`
+        (1.0, [var "b" + var "c" + var "d", var "a"])
