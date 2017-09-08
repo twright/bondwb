@@ -1,5 +1,5 @@
 module CPi.ODEExtraction
-  (IVP(..), PrintStyle(..), matlabExpr, sympyExpr, matlabODE, vectorFieldToODEs, extractIVP, sympyODE, solveODEPython, printODEPython, sympySimplify) where
+  (IVP(..), PrintStyle(..), matlabExpr, sympyExpr, matlabODE, vectorFieldToODEs, extractIVP, sympyODE, solveODEPython, printODEPython, sympySimplify, runPython) where
 
 import CPi.Symbolic
 import CPi.Processes

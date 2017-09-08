@@ -22,7 +22,7 @@ import CPi.Processes
 import CPi.Simulation
 import CPi.ParserNew (parseFile)
 import CPi.ODEExtraction (solveODEPython, printODEPython, PrintStyle(..))
-import CPi.StochPyExtraction (generateStochPy)
+import CPi.StochPyExtraction (generateStochPy, simulateStochPy)
 
 import System.Console.Haskeline
 import Control.Monad.Trans.State.Strict
@@ -100,6 +100,9 @@ commands = [("help",
                      cmdHelp = helpTextTrans}),
             ("plot",
              CmdRec {cmdFn = plotPythonCmd,
+                     cmdHelp = helpTextPlot}),
+            ("stochpy",
+             CmdRec {cmdFn = plotStochPyCmd,
                      cmdHelp = helpTextPlot}),
             ("savestochpy",
              CmdRec {cmdFn = saveStochPyCmd,
@@ -182,14 +185,32 @@ saveStochPyCmd x = do
   abstractModel <- getEnv
   let args    = words x
   let name    = args!!1
-  let filename = args!!2
+  let step    = read(args!!2) :: Double
+  let filename = args!!3
   case symbolifyModel abstractModel of
     Right (env, defs) ->
       case M.lookup name defs of
         Just (network, _, p, inits) ->
           lift $ lift $ do
-            _ <- generateStochPy filename env network p inits
+            _ <- generateStochPy filename env network p step inits
             return ()
+        Nothing -> say $ "Process " ++ name ++ " not defined!"
+    Left err -> say $ "Error in model: " ++ err
+
+plotStochPyCmd :: String -> Environment ()
+plotStochPyCmd x = do
+  abstractModel <- getEnv
+  let args    = words x
+  let name    = args!!1
+  let step    = read(args!!2) :: Double
+  let n       = read(args!!3) :: Int
+  let method  = read(args!!4)
+  case symbolifyModel abstractModel of
+    Right (env, defs) ->
+      case M.lookup name defs of
+        Just (network, _, p, inits) -> do
+          res <- lift $ lift $ simulateStochPy method n env network p step inits
+          lift $ lift $ plotTrace res
         Nothing -> say $ "Process " ++ name ++ " not defined!"
     Left err -> say $ "Error in model: " ++ err
 
