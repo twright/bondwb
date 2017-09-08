@@ -43,7 +43,7 @@ test-suite spec
   build-depends:    base >=4.7, hspec, containers>=0.5, cpilib, QuickCheck,
                     hashable, hspec-megaparsec, megaparsec
   other-modules:    CPi.ASTSpec, CPi.ParserNewSpec, CPi.SymbolicSpec,
-                    CPi.VectorSpec, CPi.ODEExtractionSpec
+                    CPi.VectorSpec, CPi.ODEExtractionSpec, CPi.StochPyExtractionSpec
   default-language: Haskell2010
 
 benchmark signal-bench

@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, RankNTypes #-}
+{-# LANGUAGE ExistentialQuantification, RankNTypes, TypeSynonymInstances, FlexibleInstances #-}
 module CPi.Base
   (Expression(..), Pretty(..), Nullable(..), DoubleExpression(..), BoolConc(..)) where
 
@@ -15,6 +15,7 @@ class (Num a, Floating a, Expression a) => DoubleExpression a where
   fromFloat :: Double -> a
 
 instance Expression Double where
+instance Expression String where
 instance Expression Integer where
 instance DoubleExpression Double where
   fromFloat = id

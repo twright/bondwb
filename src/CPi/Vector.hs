@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveFunctor, GeneralizedNewtypeDeriving, FlexibleContexts, FunctionalDependencies, UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveFunctor, GeneralizedNewtypeDeriving, FlexibleContexts, FunctionalDependencies, UndecidableInstances, InstanceSigs #-}
 
 module CPi.Vector (Tensor(..), Vector(..), Vect(..), (><), vect, (*>), delta, toList, fromList, multilinear, support) where
 
@@ -9,6 +9,7 @@ import Data.HashMap.Strict hiding (fromList, toList)
 import qualified Data.HashMap.Strict as H
 import qualified Data.List as L
 import GHC.Exts (sortWith)
+import Data.Bifunctor
 
 -- Module inspired by Jan Skibinski's Quantum Vector module
 
@@ -20,7 +21,7 @@ infix 5 ><  -- closure
 
 -- (Num b, Hashable a) =>
 newtype (Num k, Hashable i) => Vect i k = Vect (HashMap i k)
-  deriving Functor
+  deriving (Functor, Hashable)
 -- newtype Bra = (Num b, Hashable a) => Map a b
 --
 -- instance (Eq k, Eq i) => Eq (Vect i k) where
@@ -98,8 +99,20 @@ fromList kvs = Vect $ H.fromListWith (+) $ L.map (\(i,v) -> (v,i)) kvs
 toList :: (Num k, Hashable i, Ord i) => Vect i k -> [(k,i)]
 toList (Vect v) = sortWith snd $ fmap (\(x,y) -> (y,x)) (H.toList v)
 
-instance (Eq k, Ord i, Num k, Fractional k, Expression k, Expression i, Eq i, Hashable i, Nullable k) => Eq (Vect i k) where
+-- instance Bifunctor(Vect) where
+--   bimap :: (Vector k (Vect i k), Nullable k) => (i -> i') -> (k -> k') -> Vect i k -> Vect i' k'
+--   bimap f g (Vect v) = Vect (H.fromList $ fmap (bimap f g) $ H.toList v)
+-- 
+-- instance (Num k, Ord k, Hashable i, Ord i) => Ord(Vect i k) where
+--   v <= u = toList (fmap simplify v) <= toList (fmap simplify u)
+--   where kvs w = L.filter (not.isnull.fst) $ toList $ fmap simplify w
+
+instance (Ord i, Eq k, Num k, Expression k, Expression i, Eq i, Hashable i, Nullable k) => Eq (Vect i k) where
   x == y = kvs x == kvs y
+    where kvs w = L.filter (not.isnull.fst) $ toList $ fmap simplify w
+
+instance (Ord k, Ord i, Num k, Expression k, Expression i, Ord i, Eq i, Hashable i, Nullable k) => Ord (Vect i k) where
+  x <= y = kvs x <= kvs y
     where kvs w = L.filter (not.isnull.fst) $ toList $ fmap simplify w
 
 vect :: (Eq k, Num k, Fractional k, Eq i, Hashable i) => i -> Vect i k

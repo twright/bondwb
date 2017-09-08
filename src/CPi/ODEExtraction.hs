@@ -1,5 +1,5 @@
 module CPi.ODEExtraction
-  (IVP(..), PrintStyle(..), matlabExpr, sympyExpr, matlabODE, vectorFieldToODEs, extractIVP, sympyODE, solveODEPython, printODEPython) where
+  (IVP(..), PrintStyle(..), matlabExpr, sympyExpr, matlabODE, vectorFieldToODEs, extractIVP, sympyODE, solveODEPython, printODEPython, sympySimplify) where
 
 import CPi.Symbolic
 import CPi.Processes
@@ -236,6 +236,11 @@ solveODEPython env network p inits tr@(n,(t0,tn))
         ys = [fromList (xs `zip` pbasis) | xs <- yss]
         pbasis = map snd $ toList p
     in ts `zip` ys
+
+sympySimplify :: String -> String
+sympySimplify s = unsafePerformIO (runPython script)
+  where script = "from sympy import simplify, sympify\nimport re\n" ++
+                 "print(simplify(sympify(re.sub(r'([0-9]+)\\.0(?![0-9]*[1-9])', r'\\1', " ++ show s ++ "))))"
 
 printODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> PrintStyle -> String
 printODEPython env network p style

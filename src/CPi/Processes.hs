@@ -2,8 +2,8 @@
 
 module CPi.Processes (Process(..), Affinity(..), ProcessVect, InteractionVect, DirectionVect,
   ConcreteAffinityNetwork, SymbolicModel, P, D, P', D', concretifyModel, partial, conc,
-  direct, react, hide, networkSites, actions, dPdt, partial', dPdt',
-  tracesGivenNetwork, speciesVar, concretifyAffSpec, symbolifyModel) where
+  direct, react, hide, networkSites, actions, dPdt, partial', dPdt', dPdt'',
+  tracesGivenNetwork, speciesVar, concretifyAffSpec, symbolifyModel, embed, concretify, actions') where
 
 import Prelude hiding ((*>), (<*))
 import CPi.AST
@@ -86,27 +86,35 @@ react = multilinear react' <$> filter (/=vectZero)
 
 actions :: (Vector k (DirectionVect k), Nullable (DirectionVect k), DoubleExpression k, Show k) =>
            ConcreteAffinityNetwork -> InteractionVect k -> ProcessVect k
-actions network !potential = L.foldl' (+>) vectZero [
+actions = actions' react
+
+-- actions, but without specifying how to compute reactions
+actions' :: (Vector k (DirectionVect k), Nullable (DirectionVect k), DoubleExpression k, Vector k v, Show k, Pretty v) =>
+           ([DirectionVect k] -> v) -> ConcreteAffinityNetwork -> InteractionVect k -> v
+actions' react' network !potential = L.foldl' (+>) vectZero [
   let concs   = map (`conc` potential') sites'
       directs = map (`direct` potential') sites'
       sites'  = map (L.sort . map Unlocated) sites
       magnitude = law concs
-      effect  = react directs
+      effect  = react' directs
   in trace(show magnitude ++ " * " ++ show (zip3 sites' concs directs) ++ " : " ++ pretty effect) $ if not $ isnull magnitude then magnitude |> effect else vectZero
   --  if any (not.isnull) concs then law concs |> react directs else vectZero
   | ConcreteAffinity (RateLaw law) sites <- network ]
   where Vect h     = potential
         potential' = Vect $ H.filter (not.isnull) h
-        --  ((>1e-12).abs) h
 
 partial' :: (Vector k (InteractionVect k), Expression k) => (Species -> MTS) -> ProcessVect k -> InteractionVect k
 partial' tr = (partial'' ><)
   where partial'' spec = fromList [(1, s :* s' :* L.sort a)
                            | Trans s a s' <- simplify $ tr spec]
 
+-- dPdt without specifying how to compute reactions
 dPdt' :: (Vector k (ProcessVect k), Show k, DoubleExpression k) => (Species -> MTS) -> ConcreteAffinityNetwork -> ProcessVect k -> ProcessVect k
-dPdt' tr network p = trace ("part = " ++ pretty part ++ ", acts = " ++ pretty acts) acts
-  where acts = actions network part
+dPdt' = dPdt'' react
+
+dPdt'' :: (Vector k (ProcessVect k), Show k, DoubleExpression k, Pretty v, Vector k v) => ([DirectionVect k] -> v) -> (Species -> MTS) -> ConcreteAffinityNetwork -> ProcessVect k -> v
+dPdt'' react' tr network p = trace ("part = " ++ pretty part ++ ", acts = " ++ pretty acts) acts
+  where acts = actions' react' network part
         part = partial' tr p
 
 -- Extends the support of a process vector to the closure,
