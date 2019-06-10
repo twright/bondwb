@@ -2,11 +2,33 @@
 
 This repository contains two biologically-inspired process calculi, the bond-calculus and the continuous pi-calculus.
 
+## Quickstart
+
+The simplest way of trying these languages is via the prebuilt docker image ```thomasdwright/bondwb```. You can download the image and run ```cpiwb``` using the command,
+```bash
+
+xhost +local:root && docker run -it -v $(pwd):/host -w /host -v /tmp/.X11-unix:/tmp/.X11-unix:rw -e DISPLAY thomasdwright/bondwb cpiwb
+```
+or run ```bondwb``` using the command,
+```bash
+
+xhost +local:root && docker run -it -v $(pwd):/host -w /host -v /tmp/.X11-unix:/tmp/.X11-unix:rw -e DISPLAY thomasdwright/bondwb bondwb
+```
+
+These commands only depend on having a working install of Docker. They also do a little additional setup:
+
+ - The current directory will be mounted at ```/host``` within the image, allowing you to use any models within the current directory.
+ - This enables X11-forwarding between your host and the image, allowing you to view the plots windows produced by the tool.
+
+See [Usage](#usage) for some examples of how to get started with the tools.
+
 ## Building
 
-The languages are configured to build using stack in a isolated environment within a Docker image containing all of its dependancies.
+If you wish to compile/edit the source code yourself, you can download the source code from this repo and compile the tools using stack.
 
-This depends only on a working installation of Docker and stack. This is also only known to work on a Linux or OSX (whilst Docker has Windows support, stack's docker integration and graphical output via X11 do not: [stack issue #2421](https://github.com/commercialhaskell/stack/issues/2421)).
+The languages are configured to build using stack in a isolated environment within another Docker image -- thomasdwright/bond-env -- containing all of its dependancies.
+
+This depends only on a working installation of Docker, stack, and git. This is also only known to work on a Linux or OSX (whilst Docker has Windows support, stack's docker integration and graphical output via X11 do not: [stack issue #2421](https://github.com/commercialhaskell/stack/issues/2421)).
 
 Stack can be installed via the command (see [https://docs.haskellstack.org/en/stable/README/](https://docs.haskellstack.org/en/stable/README/)):
 ```sh
@@ -15,22 +37,29 @@ wget -qO- https://get.haskellstack.org/ | sh
 ```
 whilst installation instructions for docker are available at ([https://docs.docker.com/install/](https://docs.docker.com/install/)).
 
+Then you can clone the repository using,
+```bash
+
+git clone https://github.com/twright/bondwb.git
+```
+
+Next enter the directory and setup stack,
+```bash
+
+cd bondwb
+stack setup
+```
+
 One can build the library and all of its dependencies using the command
-```sh
+```bash
 
 stack build
 ```
 
-The images is described by ```Dockerfile```; if needed it can be rebuilt via the command:
-```sh
-
-docker build -t thomasdwright/bondwb -f Dockerfile .
-```
-
-## Running
+### Running
 
 Once the build is finished the bond-calculus' command line interface, bondwb, can be run via the command:
-```sh
+```bash
 stack exec bondwb
 ```
 whilst continuous pi's commandline interface, cpiwb, can be run via the command
@@ -38,21 +67,17 @@ whilst continuous pi's commandline interface, cpiwb, can be run via the command
 stack exec cpiwb
 ```
 
-If graphically plot output is required, it can be displayed outside of the container using X11-forwarding, however requires giving the machine access to your display by first running the command:
+If graphical plot output is required, it can be displayed outside of the container using X11-forwarding, however requires giving the machine access to your display by first running the command:
 ```bash
 
 xhost +local:root
 ```
+
+## Usage
 
 ### Using cpiwb
 
-To use cpiwb first run the commands,
-```bash
-xhost +local:root
-stack exec cpiwb
-```
-
-This should show the following prompt
+Once you have started ```cpiwb```, you should see the following prompt
 ```
 Welcome to the Continuous Pi-calculus Workbench (CPiWB).
 Type "help" for help.
@@ -85,17 +110,14 @@ It is now possible to simulate the resulting model (via generating ODEs)  and pl
 CPiWB:> plot Pi 0 10 100
 ```
 This specifies that we should plot the concentration of each species in the process ```Pi``` from timepoints ```0``` to ```10``` using ```100``` steps, and results in the display of the following plot window:
+
 ![](./images/enzyme-plot-window-cpi.png)
 
 It is also possible to use the command ```help``` to list all available commands.
 
 ### Using bondwb
 
-To use bondwb first run the commands,
-```bash
-xhost +local:root
-stack exec bondwb
-```
+Once you have started ```cpiwb```, you should see the following prompt
 
 This should show the following prompt
 ```
@@ -132,6 +154,7 @@ It is now possible to simulate the resulting model (via generating ODEs) and plo
 BioWB:> plot Pi 0 10 100
 ```
 resulting in the following plot window:
+
 ![](./images/enzyme-plot-window-bond.png)
 
 We can also perform a stochastic simulation of the model using [StochPy](http://stochpy.sourceforge.net/)'s implementation of Gillespie's Stochastic Simulation Algorithm:
@@ -144,3 +167,16 @@ This specifies a simulation of process ```Pi``` with the continuous concentratio
 ![](./images/enzyme-plot-window-bond-stoch.png)
 
 It is also possible to use the command ```help``` to list all available commands.
+
+## Updating docker images
+
+The build environment image is described by ```Dockerfile```; if needed it can be rebuilt via the command:
+```bash
+
+docker build -t thomasdwright/bondwb-env -f Dockerfile .
+```
+whilst the deployment image can be rebuilt via the command:
+```bash
+
+stack image container
+```

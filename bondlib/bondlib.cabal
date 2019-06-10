@@ -4,16 +4,18 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 93d52e63adfffe9ed55f351f829c8f62bd5c8244b3b4da4b2fcded72162b0cce
+-- hash: f850244b1d2a158c0ab313ea7767e8f0ea2993a41c7dbb3845a6d0ec9e48722d
 
 name:           bondlib
-version:        0.1.0.0
+version:        0.7.0.0
+synopsis:       The bond-calculus: Haskell library
 description:    Please see the README on GitHub at <https://github.com/githubuser/bondwb#readme>
+category:       SystemsBiology
 homepage:       https://github.com/githubuser/bondwb#readme
 bug-reports:    https://github.com/githubuser/bondwb/issues
-author:         Thomas Wright
+author:         Thomas Wright, Ian Stark
 maintainer:     tom.tdw@gmail.com
-copyright:      2019 Author name here
+copyright:      2016-2019 Thomas Wright, Ian Stark
 license:        GPL-3
 build-type:     Simple
 

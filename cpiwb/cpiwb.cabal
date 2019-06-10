@@ -4,16 +4,18 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cc4fb9bd58d4a6ecb9fe5eb1bbfb45f5fdfed8a55f047a8e7dc3ff4ca08a2389
+-- hash: 33213a3bb039d821b497ce41bdee49d408c065c98d6fbd7872a12ae054055d7b
 
 name:           cpiwb
-version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/bondwb#readme>
+version:        0.7.0.0
+synopsis:       The CPi Workbench: An interactive command-line tool for working with the Continuous pi-Calculus
+description:    The Continuous pi-Calculus is a process algebra for modelling continuous behaviour in biochemical systems.  The CPi Workbench is an interactive command-line tool for working with the calculus.  It provides facilities to read and parse .cpi files containing descriptions of CPi systems; to analyse their possible behaviour; and generate ODEs and numerical simulations of the systems they describe.
+category:       SystemsBiology
 homepage:       https://github.com/githubuser/bondwb#readme
 bug-reports:    https://github.com/githubuser/bondwb/issues
-author:         Thomas Wright
+author:         Chris Banks, Ian Stark, Thomas Wright
 maintainer:     tom.tdw@gmail.com
-copyright:      2019 Author name here
+copyright:      Chris Banks, Ian Stark, Thomas Wright
 license:        GPL-3
 build-type:     Simple
 

@@ -4,16 +4,18 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9c51871542bce15fa4cc0ccdc04b5e16a606ef5a70bdf6ad0e078039850af23b
+-- hash: 475ca08238664d68b6715c0f03cc9189c245cf2a24719d2a97be5823b44b946c
 
 name:           cpilib
-version:        0.1.0.0
+version:        0.7.0.0
+synopsis:       The Continuous Pi Calculus: Haskell library
 description:    Please see the README on GitHub at <https://github.com/githubuser/bondwb#readme>
+category:       SystemsBiology
 homepage:       https://github.com/githubuser/bondwb#readme
 bug-reports:    https://github.com/githubuser/bondwb/issues
-author:         Thomas Wright
+author:         Chris Banks, Ian Stark, Thomas Wright
 maintainer:     tom.tdw@gmail.com
-copyright:      2019 Author name here
+copyright:      Chris Banks, Ian Stark, Thomas Wright
 license:        GPL-3
 build-type:     Simple
 
