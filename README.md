@@ -105,7 +105,7 @@ Type "help" for help.
 BioWB:> 
 ```
 
-Next we will load an example model stored in the file ```models/enzymemm.cpi```:
+Next we will load an example model stored in the file ```models/enzymemm.biocpi```:
 ```haskell
 species S = s -> P;
 
