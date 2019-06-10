@@ -117,9 +117,7 @@ It is also possible to use the command ```help``` to list all available commands
 
 ### Using bondwb
 
-Once you have started ```cpiwb```, you should see the following prompt
-
-This should show the following prompt
+Once you have started ```bondwb```, you should see the following prompt,
 ```
 Welcome to the Biological Continuous Pi-calculus Workbench (BioWB).
 Type "help" for help.
