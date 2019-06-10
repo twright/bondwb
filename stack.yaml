@@ -22,7 +22,7 @@ resolver: lts-13.24
 docker:
     enable: true
     # image: "twright/biocalc"
-    repo: thomasdwright/bondwb
+    repo: thomasdwright/bondwb:latest
     mount:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
     env:
