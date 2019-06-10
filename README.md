@@ -21,10 +21,10 @@ One can build the library and all of its dependencies using the command
 stack build
 ```
 
-The images is described by ```Dockerfile.base```; if needed it can be rebuilt via the command:
+The images is described by ```Dockerfile```; if needed it can be rebuilt via the command:
 ```sh
 
-docker build -t twright/biocalc -f Dockerfile.base .
+docker build -t thomasdwright/bondwb -f Dockerfile .
 ```
 
 ## Running
@@ -82,7 +82,7 @@ Done. Type "env" to view.
 ```
 It is now possible to simulate the resulting model (via generating ODEs)  and plot the result using the command,
 ```
-plot Pi 0 10 100
+CPiWB:> plot Pi 0 10 100
 ```
 This specifies that we should plot the concentration of each species in the process ```Pi``` from timepoints ```0``` to ```10``` using ```100``` steps, and results in the display of the following plot window:
 ![](./images/enzyme-plot-window-cpi.png)
@@ -129,13 +129,17 @@ Done. Type "env" to view.
 ```
 It is now possible to simulate the resulting model (via generating ODEs) and plot the result using the command,
 ```
-plot Pi 0 10 100
+BioWB:> plot Pi 0 10 100
 ```
 Resulting in the following plot window:
 ![](./images/enzyme-plot-window-bond.png)
 
 We can also perform a stochastic simulation of the model using [StochPy](http://stochpy.sourceforge.net/)'s implementation of Gillespie's Stochastic Simulation Algorithm:
-This specifies a simulation of process ```Pi``` with the continuous concentrations of the models scaled to discrete variables by a factor ```0.5```, simulated for ```10``` units of time using the "tauleap" method (this [can be any method supported by StochPy](http://stochpy.sourceforge.net/html/userguide_doc.html#module-3-stochastic-simulation-algorithm)), resulting in the following plot:
+```
+BioWB:> stochpy Pi 0.01 10 "tauleap"
+```
+
+This specifies a simulation of process ```Pi``` with the continuous concentrations of the models scaled to discrete variables by a factor ```0.5```, simulated for ```10``` units of time using the ```tauleap``` method (this [can be any method supported by StochPy](http://stochpy.sourceforge.net/html/userguide_doc.html#module-3-stochastic-simulation-algorithm)), resulting in the following plot:
 ![](./images/enzyme-plot-window-bond-stoch.png)
 
 It is also possible to use the command ```help``` to list all available commands.
