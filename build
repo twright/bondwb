@@ -1,7 +1,0 @@
-cabal update
-cabal sandbox delete
-cabal sandbox init
-cabal install "$@" 'Cabal'
-cabal install "$@" 'gtk2hs-buildtools'
-cabal install "$@" --dependencies-only
-cabal build

@@ -1,0 +1,65 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.1.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 9c51871542bce15fa4cc0ccdc04b5e16a606ef5a70bdf6ad0e078039850af23b
+
+name:           cpilib
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/bondwb#readme>
+homepage:       https://github.com/githubuser/bondwb#readme
+bug-reports:    https://github.com/githubuser/bondwb/issues
+author:         Thomas Wright
+maintainer:     tom.tdw@gmail.com
+copyright:      2019 Author name here
+license:        GPL-3
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/bondwb
+
+library
+  exposed-modules:
+      CPi.Lib
+      CPi.Logic
+      CPi.Matlab
+      CPi.ODE
+      CPi.Parser
+      CPi.Plot
+      CPi.Semantics
+      CPi.Signals
+      CPi.Tests
+  other-modules:
+      Paths_cpilib
+  hs-source-dirs:
+      ./.
+  build-depends:
+      Chart
+    , Chart-cairo
+    , Chart-gtk
+    , MissingH
+    , QuickCheck
+    , base >=4.7 && <5
+    , cairo
+    , colour
+    , containers
+    , data-accessor
+    , data-default-class
+    , gtk
+    , hashable
+    , haskeline
+    , hmatrix
+    , hmatrix-gsl
+    , lens
+    , megaparsec
+    , parsec
+    , parser-combinators >=1.0.0
+    , process
+    , scientific
+    , sharedlib
+    , transformers
+    , unordered-containers
+  default-language: Haskell2010

@@ -1,1 +1,0 @@
-haddock -h -o CPi/docs/ CPi/*.hs

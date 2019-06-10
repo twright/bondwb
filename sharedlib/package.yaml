@@ -1,0 +1,52 @@
+name:                sharedlib
+version:             0.1.0.0
+github:              "githubuser/bondwb"
+license:             GPL-3
+author:              "Thomas Wright"
+maintainer:          "tom.tdw@gmail.com"
+copyright:           "2019 Author name here"
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/bondwb#readme>
+
+# dependencies:
+# - base >= 4.7 && < 5
+# - bondlib
+
+# library:
+#   source-dirs: src
+
+dependencies:
+- base >= 4.7 && < 5
+- parsec
+- containers
+- transformers
+- process
+- colour
+- data-accessor
+- haskeline
+- Chart
+- Chart-gtk
+- gtk
+- Chart-cairo
+- lens
+- data-default-class
+- unordered-containers
+- cairo
+- hashable
+- megaparsec
+- scientific
+- MissingH
+- hmatrix-gsl
+- hmatrix
+- QuickCheck
+- parser-combinators >= 1.0.0
+
+library:
+  source-dirs: .

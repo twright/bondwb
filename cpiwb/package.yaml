@@ -1,0 +1,28 @@
+name:                cpiwb
+version:             0.7.0.0
+github:              "githubuser/bondwb"
+license:             GPL-3
+author:              "Chris Banks, Ian Stark, Thomas Wright"
+maintainer:          "tom.tdw@gmail.com"
+copyright:           Chris Banks, Ian Stark, Thomas Wright
+# Metadata used when publishing your package
+synopsis:            "The CPi Workbench: An interactive command-line tool for working with the Continuous pi-Calculus"
+category:            SystemsBiology
+
+description:         The Continuous pi-Calculus is a process algebra for modelling continuous behaviour in biochemical systems.  The CPi Workbench is an interactive command-line tool for working with the calculus.  It provides facilities to read and parse .cpi files containing descriptions of CPi systems; to analyse their possible behaviour; and generate ODEs and numerical simulations of the systems they describe.
+
+executables:
+  cpiwb:
+    main:                cpiwb.hs
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - base
+    - sharedlib
+    - cpilib
+    - haskeline
+    - transformers
+    - Chart
+    - containers

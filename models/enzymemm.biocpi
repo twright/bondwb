@@ -1,4 +1,4 @@
-species S =  s -> P;
+species S = s -> P;
 
 species P = 0;
 
@@ -10,4 +10,4 @@ affinity network M(v,k) = {
   e, s at rate MichaelisMenten(v, k);
 }
 
-process Pi = [0.1] E || [1.0] S || [0.0001] P with network M(1.0, 2.0);
+process Pi = [100] S || [10] E with network M(1.1, 2.0);

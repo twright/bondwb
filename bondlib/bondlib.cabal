@@ -1,0 +1,117 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.1.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 93d52e63adfffe9ed55f351f829c8f62bd5c8244b3b4da4b2fcded72162b0cce
+
+name:           bondlib
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/bondwb#readme>
+homepage:       https://github.com/githubuser/bondwb#readme
+bug-reports:    https://github.com/githubuser/bondwb/issues
+author:         Thomas Wright
+maintainer:     tom.tdw@gmail.com
+copyright:      2019 Author name here
+license:        GPL-3
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/bondwb
+
+library
+  exposed-modules:
+      BondCalculus.AST
+      BondCalculus.Base
+      BondCalculus.Examples
+      BondCalculus.NumericalMethods
+      BondCalculus.ODEExtraction
+      BondCalculus.ParserNew
+      BondCalculus.Plot
+      BondCalculus.Processes
+      BondCalculus.Simulation
+      BondCalculus.StochPyExtraction
+      BondCalculus.Symbolic
+      BondCalculus.Transitions
+      BondCalculus.Vector
+  other-modules:
+      Paths_bondlib
+  hs-source-dirs:
+      ./.
+  build-depends:
+      Chart
+    , Chart-cairo
+    , Chart-gtk
+    , MissingH
+    , QuickCheck
+    , base >=4.7 && <5
+    , cairo
+    , colour
+    , containers
+    , data-accessor
+    , data-default-class
+    , gtk
+    , hashable
+    , haskeline
+    , hmatrix
+    , hmatrix-gsl
+    , lens
+    , megaparsec
+    , parsec
+    , parser-combinators >=1.0.0
+    , process
+    , scientific
+    , sharedlib
+    , transformers
+    , unordered-containers
+  default-language: Haskell2010
+
+test-suite bondlib-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      BondCalculus.ASTSpec
+      BondCalculus.ODEExtractionSpec
+      BondCalculus.ParserNewSpec
+      BondCalculus.ProcessesSpec
+      BondCalculus.StochPyExtractionSpec
+      BondCalculus.SymbolicSpec
+      BondCalculus.TransitionsSpec
+      BondCalculus.VectorSpec
+      Paths_bondlib
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -O2 -fprof-auto -fwarn-tabs -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Chart
+    , Chart-cairo
+    , Chart-gtk
+    , MissingH
+    , QuickCheck
+    , base >=4.7 && <5
+    , bondlib
+    , cairo
+    , colour
+    , containers
+    , data-accessor
+    , data-default-class
+    , gtk
+    , hashable
+    , haskeline
+    , hmatrix
+    , hmatrix-gsl
+    , hspec
+    , hspec-discover
+    , hspec-megaparsec
+    , lens
+    , megaparsec
+    , parsec
+    , parser-combinators >=1.0.0
+    , process
+    , scientific
+    , sharedlib
+    , transformers
+    , unordered-containers
+  default-language: Haskell2010
