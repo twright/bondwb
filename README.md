@@ -131,7 +131,7 @@ It is now possible to simulate the resulting model (via generating ODEs) and plo
 ```
 BioWB:> plot Pi 0 10 100
 ```
-Resulting in the following plot window:
+resulting in the following plot window:
 ![](./images/enzyme-plot-window-bond.png)
 
 We can also perform a stochastic simulation of the model using [StochPy](http://stochpy.sourceforge.net/)'s implementation of Gillespie's Stochastic Simulation Algorithm:
@@ -140,6 +140,7 @@ BioWB:> stochpy Pi 0.01 10 "tauleap"
 ```
 
 This specifies a simulation of process ```Pi``` with the continuous concentrations of the models scaled to discrete variables by a factor ```0.5```, simulated for ```10``` units of time using the ```tauleap``` method (this [can be any method supported by StochPy](http://stochpy.sourceforge.net/html/userguide_doc.html#module-3-stochastic-simulation-algorithm)), resulting in the following plot:
+
 ![](./images/enzyme-plot-window-bond-stoch.png)
 
 It is also possible to use the command ```help``` to list all available commands.
