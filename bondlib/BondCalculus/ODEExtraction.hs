@@ -135,7 +135,7 @@ sympyODEPrint ode style =
     Pretty -> "for ode in odes: print(sym.pretty(ode))\n"
     Plain -> "for ode in odes: print(ode)\n"
     -- print system of odes as latex (formatted for use in an align environment)
-    LaTeX -> "print(sym.latex(odes)[8:-8].replace('=', '& =').replace(', \\\\quad', '\\\\\\\\\\n').replace('{\\\\left (t \\\\right )}', ''))\n"
+    LaTeX -> "print(sym.latex(odes)[7:-7].replace('=', '& =').replace(', \\\\  ', ' \\\\\\\\\\n').replace('{\\\\left(t \\\\right)}', '').replace('\\\\frac{d}{d t}', '\\\\frac{\\\\mathrm d}{\\\\mathrm d t}').replace('operatorname', 'mathrm'))\n"
     MathML -> "from sympy.printing import print_mathml\nprint_mathml(odes)\n"
     where
       xvars = ["xts[" ++ show i ++ "]" | i <- [(0::Integer)..]]

@@ -18,8 +18,16 @@ description:         Please see the README on GitHub at <https://github.com/gith
 # - base >= 4.7 && < 5
 # - bondlib
 
-# library:
-#   source-dirs: src
+library:
+  source-dirs: .
+  dependencies:
+    - base
+    - sharedlib
+    - bondlib
+    - scientific
+    - megaparsec
+  # exposed-modules: BondCalculus.ArgListParser
+  # exposed-modules: BondCalculus.ArgListParser
 
 executables:
   bondwb:
@@ -31,10 +39,15 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - base
+    - bondwb
     - sharedlib
     - bondlib
+    - optparse-applicative
     - haskeline
     - transformers
     - Chart
     # - Chart-gtk
     - containers
+    - scientific
+    - hashable
+    - megaparsec

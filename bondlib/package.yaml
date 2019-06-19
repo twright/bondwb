@@ -25,27 +25,18 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - sharedlib
 - base >= 4.7 && < 5
-- parsec
 - containers
 - transformers
 - process
-- colour
 - data-accessor
-- haskeline
 - Chart
-- Chart-gtk
-- gtk
-- Chart-cairo
 - lens
 - data-default-class
 - unordered-containers
-- cairo
 - hashable
 - megaparsec
 - scientific
 - MissingH
-- hmatrix-gsl
-- hmatrix
 - QuickCheck
 - parser-combinators >= 1.0.0
 

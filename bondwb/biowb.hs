@@ -1,19 +1,19 @@
--- (C) Copyright Chris Banks 2011-2012
+-- (C) Copyright Thomas Wright 2016-2019, Chris Banks 2011-2012
 
--- This file is part of The Continuous Pi-calculus Workbench (CPiWB).
+-- This file is part of The Bond Calculus Workbench (BondWB).
 
---     CPiWB is free software: you can redistribute it and/or modify
---     it under the terms of the GNU General Public License as published by
---     the Free Software Foundation, either version 3 of the License, or
---     (at your option) any later version.
+-- BondWB is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
 
---     CPiWB is distributed in the hope that it will be useful,
---     but WITHOUT ANY WARRANTY; without even the implied warranty of
---     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
---     GNU General Public License for more details.
+-- BondWB is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
 
---     You should have received a copy of the GNU General Public License
---     along with CPiWB.  If not, see <http://www.gnu.org/licenses/>.
+-- You should have received a copy of the GNU General Public License
+-- along with BondWB.  If not, see <http://www.gnu.org/licenses/>.
 
 import BioCalcLib.Lib
 import BondCalculus.Plot
@@ -23,29 +23,162 @@ import BondCalculus.Simulation
 import BondCalculus.ParserNew (parseFile)
 import BondCalculus.ODEExtraction (solveODEPython, printODEPython, PrintStyle(..))
 import BondCalculus.StochPyExtraction (generateStochPy, simulateStochPy)
+import BondCalculus.ArgListParser (args)
 
-import System.Console.Haskeline
+import System.Console.Haskeline hiding (defaultPrefs)
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
+import Text.Megaparsec (parse)
 
-import Graphics.Rendering.Chart.Renderable
-
-import qualified Data.List as L
-import qualified Control.Exception as X
+import Options.Applicative
+import Data.Semigroup ((<>))
 
 import qualified Data.Map as M
 
-import Debug.Trace(trace)
-
 
 -- Some configurables:
-welcome = "\nWelcome to the Biological Continuous Pi-calculus Workbench (BioWB).\n"
+welcome = "\nWelcome to the Bond Calculus Workbench (BondWB).\n"
           ++"Type \"help\" for help.\n"
-prompt = "BioWB:> "
+prompt = "BondWB:> "
+
 
 -- Our environment will be a stack of the Haskeline,
 -- State transformer (of CPi Definitions), and IO monads:
 type Environment = InputT (StateT BondCalculusModel IO)
+
+
+-- Data structures for command arguments
+data Command = PlotArgs String Double Double Double Double Double Double Double Int
+             | PlotPythonArgs String Double Double Int
+             | LoadArgs String
+             | SaveStochPyArgs String Double String
+             | PlotStochPyArgs String Double Int String
+             | PlotUptoEpsilonArgs String Double Double Double Double Double Double Double Double
+             | ODEsPrettyArgs String
+             | ODEsLaTeXArgs String
+             | EnvArgs
+             | ClearArgs
+             deriving (Show)
+
+
+-- Definition of parsers for commands
+commands :: [(String, Parser Command, String)]
+commands = [
+    ( "plot"
+    , PlotPythonArgs
+        <$> argument str  (metavar "process")
+        <*> argument auto (metavar "start")
+        <*> argument auto (metavar "end")
+        <*> argument auto (metavar "n")
+    , "Plot a graph via an extracted python script." ),
+    ( "plotn"
+    , PlotArgs
+        <$> argument str  (metavar "process")
+        <*> argument auto (metavar "start")
+        <*> argument auto (metavar "end")
+        <*> argument auto (metavar "tolabs")
+        <*> argument auto (metavar "tolrel")
+        <*> argument auto (metavar "h")
+        <*> argument auto (metavar "hmin")
+        <*> argument auto (metavar "hmax")
+        <*> argument auto (metavar "n")
+    , "Plot a graph directly using semantics and integrated " ++
+        "numerical methods, for upto n species." ),
+    ( "plotepsilon"
+    , PlotUptoEpsilonArgs
+        <$> argument str  (metavar "process")
+        <*> argument auto (metavar "start")
+        <*> argument auto (metavar "end")
+        <*> argument auto (metavar "tolabs")
+        <*> argument auto (metavar "tolrel")
+        <*> argument auto (metavar "h")
+        <*> argument auto (metavar "hmin")
+        <*> argument auto (metavar "hmax")
+        <*> argument auto (metavar "epsilon")
+    , "Plot a graph directly using semantics and integrated " ++
+      "numerical methods, with concentration threshold epsilon." ),
+    ( "load"
+    , LoadArgs
+        <$> argument str (metavar "file")
+    , "Load a model file." ),
+    ( "env"
+    , pure EnvArgs
+    , "Display the current environment." ),
+    ( "clear"
+    , pure ClearArgs
+    , "Clear the current environment." ),
+    ( "savestochpy"
+    , SaveStochPyArgs
+        <$> argument str  (metavar "process")
+        <*> argument auto (metavar "step")
+        <*> argument str (metavar "filename")
+    , "Save StochPy Stochastic Simulation model." ),
+    ( "plotstochpy"
+    , PlotStochPyArgs 
+        <$> argument str  (metavar "process")
+        <*> argument auto (metavar "step")
+        <*> argument auto (metavar "n")
+        <*> argument str  (metavar "method")
+    , "Plot Stochastic simulation results." ),
+    ( "odes"
+    , ODEsPrettyArgs
+        <$> argument str (metavar "process")
+    , "Display ODEs for process." ),
+    ( "odeslatex"
+    , ODEsLaTeXArgs
+        <$> argument str (metavar "process")
+    , "Display latex formatted ODEs for process.") ]
+
+
+---------------------
+-- Command Functions:
+---------------------
+
+cmd :: Command -> Environment ()
+-- load bondwb file
+cmd (LoadArgs filename) = do
+    say $ "Loading: " ++ filename
+    f <- getFile filename
+    case parseFile filename f of
+       Left err -> say $ "Parse error:\n" ++ show err
+       Right ds -> do putEnv ds;
+                      say "Done. Type \"env\" to view."
+-- Display the current environment
+cmd (ClearArgs) = putEnv emptyBondCalculusModel
+-- Clear the current environment
+cmd (EnvArgs) = undefined
+-- plot ODE trace manually, with max n species
+cmd (PlotArgs name start end tolabs tolrel h hmin hmax n) =
+    applyConcrete name $ \env (network, _, p) -> 
+        let simulator = simulateMaxSpecies n env network tolabs tolrel h hmin hmax start p
+        in plotTrace $ takeWhile ((<=end).fst) simulator
+-- plot ODE trace via Python script extraction
+cmd (PlotPythonArgs name start end n) =
+    applySymbolic name $ \env (network, _, p, inits) -> 
+        plotTrace $ solveODEPython env network p inits (n, (start, end))
+-- plot ODE trace manually, truncating species with concentration <= n
+cmd (PlotUptoEpsilonArgs name start end tolabs tolrel h hmin hmax epsilon) =
+    applyConcrete name $ \env (network, _, p) ->
+        let simulator = simulateUptoEpsilon epsilon env network tolabs tolrel h hmin hmax start p
+        in plotTrace $ takeWhile ((<=end).fst) simulator
+-- plot Guillespie SSA traces via StochPy
+cmd (PlotStochPyArgs name step n method) =
+    applySymbolic name $ \env (network, _, p, inits) -> do
+        res <- simulateStochPy method n env network p step inits
+        plotTrace res
+-- save StochPy model
+cmd (SaveStochPyArgs name step filename) =
+    applySymbolic name $ \env (network, _, p, inits) ->
+        generateStochPy filename env network p step inits >> return ()
+-- Extract ODEs
+cmd (ODEsPrettyArgs name) = 
+    applySymbolic name $ \env (network, _, p, _) ->
+        putStrLn $ printODEPython env network p Pretty
+-- Extract LaTeX formatted ODEs
+cmd (ODEsLaTeXArgs name) =
+    applySymbolic name $ \env (network, _, p, _) ->
+        putStrLn $ printODEPython env network p LaTeX
+
 
 -- Main function:
 main :: IO ()
@@ -58,237 +191,33 @@ main = do putStrLn welcome;
                             Nothing -> return ()
                             Just "" -> loop
                             Just "quit" -> return ()
-                            Just i -> do doCommand i;
-                                         loop
--- TODO: command autocomplete (see Haskeline docs).
---       can we use the command map?
+                            Just i -> do 
+                                x <- doCommandParse i
+                                mapM cmd x
+                                loop
 
+doCommandParse :: String -> Environment (Maybe Command)
+doCommandParse cmdln = case parse args "" cmdln of 
+    Left err -> do
+        say $ "Arg parse error: " ++ show err
+        return Nothing
+    Right cmds ->
+        case execParserPure defaultPrefs commandParserInfo cmds of
+            Success x -> return $ Just x
+            Failure err -> do
+                let (msg, exit) = renderFailure err "bondwb"
+                say $ "Invalid arguments: " ++ msg
+                return $ Nothing
 
-doCommand :: String -> Environment ()
-doCommand cmdln = let cmd = head $ words cmdln in
-                  case lookup cmd commands of
-                    Nothing -> say "Try again."
-                    Just x  -> cmdFn x cmdln
+-- Create command parsers
+commandParser :: Parser Command
+commandParser = hsubparser $ foldl1 (<>)
+                             [ (command c $ info p $ progDesc h)
+                             | (c, p, h) <- commands ]
 
----------------
--- Command map:
----------------
+commandParserInfo :: ParserInfo Command
+commandParserInfo = info commandParser mempty
 
--- TODO: document how to add new commands
-
-data CmdRec = CmdRec {cmdFn::String->Environment (),
-                      cmdHelp::(String,String)}
-
-commands :: [(String,CmdRec)]
-commands = [("help",
-             CmdRec {cmdFn = helpCmd,
-                     cmdHelp = helpTextHelp}),
-            ("quit",
-             CmdRec {cmdFn = undefined,
-                     cmdHelp = helpTextQuit}),
-            ("load",
-             CmdRec {cmdFn = loadCmd,
-                     cmdHelp = helpTextLoad}),
-            ("env",
-             CmdRec {cmdFn = envCmd,
-                     cmdHelp = helpTextEnv}),
-            ("clear",
-             CmdRec {cmdFn = clearCmd,
-                     cmdHelp = helpTextClear}),
-            ("trans",
-             CmdRec {cmdFn = transCmd,
-                     cmdHelp = helpTextTrans}),
-            ("plot",
-             CmdRec {cmdFn = plotPythonCmd,
-                     cmdHelp = helpTextPlot}),
-            ("stochpy",
-             CmdRec {cmdFn = plotStochPyCmd,
-                     cmdHelp = helpTextPlot}),
-            ("savestochpy",
-             CmdRec {cmdFn = saveStochPyCmd,
-                     cmdHelp = helpTextPlot}),
-            ("odes",
-             CmdRec {cmdFn = extractODECmd Pretty,
-                     cmdHelp = helpTextPlot}),
-            ("odeslatex",
-             CmdRec {cmdFn = extractODECmd LaTeX,
-                     cmdHelp = helpTextPlot}),
-            ("plotn",
-             CmdRec {cmdFn = plotCmd,
-                     cmdHelp = helpTextPlot}),
-            ("plotUptoEpsilon",
-             CmdRec {cmdFn = plotEpsilonCmd,
-                     cmdHelp = helpTextPlot})
-                     ]
-
----------------------
--- Command Functions:
----------------------
-
-plotCmd :: String -> Environment ()
-plotCmd x = do
-  abstractModel <- getEnv
-  let args    = words x
-  let name    = args!!1
-      start   = read(args!!2) :: Double
-      end     = read(args!!3) :: Double
-      tolabs  = read(args!!4) :: Double
-      tolrel  = read(args!!5) :: Double
-      h       = read(args!!6)
-      hmin    = read(args!!7)
-      hmax    = read(args!!8)
-      -- h       = (end - start) / fromIntegral steps
-      n       = read(args!!9) :: Int
-  case concretifyModel abstractModel of
-    Right (env, defs) ->
-      case M.lookup name defs of
-        Just (network, _, p) -> do
-          let simulator = simulateMaxSpecies n env network tolabs tolrel h hmin hmax start p
-              res       = takeWhile ((<=end).fst) simulator
-          lift $ lift $ plotTrace res
-        Nothing -> say $ "Process " ++ name ++ " not defined!"
-    Left err -> say $ "Error in model: " ++ err
-
-plotPythonCmd :: String -> Environment ()
-plotPythonCmd x = do
-  abstractModel <- getEnv
-  let args    = words x
-  let name    = args!!1
-      start   = read(args!!2) :: Double
-      end     = read(args!!3) :: Double
-      n       = read(args!!4) :: Int
-  case symbolifyModel abstractModel of
-    Right (env, defs) ->
-      case M.lookup name defs of
-        Just (network, _, p, inits) -> do
-          let res = solveODEPython env network p inits (n, (start, end))
-          lift $ lift $ plotTrace res
-        Nothing -> say $ "Process " ++ name ++ " not defined!"
-    Left err -> say $ "Error in model: " ++ err
-
-extractODECmd :: PrintStyle -> String -> Environment ()
-extractODECmd style x = do
-  abstractModel <- getEnv
-  let args    = words x
-  let name    = args!!1
-  case symbolifyModel abstractModel of
-    Right (env, defs) ->
-      case M.lookup name defs of
-        Just (network, _, p, _) -> do
-          let res = printODEPython env network p style
-          say res
-        Nothing -> say $ "Process " ++ name ++ " not defined!"
-    Left err -> say $ "Error in model: " ++ err
-
-saveStochPyCmd :: String -> Environment ()
-saveStochPyCmd x = do
-  abstractModel <- getEnv
-  let args    = words x
-  let name    = args!!1
-  let step    = read(args!!2) :: Double
-  let filename = args!!3
-  case symbolifyModel abstractModel of
-    Right (env, defs) ->
-      case M.lookup name defs of
-        Just (network, _, p, inits) ->
-          lift $ lift $ do
-            _ <- generateStochPy filename env network p step inits
-            return ()
-        Nothing -> say $ "Process " ++ name ++ " not defined!"
-    Left err -> say $ "Error in model: " ++ err
-
-plotStochPyCmd :: String -> Environment ()
-plotStochPyCmd x = do
-  abstractModel <- getEnv
-  let args    = words x
-  let name    = args!!1
-  let step    = read(args!!2) :: Double
-  let n       = read(args!!3) :: Int
-  let method  = read(args!!4)
-  case symbolifyModel abstractModel of
-    Right (env, defs) ->
-      case M.lookup name defs of
-        Just (network, _, p, inits) -> do
-          res <- lift $ lift $ simulateStochPy method n env network p step inits
-          lift $ lift $ plotTrace res
-        Nothing -> say $ "Process " ++ name ++ " not defined!"
-    Left err -> say $ "Error in model: " ++ err
-
-plotEpsilonCmd :: String -> Environment ()
-plotEpsilonCmd x = do
-  abstractModel <- getEnv
-  let args    = words x
-  let name    = args!!1
-      start   = read(args!!2) :: Double
-      end     = read(args!!3) :: Double
-      tolabs  = read(args!!4) :: Double
-      tolrel  = read(args!!5) :: Double
-      h       = read(args!!6)
-      hmin    = read(args!!7)
-      hmax    = read(args!!8)
-      -- h       = (end - start) / fromIntegral steps
-      epsilon = read(args!!9) :: Double
-  case concretifyModel abstractModel of
-    Right (env, defs) ->
-      case M.lookup name defs of
-        Just (network, _, p) -> do
-          let simulator = simulateUptoEpsilon epsilon env network tolabs tolrel h hmin hmax start p
-              res       = takeWhile ((<=end).fst) simulator
-          lift $ lift $ plotTrace res
-        Nothing -> say $ "Process " ++ name ++ " not defined!"
-    Left err -> say $ "Error in model: " ++ err
-
--- help Command
-helpCmd :: String -> Environment ()
-helpCmd x
-    | not(null(param x))
-        = case lookup (param x) commands of
-            Nothing -> say $ "Sorry no help on \""++x++"\"."
-            Just r -> let (c,d) = cmdHelp r in
-                      say $ "\n"++c++"\n\t"++d++"\n"
-    | otherwise
-        = say $ "\nThe available commands are:\n"
-          ++"\n" ++ prettyList (map fst commands) ++ "\n\n"
-          ++"Type \"help <command>\" for help on a specific command.\n"
-
--- load Command
-loadCmd :: String -> Environment ()
-loadCmd x = do say $ "Loading: " ++ param x
-               f <- getFile (param x)
-               case parseFile x f of
-                 Left err -> say $ "Parse error:\n" ++ show err
-                 Right ds -> do putEnv ds;
-                                say "Done. Type \"env\" to view."
-
--- env Command
-envCmd :: String -> Environment ()
-envCmd _ = do s <- getEnv;
-              say undefined
-
--- clear Command
-clearCmd :: String -> Environment ()
-clearCmd _ = putEnv emptyBondCalculusModel
-
--- trans Command
-transCmd :: String -> Environment ()
-transCmd x = undefined
-
-----------------------
--- Command help texts:
-----------------------
-
-helpTextHelp = ("help <command>","Shows help on a specific command.")
-helpTextQuit = ("quit","Quits the session, same as Ctrl+D")
-helpTextLoad = ("load <filename>","Loads a CPi definition file.")
-helpTextEnv = ("env","Shows the contents of the current environment.")
-helpTextSpecies = ("species <definition>","Adds a species definition to the "
-                   ++"current environment.")
-helpTextClear = ("clear","Clears the environment.")
-helpTextProcess = ("process <definition>","Adds a process definition to the "
-                   ++"environment.")
-helpTextTrans = ("trans <process>","Shows the transitions of a process.")
-helpTextOdes = ("odes <process>","Shoes the ODEs for a process.")
-helpTextPlot = ("plot <process> <start> <end> <points>","Plots the time series of a process for the given interval [start,end] with the given number of time points.")
 
 ---------------------
 -- Utility functions:
@@ -305,11 +234,6 @@ getEnv = lift get
 putEnv :: BondCalculusModel -> Environment ()
 putEnv = lift . put
 
--- Add to the Environment state:
--- addEnv :: OldLib.Definition -> Environment ()
--- addEnv x = do env <- getEnv;
---               putEnv (x:env)
-
 -- Read in a file:
 getFile :: FilePath -> Environment String
 getFile = lift . lift . readFile
@@ -318,12 +242,18 @@ getFile = lift . lift . readFile
 putFile :: FilePath -> String -> Environment ()
 putFile f s = lift $ lift $ writeFile f s
 
--- get the parameters from a command line:
-params :: String -> [String]
-params cmdln = tail(words cmdln)
--- just the first:
-param :: String -> String
-param cmdln = let ps = params cmdln in
-              case ps of
-                []     -> []
-                (p:ps) -> p
+applySymbolic :: String -> (Env -> SymbolicDef -> IO()) -> Environment ()
+applySymbolic = applyToEnv symbolifyModel
+
+applyConcrete :: String -> (Env -> ConcreteDef -> IO()) -> Environment ()
+applyConcrete = applyToEnv concretifyModel
+
+applyToEnv :: (BondCalculusModel -> Either String (Env, M.Map String b)) -> String -> (Env -> b -> IO()) -> Environment()
+applyToEnv g name f = do
+    abstractModel <- getEnv
+    case g abstractModel of
+        Right (env, defs) -> 
+            case M.lookup name defs of
+                Just def -> lift $ lift $ f env def
+                Nothing -> say $ "Process " ++ name ++ " not defined!"
+        Left err -> say $ "Error in model: " ++ err

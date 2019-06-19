@@ -1,9 +1,11 @@
 {-# LANGUAGE  FlexibleInstances, BangPatterns, MultiParamTypeClasses, FlexibleContexts, MonoLocalBinds #-}
 
-module BondCalculus.Processes (Process(..), Affinity(..), ProcessVect, InteractionVect, DirectionVect,
-  ConcreteAffinityNetwork, SymbolicModel, P, D, P', D', concretifyModel, partial, conc,
-  direct, react, hide, networkSites, actions, dPdt, partial', dPdt', dPdt'',
-  tracesGivenNetwork, speciesVar, concretifyAffSpec, symbolifyModel, embed, concretify, actions') where
+module BondCalculus.Processes (Process(..), Affinity(..), ProcessVect,
+  InteractionVect, DirectionVect, ConcreteAffinityNetwork, SymbolicModel,
+  SymbolicDef, ConcreteModel, ConcreteDef, P, D, P', D',
+  concretifyModel, partial, conc, direct, react, hide, networkSites,
+  actions, dPdt, partial', dPdt', dPdt'', tracesGivenNetwork, speciesVar,
+  concretifyAffSpec, symbolifyModel, embed, concretify, actions') where
 
 import Prelude hiding ((*>), (<*))
 import BondCalculus.AST
@@ -44,8 +46,10 @@ data Process = Mixture [(Conc, Species)]
              | React ConcreteAffinityNetwork Process
 
 -- A BondCalculus model with all of the variables looked up
-type ConcreteModel = (Env, M.Map String (ConcreteAffinityNetwork, Species -> MTS, P))
-type SymbolicModel = (Env, M.Map String (ConcreteAffinityNetwork, Species -> MTS, P', [Double]))
+type ConcreteDef = (ConcreteAffinityNetwork, Species -> MTS, P)
+type ConcreteModel = (Env, M.Map String ConcreteDef)
+type SymbolicDef = (ConcreteAffinityNetwork, Species -> MTS, P', [Double])
+type SymbolicModel = (Env, M.Map String SymbolicDef)
 
 powerset :: [a] -> [[a]]
 powerset []     = [[]]

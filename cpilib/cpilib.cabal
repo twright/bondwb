@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 475ca08238664d68b6715c0f03cc9189c245cf2a24719d2a97be5823b44b946c
+-- hash: 9a9b154ea906b7acfedbc06424dca0bb92bc145105a862e31012c1cda38ebcc2
 
 name:           cpilib
 version:        0.7.0.0
@@ -56,9 +56,7 @@ library
     , hmatrix
     , hmatrix-gsl
     , lens
-    , megaparsec
     , parsec
-    , parser-combinators >=1.0.0
     , process
     , scientific
     , sharedlib

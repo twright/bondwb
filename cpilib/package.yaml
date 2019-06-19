@@ -41,13 +41,11 @@ dependencies:
 - unordered-containers
 - cairo
 - hashable
-- megaparsec
 - scientific
 - MissingH
 - hmatrix-gsl
 - hmatrix
 - QuickCheck
-- parser-combinators >= 1.0.0
 
 library:
   source-dirs: .

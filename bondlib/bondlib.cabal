@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f850244b1d2a158c0ab313ea7767e8f0ea2993a41c7dbb3845a6d0ec9e48722d
+-- hash: 810a5facce1a5eab36b7b6137ff00b2bf9339d5a298dba8625150a1430514cdb
 
 name:           bondlib
 version:        0.7.0.0
@@ -44,24 +44,15 @@ library
       ./.
   build-depends:
       Chart
-    , Chart-cairo
-    , Chart-gtk
     , MissingH
     , QuickCheck
     , base >=4.7 && <5
-    , cairo
-    , colour
     , containers
     , data-accessor
     , data-default-class
-    , gtk
     , hashable
-    , haskeline
-    , hmatrix
-    , hmatrix-gsl
     , lens
     , megaparsec
-    , parsec
     , parser-combinators >=1.0.0
     , process
     , scientific
@@ -88,28 +79,19 @@ test-suite bondlib-test
   ghc-options: -Wall -O2 -fprof-auto -fwarn-tabs -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Chart
-    , Chart-cairo
-    , Chart-gtk
     , MissingH
     , QuickCheck
     , base >=4.7 && <5
     , bondlib
-    , cairo
-    , colour
     , containers
     , data-accessor
     , data-default-class
-    , gtk
     , hashable
-    , haskeline
-    , hmatrix
-    , hmatrix-gsl
     , hspec
     , hspec-discover
     , hspec-megaparsec
     , lens
     , megaparsec
-    , parsec
     , parser-combinators >=1.0.0
     , process
     , scientific
