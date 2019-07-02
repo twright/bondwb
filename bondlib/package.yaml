@@ -39,6 +39,13 @@ dependencies:
 - MissingH
 - QuickCheck
 - parser-combinators >= 1.0.0
+# Use interval representation
+- aern2-mp
+# Include testing dependencies here for code autocompletion
+- hspec-expectations
+- hspec-megaparsec
+- hashable
+- hspec
 
 library:
   source-dirs: .
@@ -58,6 +65,7 @@ tests:
     dependencies:
     - bondlib
     - hspec-megaparsec
+    - hspec-expectations
     - hashable
     - hspec-discover
     - hspec

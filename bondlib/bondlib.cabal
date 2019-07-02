@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 810a5facce1a5eab36b7b6137ff00b2bf9339d5a298dba8625150a1430514cdb
+-- hash: 844130189e2f8658993ed774ebab4b123a28c5672455830c5d628485461d808a
 
 name:           bondlib
 version:        0.7.0.0
@@ -30,7 +30,7 @@ library
       BondCalculus.Examples
       BondCalculus.NumericalMethods
       BondCalculus.ODEExtraction
-      BondCalculus.ParserNew
+      BondCalculus.Parser
       BondCalculus.Plot
       BondCalculus.Processes
       BondCalculus.Simulation
@@ -46,11 +46,15 @@ library
       Chart
     , MissingH
     , QuickCheck
+    , aern2-mp
     , base >=4.7 && <5
     , containers
     , data-accessor
     , data-default-class
     , hashable
+    , hspec
+    , hspec-expectations
+    , hspec-megaparsec
     , lens
     , megaparsec
     , parser-combinators >=1.0.0
@@ -66,8 +70,9 @@ test-suite bondlib-test
   main-is: Spec.hs
   other-modules:
       BondCalculus.ASTSpec
+      BondCalculus.BaseSpec
       BondCalculus.ODEExtractionSpec
-      BondCalculus.ParserNewSpec
+      BondCalculus.ParserSpec
       BondCalculus.ProcessesSpec
       BondCalculus.StochPyExtractionSpec
       BondCalculus.SymbolicSpec
@@ -81,6 +86,7 @@ test-suite bondlib-test
       Chart
     , MissingH
     , QuickCheck
+    , aern2-mp
     , base >=4.7 && <5
     , bondlib
     , containers
@@ -89,6 +95,7 @@ test-suite bondlib-test
     , hashable
     , hspec
     , hspec-discover
+    , hspec-expectations
     , hspec-megaparsec
     , lens
     , megaparsec

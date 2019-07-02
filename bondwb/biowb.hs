@@ -15,12 +15,11 @@
 -- You should have received a copy of the GNU General Public License
 -- along with BondWB.  If not, see <http://www.gnu.org/licenses/>.
 
-import BioCalcLib.Lib
 import BondCalculus.Plot
 import BondCalculus.AST
 import BondCalculus.Processes
 import BondCalculus.Simulation
-import BondCalculus.ParserNew (parseFile)
+import BondCalculus.Parser (parseFile, process)
 import BondCalculus.ODEExtraction (solveODEPython, printODEPython, PrintStyle(..))
 import BondCalculus.StochPyExtraction (generateStochPy, simulateStochPy)
 import BondCalculus.ArgListParser (args)
@@ -29,6 +28,8 @@ import System.Console.Haskeline hiding (defaultPrefs)
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class
 import Text.Megaparsec (parse)
+-- import Text.Megaparsec.Error
+import Control.Exception
 
 import Options.Applicative
 import Data.Semigroup ((<>))
@@ -114,7 +115,7 @@ commands = [
         <*> argument str (metavar "filename")
     , "Save StochPy Stochastic Simulation model." ),
     ( "plotstochpy"
-    , PlotStochPyArgs 
+    , PlotStochPyArgs
         <$> argument str  (metavar "process")
         <*> argument auto (metavar "step")
         <*> argument auto (metavar "n")
@@ -144,17 +145,17 @@ cmd (LoadArgs filename) = do
        Right ds -> do putEnv ds;
                       say "Done. Type \"env\" to view."
 -- Display the current environment
-cmd (ClearArgs) = putEnv emptyBondCalculusModel
+cmd ClearArgs = putEnv emptyBondCalculusModel
 -- Clear the current environment
-cmd (EnvArgs) = undefined
+cmd EnvArgs = undefined
 -- plot ODE trace manually, with max n species
 cmd (PlotArgs name start end tolabs tolrel h hmin hmax n) =
-    applyConcrete name $ \env (network, _, p) -> 
+    applyConcrete name $ \env (network, _, p) ->
         let simulator = simulateMaxSpecies n env network tolabs tolrel h hmin hmax start p
         in plotTrace $ takeWhile ((<=end).fst) simulator
 -- plot ODE trace via Python script extraction
 cmd (PlotPythonArgs name start end n) =
-    applySymbolic name $ \env (network, _, p, inits) -> 
+    applySymbolic name $ \env (network, _, p, inits) ->
         plotTrace $ solveODEPython env network p inits (n, (start, end))
 -- plot ODE trace manually, truncating species with concentration <= n
 cmd (PlotUptoEpsilonArgs name start end tolabs tolrel h hmin hmax epsilon) =
@@ -171,7 +172,7 @@ cmd (SaveStochPyArgs name step filename) =
     applySymbolic name $ \env (network, _, p, inits) ->
         generateStochPy filename env network p step inits >> return ()
 -- Extract ODEs
-cmd (ODEsPrettyArgs name) = 
+cmd (ODEsPrettyArgs name) =
     applySymbolic name $ \env (network, _, p, _) ->
         putStrLn $ printODEPython env network p Pretty
 -- Extract LaTeX formatted ODEs
@@ -191,13 +192,13 @@ main = do putStrLn welcome;
                             Nothing -> return ()
                             Just "" -> loop
                             Just "quit" -> return ()
-                            Just i -> do 
+                            Just i -> do
                                 x <- doCommandParse i
-                                mapM cmd x
+                                mapM_ cmd x
                                 loop
 
 doCommandParse :: String -> Environment (Maybe Command)
-doCommandParse cmdln = case parse args "" cmdln of 
+doCommandParse cmdln = case parse args "" cmdln of
     Left err -> do
         say $ "Arg parse error: " ++ show err
         return Nothing
@@ -242,18 +243,43 @@ getFile = lift . lift . readFile
 putFile :: FilePath -> String -> Environment ()
 putFile f s = lift $ lift $ writeFile f s
 
+applySymbolicName :: String -> (Env -> SymbolicDef -> IO()) -> Environment ()
+applySymbolicName = applyToEnvName symbolifyModel
+
+applyConcreteName :: String -> (Env -> ConcreteDef -> IO()) -> Environment ()
+applyConcreteName = applyToEnvName concretifyModel
+
 applySymbolic :: String -> (Env -> SymbolicDef -> IO()) -> Environment ()
-applySymbolic = applyToEnv symbolifyModel
+applySymbolic = applyToEnvProcess symbolifyModel symbolifyProcess
 
 applyConcrete :: String -> (Env -> ConcreteDef -> IO()) -> Environment ()
-applyConcrete = applyToEnv concretifyModel
+applyConcrete = applyToEnvProcess concretifyModel concretifyProcess
 
-applyToEnv :: (BondCalculusModel -> Either String (Env, M.Map String b)) -> String -> (Env -> b -> IO()) -> Environment()
-applyToEnv g name f = do
+applyToEnvName :: (BondCalculusModel -> Either String (Env, M.Map String b))
+               -> String
+               -> (Env -> b -> IO())
+               -> Environment()
+applyToEnvName g name f = do
     abstractModel <- getEnv
     case g abstractModel of
-        Right (env, defs) -> 
+        Right (env, defs) ->
             case M.lookup name defs of
                 Just def -> lift $ lift $ f env def
                 Nothing -> say $ "Process " ++ name ++ " not defined!"
+        Left err -> say $ "Error in model: " ++ err
+
+applyToEnvProcess :: (BondCalculusModel -> Either String (Env, M.Map String a)) -- transform the model (concretify/symbolify)
+                  -> (BondCalculusModel -> Env -> AbstractProcess -> Either String b) -- transform a single process
+                  -> String -- textual representaiton of process
+                  -> (Env -> b -> IO()) -- Action to apply
+                  -> Environment()
+applyToEnvProcess g h procStr f = do
+    abstractModel <- getEnv
+    case g abstractModel of
+        Right (env, defs) -> 
+            case parse process "" procStr of
+                Right proc -> case h abstractModel env proc of
+                    Right proc' -> lift $ lift $ f env proc'
+                    Left err'' -> say $ "Error in process: " ++ show err''
+                Left err' -> say $ "Process parse error: " ++ displayException err'
         Left err -> say $ "Error in model: " ++ err

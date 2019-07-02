@@ -16,7 +16,7 @@ import Data.Bifunctor
 -- import Control.Applicative
 
 import Data.Void
-import BondCalculus.ParserNew (Parser)
+import BondCalculus.Parser (Parser)
 
 -- We need to define a Parser type synonym in megaparsec >= 6.0 
 -- type Parser = Parsec Void String

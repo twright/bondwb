@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module BondCalculus.ASTSpec (spec) where
 
 import Test.Hspec
@@ -293,3 +294,32 @@ spec = do
       normalForm(mkAbs 0 (mkSum [(Unlocated "x", mkAbs 1 $ Def "E" [] [0, 1])]))
       `shouldBe`
       mkAbs 1 (mkSum [(Unlocated "x", mkAbs 0 $ Def "E" [] [1, 0])])
+  describe "AffinityNetworkSpec" $ do
+    it "eq test basic apply" $
+      AffinityNetworkAppl "S" [1, 2] `shouldBe` AffinityNetworkAppl "S" [1, 2]
+    it "not eq test basic apply, different def" $
+      AffinityNetworkAppl "S" [1, 2] `shouldNotBe` AffinityNetworkAppl "R" [1, 2]
+    it "not eq test basic apply, different rate" $
+      AffinityNetworkAppl "S" [1, 2] `shouldNotBe` AffinityNetworkAppl "S" [1, 3]
+    it "should detect compo equal, commutivity" $
+      AffinityNetworkAppl "S" [1, 2] <> AffinityNetworkAppl "R" [3]
+      `shouldBe`
+      AffinityNetworkAppl "R" [3] <> AffinityNetworkAppl "S" [1, 2]
+    xit "eq compo identity" $
+      property $ \(x :: AffinityNetworkSpec) ->
+        x <> mempty `shouldBe` x 
+    xit "eq compo commutativity" $
+      property $ \(x :: AffinityNetworkSpec) (y :: AffinityNetworkSpec) ->
+        x <> y `shouldBe` y <> x 
+    xit "eq compo associativity" $
+      property $ \(x :: AffinityNetworkSpec) (y :: AffinityNetworkSpec) (z :: AffinityNetworkSpec) ->
+        x <> (y <> z) `shouldBe` (x <> y) <> z
+  describe "AbstractProcess" $
+    describe "normalizeProcess" $
+        it "can put a process composition into normal form" $
+          normalizeProc (ProcessAppl "Pi"
+                      <> mkProcess mempty [(1.0 , enzymeE)]
+                      <> ProcessAppl "Psi"
+                      <> mkProcess mempty [(2.0, enzymeS)])
+          `shouldBe`
+          (["Pi", "Psi"], mempty, [(2.0, enzymeS), (1.0 , enzymeE)])

@@ -9,9 +9,15 @@ import BondCalculus.Processes
 -- import Data.Map (Map)
 import qualified Data.Map as M
 import BondCalculus.Vector
-import BondCalculus.Symbolic
-
 import BondCalculus.Examples
+
+import BondCalculus.Symbolic hiding (var, val)
+import qualified BondCalculus.Symbolic as Symb
+
+var :: String -> SymbolicExpr
+var = Symb.var
+val :: Double -> SymbolicExpr
+val = Symb.val
 
 spec :: SpecWith ()
 spec = do

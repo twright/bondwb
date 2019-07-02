@@ -5,11 +5,20 @@ module BondCalculus.VectorSpec (spec) where
 import Prelude hiding ((*>), (<>))
 
 import Test.Hspec
+import Test.Hspec.Expectations
 import Test.QuickCheck
 import BondCalculus.Vector
-import BondCalculus.Symbolic
+-- import BondCalculus.Symbolic
 import Test.QuickCheck.Arbitrary
-import BondCalculus.Base ()
+import BondCalculus.Base
+
+import BondCalculus.Symbolic hiding (var, val)
+import qualified BondCalculus.Symbolic as Symb
+
+var :: String -> SymbolicExpr
+var = Symb.var
+val :: Double -> SymbolicExpr
+val = Symb.val
 
 instance Arbitrary (Vect Integer Double) where
   arbitrary = sized genVect
@@ -73,3 +82,15 @@ spec = do
           f _ = error "partially defined"
       in multilinear f [vect 6, 3 |> vect 1 +> 4 |> vect 2]
         `shouldBe` 3 |> vect (7 :* 2) +> 4 |> vect (7 :* 3)
+  describe "Interval vectors" $ do
+    it "should be able to add" $
+      let a = fromEndpoints 1 2
+          b = fromEndpoints 3 4
+          c = fromEndpoints (-3) 2
+          d = fromEndpoints 4 6
+          e = fromEndpoints 0 6
+          x = (a |> vect 1 +> b |> vect 2) +> (b |> vect 1 +> c |> vect 2) :: Vect Integer Interval
+          y = d |> vect 1 +> e |> vect 2
+      in (x, y)
+         `shouldSatisfy`
+         (\(x, y) -> fmap inf x == fmap inf y && fmap sup y == fmap sup y)

@@ -5,7 +5,8 @@ module BondCalculus.Processes (Process(..), Affinity(..), ProcessVect,
   SymbolicDef, ConcreteModel, ConcreteDef, P, D, P', D',
   concretifyModel, partial, conc, direct, react, hide, networkSites,
   actions, dPdt, partial', dPdt', dPdt'', tracesGivenNetwork, speciesVar,
-  concretifyAffSpec, symbolifyModel, embed, concretify, actions') where
+  concretifyAffSpec, symbolifyModel, embed, concretify, actions',
+  symbolifyProcess, concretifyProcess) where
 
 import Prelude hiding ((*>), (<*))
 import BondCalculus.AST
@@ -14,10 +15,13 @@ import BondCalculus.Transitions
 import qualified Data.List as L
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
-import BondCalculus.Vector
+import BondCalculus.Vector hiding ((<>))
 import BondCalculus.Symbolic (SymbolicExpr, var)
 import Data.Maybe
+import Data.Either
+import Data.Either.Utils
 import Data.Bifunctor
+import Control.Monad
 -- import Debug.Trace
 import GHC.Exts (sortWith)
 trace :: String -> a -> a
@@ -140,8 +144,9 @@ tracesGivenNetwork network = trace ("prefLists = " ++ show prefLists) (transFilt
     validPref :: PrefixFilter
     validPref x = trace ("testing potential " ++ show x) (L.sort x `elem` prefListSubsets)
 
-concretifyAffSpec :: BondCalculusModel -> AffinityNetworkSpec
-                              -> Either String ConcreteAffinityNetwork
+concretifyAffSpec :: BondCalculusModel
+                  -> AffinityNetworkSpec
+                  -> Either String ConcreteAffinityNetwork
 concretifyAffSpec model@(Defs _ a _ _) (AffinityNetworkAppl name rates)
   = case M.lookup name a of
       Just (AffinityNetworkDef params body) ->
@@ -150,20 +155,28 @@ concretifyAffSpec model@(Defs _ a _ _) (AffinityNetworkAppl name rates)
         else Left $ "Affinity network " ++ name ++ " applied to the "
                      ++ "wrong number of arguments."
       Nothing -> Left $ "Affinity network " ++ name ++ " does not exist."
-    where networkFromList :: [Either String ConcreteAffinity]
-                             -> Either String ConcreteAffinityNetwork
-          networkFromList affsOrErrors = case errors of
-                                           []    -> Right affs
-                                           (e:_) -> Left e
-            where errors = [e | Left e <- affsOrErrors]
-                  affs   = [aff | Right aff <- affsOrErrors]
+concretifyAffSpec model (AffinityNetworkSpec network) =
+  networkFromList [applyAff model aff [] [] | aff <- network]
+concretifyAffSpec model (AffinityNetworkCompo x y) =
+  liftM2 (++) (concretifyAffSpec model x) (concretifyAffSpec model y)
+
+networkFromList :: [Either String ConcreteAffinity]
+                -> Either String ConcreteAffinityNetwork
+networkFromList affsOrErrors = case errors of
+                                []    -> Right affs
+                                (e:_) -> Left e
+  where errors = [e | Left e <- affsOrErrors]
+        affs   = [aff | Right aff <- affsOrErrors]
 
 applyAff :: BondCalculusModel -> Affinity -> [String] -> [Rate] -> Either String ConcreteAffinity
 applyAff model (Affinity rls sites) params rates
   = second (`ConcreteAffinity` map L.sort sites) $ applyRateLawSpec model rls params rates
 
-applyRateLawSpec :: BondCalculusModel -> RateLawSpec -> [String] -> [Rate]
-                             -> Either String RateLaw
+applyRateLawSpec :: BondCalculusModel
+                 -> RateLawSpec
+                 -> [String]
+                 -> [Rate]
+                 -> Either String RateLaw
 applyRateLawSpec (Defs _ _ m _) (RateLawAppl name params) affParams rates
   = case M.lookup name m of
       Nothing -> Left $ "Kinetic law " ++ name ++ " does not exist."
@@ -176,36 +189,48 @@ applyRateLawSpec (Defs _ _ m _) (RateLawAppl name params) affParams rates
           applyRate (RateLawParamVar n) = L.lookup n vals
           args = map applyRate params
 
-concretifyProcess :: BondCalculusModel -> Env -> AbstractProcess
-                     -> Either String (ConcreteAffinityNetwork, Species -> MTS, P)
-concretifyProcess model env (Process affSpec concSpecs)
-  = case networkOrError of
-      Right network -> Right (network, tracesGivenNetwork network env, p)
-      Left err    -> Left err
-  where p              = fromList [(c, normalForm s) | (c,s) <- concSpecs]
-        networkOrError = concretifyAffSpec model affSpec
+combineAndLookupProcess :: BondCalculusModel
+                        -> AbstractProcess
+                        -> Either String (AffinityNetworkSpec, [(Conc, Species)])
+combineAndLookupProcess model@(Defs _ _ _ m) (ProcessAppl x) = do
+  p <- maybeToEither ("Process \"" ++ x ++ "\" not defined!") (M.lookup x m)
+  combineAndLookupProcess model p
+combineAndLookupProcess model (ProcessCompo p q) = liftM2 (<>)
+  (combineAndLookupProcess model p) (combineAndLookupProcess model q)
+combineAndLookupProcess _ (Process affSpec concSpecs) = return (affSpec, concSpecs)
 
-symbolifyProcess :: BondCalculusModel -> Env -> AbstractProcess -> Either String (ConcreteAffinityNetwork, Species -> MTS, P', [Double])
-symbolifyProcess model env (Process affSpec concSpecs)
-  = case networkOrError of
-      Right network -> Right (network, tr, p, inits)
-        where
-          p0 = fromList concSpecs
-          reach = closure tr network (support p0)
-          concSpecs' = [(getInit i, i) | (NonZero,i) <- toList reach]
-          p     = fromList $ map (\(_,x,y) -> (x,y)) ress
-          tr = tracesGivenNetwork network env
-          ress  = sortWith (\(_,_,x) -> x)
-                           [let nf = normalForm x
-                                name = var (pretty nf)
-                            in (x0, name, nf) | (x0,x) <- concSpecs']
-          inits = map (\(x,_,_) -> x) ress
-      Left err    -> Left err
+concretifyProcess :: BondCalculusModel
+                  -> Env
+                  -> AbstractProcess
+                  -> Either String ConcreteDef
+concretifyProcess model env proc = do
+  (affSpec, concSpecs) <- combineAndLookupProcess model proc
+  network <- concretifyAffSpec model affSpec
+  return (network, tracesGivenNetwork network env,
+          fromList [(c, normalForm s) | (c,s) <- concSpecs])
+
+symbolifyProcess :: BondCalculusModel
+                 -> Env
+                 -> AbstractProcess
+                 -> Either String SymbolicDef
+symbolifyProcess model env proc = do
+  (affSpec, concSpecs) <- combineAndLookupProcess model proc
+  network <- concretifyAffSpec model affSpec
   -- This code takes some care to keep the lists/vector bases in a consistient
-  -- order, matching the ordering on basis elements (prime species)
-  where initmap = map (\(x,y) -> (y,x)) concSpecs
-        getInit i = fromMaybe 0.0 (lookup i initmap)
-        networkOrError = concretifyAffSpec model affSpec
+  -- order, matching the ordering on basis elements (prime species),
+  -- but is presently, sadly, rather unreadable
+  let p0 = fromList concSpecs
+      getInit i = sum [c | (c, s) <- concSpecs, s == i]
+      reach = closure tr network (support p0)
+      concSpecs' = [(getInit i, i) | (x, i) <- toList reach, x == NonZero]
+      p     = fromList $ map (\(_,x,y) -> (x,y)) ress
+      tr = tracesGivenNetwork network env
+      ress = sortWith (\(_,_,x) -> x)
+                      [let nf = normalForm x
+                           name = var (pretty nf)
+                       in (x0, name, nf) | (x0,x) <- concSpecs']
+      inits = map (\(x,_,_) -> x) ress
+  return (network, tr, p, inits)
 
 symbolifyModel :: BondCalculusModel -> Either String SymbolicModel
 symbolifyModel model@(Defs env _ _ p)

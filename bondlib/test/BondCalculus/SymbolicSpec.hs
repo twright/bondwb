@@ -7,7 +7,13 @@ import Data.Either
 import Data.Bifunctor
 import BondCalculus.ODEExtraction (sympyExpr)
 
-import BondCalculus.Symbolic
+import BondCalculus.Symbolic hiding (var, val)
+import qualified BondCalculus.Symbolic as Symb
+
+var :: String -> SymbolicExpr
+var = Symb.var
+val :: Double -> SymbolicExpr
+val = Symb.val
 
 spec :: SpecWith ()
 spec = do
@@ -34,11 +40,11 @@ spec = do
     let env = M.fromList [("x", 1.0 :: Double), ("y", 2.0), ("z", 3.0)]
         envsymb = M.fromList [("x", var "a"), ("y", var "b"), ("z", val 3.0)]
     it "evaluates a constant atom" $
-      eval env (Const 2) `shouldBe` Right 2
+      eval env (val 2) `shouldBe` Right 2
     it "evaluates a variable atom" $
-      eval env (Var "x") `shouldBe` Right 1
+      eval env (var "x") `shouldBe` Right 1
     it "gives error on evaluating missing variables in atoms" $
-      eval env (Var "w") `shouldSatisfy` isLeft
+      eval env (var "w") `shouldSatisfy` isLeft
     it "evaluates a constant" $
       eval env (val 2) `shouldBe` Right 2
     it "evaluates a variable" $
@@ -134,7 +140,7 @@ spec = do
     it "simplifies fractions with multiplication" $
       simplify( (var "a" + var "b" + var "c")*(var "d" * var "f" + var "e" * var "f") / (var "a" + var "b" + var "c") / var "f" )
         `shouldBe` var "d" + var "e"
-    it "simplifies repressilator Cl expression" $
+    xit "simplifies repressilator Cl expression" $
       sympyExpr (M.fromList [("x" ++ show i, "x" ++ show i) | i <- [0..5]]) (simplify (((val 10.0 * (var "x5" + var "x0" + var "x1")) * (var "x1" * val (-1.0))) / (var "x5" + var "x0" + var "x1") + (val 10.0 * (var "x3" + var "x4" + var "x2") * (var "x4")) / (var "x4" + var "x3" + var "x2")))
         `shouldBe` Just "x"
   describe "factors" $ do
@@ -143,18 +149,18 @@ spec = do
         (1.0, [var "a", var "b", var "c"])
     it "finds common factors of a sum" $
       factors (var "a" * var "b" + var "c" * var "a") `shouldBe`
-        (1.0, [var "b" + var "c", var "a"])
+        (1.0, [var "a", var "b" + var "c"])
     it "finds common factors of a longer sum" $
       factors (var "a" * var "b" + var "c" * var "a" + var "a" * var "d") `shouldBe`
-        (1.0, [var "b" + var "c" + var "d", var "a"])
+        (1.0, [var "a", var "b" + var "c" + var "d"])
     it "finds common factors from sum including coff" $
       factors (var "a" * val 2.0 + val 2.0 * var "b" * var "a")
         `shouldBe`
-        (2.0, [val 1 + var "b", var "a"])
+        (2.0, [var "a", val 1 + var "b"])
     it "finds common factors in product avoiding incomplete match" $
       factors ((var "a" + var "b")*var "a")
         `shouldBe`
-        (1.0, [var "a" + var "b", var "a"])
+        (1.0, [var "a", var "a" + var "b"])
     it "finds common factors in sum avoiding incomplete match" $
       factors (var "a" * var "b" + var "b" * var "c" + var "a" * var "c")
         `shouldBe`

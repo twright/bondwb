@@ -1,5 +1,6 @@
-module BondCalculus.ParserNew where
+module BondCalculus.Parser where
 
+import Data.Foldable
 import Text.Megaparsec
 import Text.Megaparsec.Char
 -- import Text.Megaparsec.Expr
@@ -225,13 +226,38 @@ affinityNetworkAppl = do
   let rates' = fromMaybe [] rates
   return $ AffinityNetworkAppl name rates'
 
-process :: Parser AbstractProcess
-process = do
+processLiteral :: Parser AbstractProcess
+processLiteral = do
   components <- processComponent `sepBy` symbol "||"
   _ <- symbol "with"
   _ <- symbol "network"
   network <- affinityNetworkAppl
   return $ Process network components
+
+-- process :: Parser AbstractProcess
+-- process = fold <$> processComponent `sepBy` symbol "||"
+
+process :: Parser AbstractProcess
+process = fold <$> processCompositionList
+
+processCompositionList :: Parser [AbstractProcess]
+processCompositionList = (:[]) <$> processLiteral
+                     <|> proc `sepBy1'` symbol "||"
+    where proc :: Parser AbstractProcess
+          proc = wrappedProcess
+             <|> namedProcess
+             <|> mkProcess mempty . (:[]) <$> processComponent
+             <|> (\x -> mkProcess x []) <$> affinityNetworkAppl
+          wrappedProcess :: Parser AbstractProcess
+          wrappedProcess = do
+              _ <- symbol "(" 
+              p <- processLiteral
+              _ <- symbol ")"
+              return p
+          namedProcess :: Parser AbstractProcess
+          namedProcess = ProcessAppl <$> definitionName
+
+
 
 -- Symbolic expressions
 

@@ -40,7 +40,6 @@ module CPi.Lib
      compose,
      prettyNames,
      aff,
-     nf,
      sites,
      sub,
      netUnion,

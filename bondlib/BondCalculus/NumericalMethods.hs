@@ -125,7 +125,6 @@ adamsMoulton3 f reduceVect tolerance maxFPSteps h !t0 !p0 !p1 !p2
 
 adaptiveAM3 :: (Vector Double v) => (v -> v) -> (v -> v) -> Double -> Double -> Double -> Double -> Double -> Double -> v -> v -> v -> [(Double, v)]
 adaptiveAM3 f reduceVect tolabs tolrel hmin hmax h !t0 !p0 !p1 !p2
-  -- | h < hmin = error $ "step size below minimum limit! with:\nq  = " ++ show q ++ "\nw  = " ++ show w ++ "\nw' = " ++ show w'
   -- if the difference between the predictor and corrector is too great
   -- we need to lower h and recompute
   -- it is harder to see how to adaptively increase h
@@ -299,12 +298,7 @@ startNordseik g reduceVect tolabs tolrel maxFPSteps maxStartSteps hmin hmax h !x
 correctNordseikFP :: (Vector Double v) => (v -> v) -> Double -> Double -> Int -> Double -> (v,v,v,v,v,v) -> (v,v,v,v,v,v) -> Maybe (v,v,v,v,v,v)
 correctNordseikFP f tolabs tolrel maxSteps h u@(yx,fx,ax,bx,cx,dx) v@(yxh, fxh, axh, bxh, cxh, dxh)
   | maxSteps < 1 = Nothing
-  | err < tolabs -- + tolrel*norm yxh
-  -- |   && norm (fxh +> (-1)|>yxh') < tolabs + tolrel*norm yxh
-    -- && norm (a +> (-1)|>a') < tolabs + tolrel*norm a
-    -- && norm (b +> (-1)|>b') < tolabs + tolrel*norm b
-    -- && norm (c +> (-1)|>c') < tolabs + tolrel*norm c
-    -- && norm (d +> (-1)|>d') < tolabs + tolrel*norm d
+  | err < tolabs
     = trace ("err = " ++ show err ++ "\nyxh (" ++ show maxSteps ++ ") = " ++ show (components yxh) ++ "\nfxh = " ++ show (components fxh) ++ "\nfp = " ++ show (components fp)) $ Just v'
   | otherwise = trace ("err = " ++ show err) $ correctNordseikFP f tolabs tolrel (maxSteps-1) h u $! v'
   where

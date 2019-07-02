@@ -1,6 +1,13 @@
 {-# LANGUAGE ExistentialQuantification, RankNTypes, TypeSynonymInstances, FlexibleInstances #-}
 module BondCalculus.Base
-  (Expression(..), Pretty(..), Nullable(..), DoubleExpression(..), BoolConc(..)) where
+  (Expression(..), Pretty(..), Nullable(..), DoubleExpression(..), BoolConc(..), Interval(..),
+   fromEndpoints, endpoints, inf, sup) where
+
+import Text.Printf
+import AERN2.MP ()
+import AERN2.MP.Precision
+import qualified AERN2.MP.Ball as MPB
+import qualified AERN2.MP.Float as MPF
 
 -- Pretty printing
 class (Show a) => Pretty a where
@@ -70,3 +77,61 @@ class Nullable a where
 
 instance Nullable Double where
   isnull = (<1e-16).abs
+
+-- AERN2 based intervals -- MPBall
+newtype Interval = Interval MPB.MPBall deriving (Ord)
+
+fromEndpoints :: Rational -> Rational -> Interval
+fromEndpoints l u = Interval $ MPB.fromEndpoints l' u'
+    where l' = MPF.fromRationalUp defaultPrecision l
+          u' = MPF.fromRationalDown defaultPrecision u
+
+-- NOTE: toDouble rounds upwards so this is conservative
+endpoints :: Interval -> (Double, Double)
+endpoints (Interval x) = (MPF.toDoubleDown l, MPF.toDoubleUp u)
+    where (l, u) = MPB.endpoints x :: (MPF.MPFloat, MPF.MPFloat)
+
+inf :: Interval -> Double
+inf = fst . endpoints
+
+sup :: Interval -> Double
+sup = snd . endpoints
+
+instance Eq Interval where
+    x == y = endpoints x == endpoints y
+
+instance Show Interval where
+    show x = printf "[%.6f .. %.6f]" l u
+        where (l, u) = endpoints x
+
+instance Expression Interval where
+instance DoubleExpression Interval where
+    fromFloat = fromRational . toRational
+
+instance Num Interval where
+  Interval x + Interval y = Interval (x + y)
+  Interval x * Interval y = Interval (x * y)
+  abs (Interval x) = Interval (abs x)
+  fromInteger x = Interval (fromInteger x)
+  negate (Interval x) = Interval (negate x)
+  signum (Interval x) = Interval (signum x)
+instance Fractional Interval where
+  Interval x / Interval y = Interval x / Interval y
+  fromRational x = fromEndpoints x x
+instance Floating Interval where
+  pi = Interval pi
+  sin (Interval x) = Interval (sin x)
+  cos (Interval x) = Interval (cos x)
+  tan (Interval x) = Interval (tan x)
+  exp (Interval x) = Interval (exp x)
+  asin (Interval x) = error "not implemented"
+  acos (Interval x) = error "not implemented"
+  atan (Interval x) = error "not implemented"
+  sinh (Interval x) = error "not implemented"
+  cosh (Interval x) = error "not implemented"
+  asinh (Interval x) = error "not implemented"
+  acosh (Interval x) = error "not implemented"
+  atanh (Interval x) = error "not implemented"
+  log (Interval x) = Interval (log x)
+instance Nullable Interval where
+  isnull = (== fromRational 0) . abs

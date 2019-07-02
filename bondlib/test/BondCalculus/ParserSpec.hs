@@ -1,11 +1,11 @@
-module BondCalculus.ParserNewSpec (spec) where
+module BondCalculus.ParserSpec (spec) where
 
 import Test.Hspec
 import Test.Hspec.Megaparsec
 import Text.Megaparsec
 import Test.QuickCheck
 import BondCalculus.AST
-import BondCalculus.ParserNew
+import BondCalculus.Parser
 import Data.Hashable (hash)
 import BondCalculus.Examples (rabbitSource, rabbitModel)
 import BondCalculus.Symbolic
