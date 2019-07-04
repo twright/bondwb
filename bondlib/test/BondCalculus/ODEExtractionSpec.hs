@@ -7,17 +7,20 @@ import Test.Hspec
 import qualified Data.Map as M
 import BondCalculus.ODEExtraction
 import BondCalculus.Symbolic
+import BondCalculus.Base
 import BondCalculus.Vector
-import BondCalculus.Examples (rabbitModel)
+import qualified BondCalculus.Examples as EX
 import BondCalculus.AST
-import BondCalculus.Processes (concretifyAffSpec)
+import BondCalculus.Processes (concretifyAffSpec, P')
 import Debug.Trace
 import Data.Either
+
+rabbitModel = EX.rabbitModel :: BondCalculusModel Double
 
 ode = IVP ( ["R", "F"]
           , [ var "R" - var "F" * var "R"
             , var "F" * var "R" - var "F"]
-          , [2, 1])
+          , [2 :: Double, 1])
 
 spec :: SpecWith ()
 spec = do
@@ -53,6 +56,7 @@ spec = do
           Right network = concretifyAffSpec
                           rabbitModel
                           (AffinityNetworkAppl "MassActionRabbits" [])
+          p :: P' Double
           p = var "Rabbit" |> vect (Def "Rabbit" [] []) +>
               var "Fox" |> vect (Def "Fox" [] [])
       in extractIVP env network p [10.0, 1.0]
@@ -92,3 +96,38 @@ spec = do
       in trace (show ivp) (sympyODE ivp (5, (0.0, 1.0)))
          `shouldSatisfy`
          (\x -> trace (show x) (isRight x))
+  describe "sageExprAbst" $ do
+    it "translates including variables" $
+      sageExprAbst' (M.fromList [("x", "y"), ("y","z")])
+                   ((var "x" + var "y") * var "x" :: SymbolicExpr)
+        `shouldBe`
+        Just (M.empty, "(y + z) * (y)")
+    it "handles variable not found" $
+      sageExprAbst' (M.fromList [("x", "y"), ("y","z")])
+                   ((var "x" + var "y") * var "w" :: SymbolicExpr)
+        `shouldBe`
+        Nothing
+    it "translates absolute value" $
+      sageExprAbst' (M.fromList [("x", "a"), ("y", "b")])
+                    (var "x" * abs(var "y") :: SymbolicExpr)
+        `shouldBe` Just (M.empty, "(a) * (b)")
+    it "translates double" $
+        sageExprAbst' (M.fromList [("x", "x")]) (val 2.0 * var "x" :: SymbolicExpr)
+        `shouldBe`
+        Just (M.empty, "(2.0) * (x)")
+    it "translates singleton interval" $
+        sageExprAbst' (M.fromList [("x", "x")])
+                      (valf 2.0 * var "x" :: Expr (Atom Interval))
+        `shouldBe`
+        Just (M.empty, "(2.0) * (x)")
+    it "translates interval" $
+        sageExprAbst' (M.fromList [("x", "x")])
+                      (val (fromEndpoints 2.0 3.0) * var "x" :: Expr (Atom Interval))
+        `shouldBe`
+        Just ( M.fromList [("a0", "RIF(2.00000000000000000000, 3.00000000000000000000)")]
+             , "(a0) * (x)" )
+  describe "sageODE" $ do
+    it "translates a simple ODE to python sage code" $
+      sageODE ode
+      `shouldBe`
+      Right ""

@@ -47,7 +47,7 @@ type ConcVect = Vect String Conc
 newtype ReactionSystem = ReactionSystem ([String], [(SymbolicExpr, ConcVect, ConcVect)], [Double])
   deriving (Show, Eq, Ord)
 
-extractReactionSystem :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> ReactionSystem
+extractReactionSystem :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> [Double] -> ReactionSystem
 extractReactionSystem env network p inits = ReactionSystem (vars, transitions, inits)
   where tr = tracesGivenNetwork network env
         vars = map (pretty.simplify.snd) (toList p)
@@ -56,7 +56,7 @@ extractReactionSystem env network p inits = ReactionSystem (vars, transitions, i
                       | (coeff, u :* v) <- toList reacts]
         toConcVect  = fromList . map (second (pretty.simplify)) . toList
 
-fromIVPToStochPyModel :: IVP -> Either String String
+fromIVPToStochPyModel :: IVP Double -> Either String String
 fromIVPToStochPyModel ivp =
   if any isNothing exprs
   then Left "An ODE equation has an unbound variable"
@@ -124,7 +124,7 @@ stochPyModel (ReactionSystem (vars, transitions, inits)) h =
       initlines = [y ++ " = " ++ show (y0/h) | (y,y0) <- zip species inits]
 
 
-generateStochPy :: String -> AST.Env -> ConcreteAffinityNetwork -> P' -> Double -> [Double] -> IO String
+generateStochPy :: String -> AST.Env -> ConcreteAffinityNetwork -> P' Double -> Double -> [Double] -> IO String
 generateStochPy filename env network p h inits = case stochPyModel (extractReactionSystem env network p inits) h of
   Right script -> do
     -- putStrLn $ "Python script:\n\n" ++ script
@@ -132,7 +132,7 @@ generateStochPy filename env network p h inits = case stochPyModel (extractReact
     return script
   Left _ -> undefined
 
-simulateStochPy :: String -> Int -> AST.Env -> ConcreteAffinityNetwork -> P' -> Double -> [Double] -> IO Trace
+simulateStochPy :: String -> Int -> AST.Env -> ConcreteAffinityNetwork -> P' Double -> Double -> [Double] -> IO Trace
 simulateStochPy method steps env network p h inits = case stochPyModel (extractReactionSystem env network p inits) h of
   Right stochpy -> do
     -- putStrLn $ "Python script:\n\n" ++ script

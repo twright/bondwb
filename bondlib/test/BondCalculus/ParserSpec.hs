@@ -7,15 +7,22 @@ import Test.QuickCheck
 import BondCalculus.AST
 import BondCalculus.Parser
 import Data.Hashable (hash)
-import BondCalculus.Examples (rabbitSource, rabbitModel)
+import qualified BondCalculus.Examples as EX
+import BondCalculus.Examples (rabbitSource)
 import BondCalculus.Symbolic
 
-a `shouldParseNf` b = a `parseSatisfies` (\p -> normalForm p == normalForm b)
+-- a `shouldParseNf` b = a `parseSatisfies` (\p -> normalForm p == normalForm b)
+-- shouldParseModel :: Parser (BondCalculusModel Double) -> BondCalculusModel a
+
 a `shouldParseModel` b = a
                          `parseSatisfies`
                          (\m -> speciesDefs m == speciesDefs b
                              && affinityNetworkDefs m == affinityNetworkDefs b
                              && processDefs m == processDefs b)
+a `shouldParseSym` b = a `shouldParse` (b :: SymbolicExpr)
+
+rabbitModel :: BondCalculusModel Double
+rabbitModel = EX.rabbitModel
 
 spec :: SpecWith ()
 spec = do
@@ -210,15 +217,15 @@ spec = do
                 [ (1.0, Def "Strand" [] [])
                 , (0.1, Def "TranscriptionFactor" ["cobindA", "counbindA"] [])
                 , (0.1, Def "TranscriptionFactor" ["cobindB", "counbindB"] [])
-                , (0.0, Def "Product" [] []) ] )
+                , (0.0, Def "Product" [] []) ] :: AbstractProcess Double )
   describe "model" $ do
     it "should parse the mass action rabbit growth model" $
       parse model "" rabbitSource `shouldParseModel` rabbitModel
   describe "number" $ do
     it "parses floats" $
-      parse number "" "2.1" `shouldParse` 2.1
+      parse number "" "2.1" `shouldParse` (2.1 :: Double)
     it "parses integers" $
-      parse number "" "2" `shouldParse` 2.0
+      parse number "" "2" `shouldParse` (2.0 :: Double)
   describe "symbolic" $ do
     describe "symbIdentifier" $ do
       it "parses lowercase identifiers" $
@@ -227,35 +234,35 @@ spec = do
         parse symbIdentifier "" "L" `shouldParse` "L"
     describe "symbTerm" $ do
       it "parses vars" $
-        parse symbTerm "" "x" `shouldParse` var "x"
+        parse symbTerm "" "x" `shouldParseSym` var "x"
       it "parses decimal vals" $
-        parse symbTerm "" "2.1" `shouldParse` val 2.1
+        parse symbTerm "" "2.1" `shouldParseSym` val 2.1
       it "parses integral vals" $
-        parse symbTerm "" "2" `shouldParse` val 2
+        parse symbTerm "" "2" `shouldParseSym` val 2
       it "parses sines" $
-        parse symbTerm "" "sin x" `shouldParse` sin (var "x")
+        parse symbTerm "" "sin x" `shouldParseSym` sin (var "x")
       it "parses cosines" $
-        parse symbTerm "" "cos x" `shouldParse` cos (var "x")
+        parse symbTerm "" "cos x" `shouldParseSym` cos (var "x")
       it "parses tangents" $
-        parse symbTerm "" "tan x" `shouldParse` tan (var "x")
+        parse symbTerm "" "tan x" `shouldParseSym` tan (var "x")
       it "parses exponentials" $
-        parse symbTerm "" "exp x" `shouldParse` exp (var "x")
+        parse symbTerm "" "exp x" `shouldParseSym` exp (var "x")
       it "parses logarithms" $
-        parse symbTerm "" "log x" `shouldParse` log (var "x")
+        parse symbTerm "" "log x" `shouldParseSym` log (var "x")
       it "parses nested expressions" $
         parse symbTerm "" "sin cos tan x"
-          `shouldParse` sin (cos (tan (var "x")))
+          `shouldParseSym` sin (cos (tan (var "x")))
     describe "symbExpr" $ do
       it "parses sums" $
         parse symbExpr "" "sin x + cos y"
-          `shouldParse` (sin (var "x") + cos (var "y"))
+          `shouldParseSym` (sin (var "x") + cos (var "y"))
       it "parses products" $
         parse symbExpr "" "2*x*y"
-          `shouldParse` (val 2 * var "x" * var "y")
+          `shouldParseSym` (val 2 * var "x" * var "y")
       it "parses nested expessions" $
         parse symbExpr "" "2 * cos (x + y) + sin(z * w)"
-          `shouldParse` ((2 * cos (var "x" + var "y"))
+          `shouldParseSym` ((2 * cos (var "x" + var "y"))
                        + sin(var "z" * var "w"))
       it "parses hill equation" $
         parse symbExpr "" "L^n / (k + L^n)"
-          `shouldParse` (var "L"**var "n" / (var "k" + var "L"**var "n"))
+          `shouldParseSym` (var "L"**var "n" / (var "k" + var "L"**var "n"))

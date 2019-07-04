@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts, ConstraintKinds #-}
 module BondCalculus.Examples
   (
   simCH2,
@@ -151,11 +152,11 @@ partialE :: D
 partialE = 2.0 |> vect (Def "E" [] [])
            *> vect (simplify $ mkAbs 0 enzymeEbound) *> vect [Unlocated "e"]
 
-partialS' :: D'
+partialS' :: ExprConstant a => D' a
 partialS' = var "[S]" |> vect (Def "S" [] [])
            *> vect (simplify $ mkAbs 0 enzymeSbound) *> vect [Unlocated "s"]
 
-partialE' :: D'
+partialE' :: ExprConstant a => D' a
 partialE' = var "[E]" |> vect (Def "E" [] [])
            *> vect (simplify $ mkAbs 0 enzymeEbound) *> vect [Unlocated "e"]
 
@@ -179,7 +180,7 @@ partialC = vect (normalForm enzymeC
                                           <|> Def "P" [] []))
                   :* [Unlocated "p"])
 
-partialC' :: D'
+partialC' :: ExprConstant a => D' a
 partialC' = var "[C]" |> (vect (normalForm enzymeC
                 :* normalForm (mkAbsBase (Def "E" [] [] <|> Def "S" [] []))
                 :* [Unlocated "r", Unlocated "x"]) +>
@@ -199,13 +200,13 @@ partialC' = var "[C]" |> (vect (normalForm enzymeC
                                           <|> Def "P" [] []))
                   :* [Unlocated "p"]))
 
-enzymeProc :: P'
+enzymeProc :: ExprConstant a => P' a
 enzymeProc = var "[S]" |> vect (Def "S" [] [])
           +> var "[E]" |> vect (Def "E" [] [])
           +> var "[C]" |> vect enzymeC
           +> var "[P]" |> vect (Def "P" [] [])
 
-partialEnzymeMM :: D'
+partialEnzymeMM :: ExprConstant a => D' a
 partialEnzymeMM
   =  var "[S]" |> vect (Def "S" [] [] :* mkAbsBase (Def "P" [] [])
                                       :* [Unlocated "s"])
@@ -237,7 +238,7 @@ rabbitSource =
   ++ "process FoxesAndRabbits = [10.0] Rabbit || [1.0] Fox\n"
   ++ "                          with network MassActionRabbits;"
 
-rabbitModel :: BondCalculusModel
+rabbitModel :: ExprConstant a => BondCalculusModel a
 rabbitModel = combineModels emptyBondCalculusModel
   Defs { speciesDefs = M.fromList [
             ("Rabbit", SpeciesDef [] []

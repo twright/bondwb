@@ -1,4 +1,4 @@
-{-# LANGUAGE  FlexibleInstances, BangPatterns, MultiParamTypeClasses, FlexibleContexts, MonoLocalBinds #-}
+{-# LANGUAGE  FlexibleInstances, BangPatterns, MultiParamTypeClasses, TypeSynonymInstances, FlexibleContexts, MonoLocalBinds #-}
 
 module BondCalculus.Processes (Process(..), Affinity(..), ProcessVect,
   InteractionVect, DirectionVect, ConcreteAffinityNetwork, SymbolicModel,
@@ -16,7 +16,7 @@ import qualified Data.List as L
 import qualified Data.HashMap.Strict as H
 import qualified Data.Map as M
 import BondCalculus.Vector hiding ((<>))
-import BondCalculus.Symbolic (SymbolicExpr, var)
+import BondCalculus.Symbolic (SymbolicExpr, ExprConstant, Expr(..), Atom(..), var)
 import Data.Maybe
 import Data.Either
 import Data.Either.Utils
@@ -27,7 +27,7 @@ import GHC.Exts (sortWith)
 trace :: String -> a -> a
 trace _ = id
 
-type SymbConc = SymbolicExpr
+type SymbConc a = Expr (Atom a)
 
 -- Process vectors over k
 type ProcessVect k = Vect Species k
@@ -36,15 +36,17 @@ type InteractionVect k = Vect (Tensor (Tensor Species Abstraction) [Prefix]) k
 -- Direction vectors over k
 type DirectionVect k = Vect (Tensor Species Abstraction) k
 
+-- NOTE: concrete versions are use doubles as concentrations
+-- (we do not automatically apply numerical semantics to intervals)
 -- Process space
 type P = ProcessVect Conc
 -- Potential interaction space
 type D = InteractionVect Conc
 
 -- Process space
-type P' = ProcessVect SymbConc
+type P' a = ProcessVect (SymbConc a)
 -- Potential interaction space
-type D' = InteractionVect SymbConc
+type D' a = InteractionVect (SymbConc a)
 
 data Process = Mixture [(Conc, Species)]
              | React ConcreteAffinityNetwork Process
@@ -52,12 +54,8 @@ data Process = Mixture [(Conc, Species)]
 -- A BondCalculus model with all of the variables looked up
 type ConcreteDef = (ConcreteAffinityNetwork, Species -> MTS, P)
 type ConcreteModel = (Env, M.Map String ConcreteDef)
-type SymbolicDef = (ConcreteAffinityNetwork, Species -> MTS, P', [Double])
-type SymbolicModel = (Env, M.Map String SymbolicDef)
-
-powerset :: [a] -> [[a]]
-powerset []     = [[]]
-powerset (x:xs) = powerset xs ++ map (x:) (powerset xs)
+type SymbolicDef a = (ConcreteAffinityNetwork, Species -> MTS, P' a, [a])
+type SymbolicModel a = (Env, M.Map String (SymbolicDef a))
 
 -- Core process semantics
 
@@ -144,7 +142,7 @@ tracesGivenNetwork network = trace ("prefLists = " ++ show prefLists) (transFilt
     validPref :: PrefixFilter
     validPref x = trace ("testing potential " ++ show x) (L.sort x `elem` prefListSubsets)
 
-concretifyAffSpec :: BondCalculusModel
+concretifyAffSpec :: BondCalculusModel a
                   -> AffinityNetworkSpec
                   -> Either String ConcreteAffinityNetwork
 concretifyAffSpec model@(Defs _ a _ _) (AffinityNetworkAppl name rates)
@@ -168,11 +166,11 @@ networkFromList affsOrErrors = case errors of
   where errors = [e | Left e <- affsOrErrors]
         affs   = [aff | Right aff <- affsOrErrors]
 
-applyAff :: BondCalculusModel -> Affinity -> [String] -> [Rate] -> Either String ConcreteAffinity
+applyAff :: BondCalculusModel a -> Affinity -> [String] -> [Rate] -> Either String ConcreteAffinity
 applyAff model (Affinity rls sites) params rates
   = second (`ConcreteAffinity` map L.sort sites) $ applyRateLawSpec model rls params rates
 
-applyRateLawSpec :: BondCalculusModel
+applyRateLawSpec :: BondCalculusModel a
                  -> RateLawSpec
                  -> [String]
                  -> [Rate]
@@ -189,9 +187,9 @@ applyRateLawSpec (Defs _ _ m _) (RateLawAppl name params) affParams rates
           applyRate (RateLawParamVar n) = L.lookup n vals
           args = map applyRate params
 
-combineAndLookupProcess :: BondCalculusModel
-                        -> AbstractProcess
-                        -> Either String (AffinityNetworkSpec, [(Conc, Species)])
+combineAndLookupProcess :: BondCalculusModel a
+                        -> AbstractProcess a
+                        -> Either String (AffinityNetworkSpec, [(a, Species)])
 combineAndLookupProcess model@(Defs _ _ _ m) (ProcessAppl x) = do
   p <- maybeToEither ("Process \"" ++ x ++ "\" not defined!") (M.lookup x m)
   combineAndLookupProcess model p
@@ -199,9 +197,9 @@ combineAndLookupProcess model (ProcessCompo p q) = liftM2 (<>)
   (combineAndLookupProcess model p) (combineAndLookupProcess model q)
 combineAndLookupProcess _ (Process affSpec concSpecs) = return (affSpec, concSpecs)
 
-concretifyProcess :: BondCalculusModel
+concretifyProcess :: BondCalculusModel Double
                   -> Env
-                  -> AbstractProcess
+                  -> AbstractProcess Double
                   -> Either String ConcreteDef
 concretifyProcess model env proc = do
   (affSpec, concSpecs) <- combineAndLookupProcess model proc
@@ -209,10 +207,11 @@ concretifyProcess model env proc = do
   return (network, tracesGivenNetwork network env,
           fromList [(c, normalForm s) | (c,s) <- concSpecs])
 
-symbolifyProcess :: BondCalculusModel
+symbolifyProcess :: ExprConstant a =>
+                    BondCalculusModel a
                  -> Env
-                 -> AbstractProcess
-                 -> Either String SymbolicDef
+                 -> AbstractProcess a
+                 -> Either String (SymbolicDef a)
 symbolifyProcess model env proc = do
   (affSpec, concSpecs) <- combineAndLookupProcess model proc
   network <- concretifyAffSpec model affSpec
@@ -232,7 +231,9 @@ symbolifyProcess model env proc = do
       inits = map (\(x,_,_) -> x) ress
   return (network, tr, p, inits)
 
-symbolifyModel :: BondCalculusModel -> Either String SymbolicModel
+symbolifyModel :: ExprConstant a =>
+                  BondCalculusModel a
+               -> Either String (SymbolicModel a)
 symbolifyModel model@(Defs env _ _ p)
   = case errors of
       []            -> Right (env, processes)
@@ -242,7 +243,7 @@ symbolifyModel model@(Defs env _ _ p)
         cprocs    = M.toList $ fmap (symbolifyProcess model env) p
         errors    = [(name, e) | (name, Left e) <- cprocs]
 
-concretifyModel :: BondCalculusModel -> Either String ConcreteModel
+concretifyModel :: BondCalculusModel Double -> Either String ConcreteModel
 concretifyModel model@(Defs env _ _ p)
   = case errors of
       []            -> Right (env, processes)

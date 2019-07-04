@@ -26,6 +26,7 @@ module BondCalculus.AST
   AbstractProcess(..),
   BondCalculusModel(..),
   KineticLawDefinition(..),
+  CombinedModel(..),
   concretify,
   pretty,
   maxLoc,
@@ -50,6 +51,7 @@ module BondCalculus.AST
   addProcessDef,
   addAffinityNetworkDef,
   emptyBondCalculusModel,
+  emptyCombinedModel,
   combineModels,
   concretifyKineticLaw,
   prefLoc,
@@ -73,6 +75,8 @@ trace :: a -> b -> b
 trace _ b = b
 
 -- import qualified Data.Map as M
+data CombinedModel = CombinedModel { modelDouble :: BondCalculusModel Double
+                                   , modelInterval :: BondCalculusModel Interval } 
 
 -- Core concepts
 type Name = String
@@ -185,21 +189,22 @@ instance Semigroup AffinityNetworkSpec where
 instance Monoid AffinityNetworkSpec where
     mempty = AffinityNetworkSpec []
 
-data AbstractProcess = Process AffinityNetworkSpec [(Conc, Species)]
-                     | ProcessAppl String
-                     | ProcessCompo AbstractProcess AbstractProcess
-                       deriving (Ord, Show)
+data AbstractProcess a =
+    Process AffinityNetworkSpec [(a, Species)]
+  | ProcessAppl String
+  | ProcessCompo (AbstractProcess a) (AbstractProcess a)
+  deriving (Ord, Show)
 
-mkProcess :: AffinityNetworkSpec -> [(Conc, Species)] -> AbstractProcess
+mkProcess :: Num a => AffinityNetworkSpec -> [(a, Species)] -> AbstractProcess a
 mkProcess x ys = Process x (normalizeConcSpecs ys)
 
-normalizeConcSpecs :: [(Conc, Species)] -> [(Conc, Species)]
+normalizeConcSpecs :: Num a => [(a, Species)] -> [(a, Species)]
 normalizeConcSpecs ys = [ (sum [c | (c, w) <- ys, w == s], s)
                         | s <- L.sort $ L.nub $ map snd ys ]
 
-type ProcNF = ([String], AffinityNetworkSpec, [(Conc, Species)])
+type ProcNF a = ([String], AffinityNetworkSpec, [(a, Species)])
 
-normalizeProc :: AbstractProcess -> ProcNF
+normalizeProc :: Num a => AbstractProcess a -> ProcNF a
 normalizeProc (Process x ys) = ([], x, normalizeConcSpecs ys)
 normalizeProc (ProcessAppl x) = ([x], mempty, [])
 normalizeProc (ProcessCompo p1 p2) = (L.sort (ps1 ++ ps2),
@@ -208,14 +213,14 @@ normalizeProc (ProcessCompo p1 p2) = (L.sort (ps1 ++ ps2),
     where (ps1, x1, ys1) = normalizeProc p1
           (ps2, x2, ys2) = normalizeProc p2
 
-instance Eq AbstractProcess where
+instance (Num a, Eq a) => Eq (AbstractProcess a) where
     Process x1 ys1 == Process x2 ys2 = x1 == x2 && normalizeConcSpecs ys1 == normalizeConcSpecs ys2
 
-instance Semigroup AbstractProcess where
+instance Num a => Semigroup (AbstractProcess a) where
     Process x1 ys1 <> Process x2 ys2 = mkProcess (x1 <> x2) (ys1 ++ ys2)
     x <> y = ProcessCompo x y
 
-instance Monoid AbstractProcess where
+instance Num a => Monoid (AbstractProcess a) where
     mempty = mkProcess mempty []
 
 data SpeciesDefinition = SpeciesDef
@@ -243,37 +248,39 @@ concretifyKineticLaw (KineticLawDef params args body) params' = RateLaw f
           Right x  -> x
         body' = simplify $ Symb.applyVar (M.fromList $ zip params (map Symb.Const params')) body
 
-data BondCalculusModel = Defs
+data BondCalculusModel a = Defs
   { speciesDefs         :: Env
   , affinityNetworkDefs :: Map String AffinityNetworkDefinition
   , kineticLawDefs      :: Map String RateLawFamily
-  , processDefs         :: Map String AbstractProcess }
+  , processDefs         :: Map String (AbstractProcess a) }
 
-instance Show BondCalculusModel where
+instance Show a => Show (BondCalculusModel a) where
   show (Defs s a _ p) = "Defs " ++ show s ++ " "
                                 ++ show a ++ " "
                                 ++ " M.empty "
                                 ++ show p
 
-instance Eq BondCalculusModel where
+instance (Num a, Eq a) => Eq (BondCalculusModel a) where
   m == n = speciesDefs m         == speciesDefs n
         && affinityNetworkDefs m == affinityNetworkDefs n
         && processDefs m         == processDefs n
 
-addSpeciesDef :: String -> SpeciesDefinition -> BondCalculusModel -> BondCalculusModel
+addSpeciesDef :: String -> SpeciesDefinition -> BondCalculusModel a -> BondCalculusModel a
 addSpeciesDef name def (Defs s a k p) = Defs (M.insert name def s) a k p
 
-addAffinityNetworkDef :: String -> AffinityNetworkDefinition -> BondCalculusModel
-                         -> BondCalculusModel
+addAffinityNetworkDef :: String
+                      -> AffinityNetworkDefinition
+                      -> BondCalculusModel a
+                      -> BondCalculusModel a
 addAffinityNetworkDef name def (Defs s a k p) = Defs s (M.insert name def a) k p
 
-addKineticLawDef :: String -> RateLawFamily -> BondCalculusModel -> BondCalculusModel
+addKineticLawDef :: String -> RateLawFamily -> BondCalculusModel a -> BondCalculusModel a
 addKineticLawDef name def (Defs s a k p) = Defs s a (M.insert name def k) p
 
-addProcessDef :: String -> AbstractProcess -> BondCalculusModel -> BondCalculusModel
+addProcessDef :: String -> AbstractProcess a -> BondCalculusModel a -> BondCalculusModel a
 addProcessDef name def (Defs s a k p) = Defs s a k (M.insert name def p)
 
-combineModels :: BondCalculusModel -> BondCalculusModel -> BondCalculusModel
+combineModels :: BondCalculusModel a -> BondCalculusModel a -> BondCalculusModel a
 combineModels (Defs s1 a1 k1 p1) (Defs s2 a2 k2 p2) = Defs (s1 `M.union` s2)
                                                            (a1 `M.union` a2)
                                                            (k1 `M.union` k2)
@@ -283,12 +290,15 @@ massAction :: RateLawFamily
 massAction [m] = RateLaw $ \xs -> product (fromFloat m:xs)
 massAction _ = error "Wrong number of parameters provided to mass action kinetic law"
 
-emptyBondCalculusModel :: BondCalculusModel
+emptyBondCalculusModel :: BondCalculusModel a
 emptyBondCalculusModel = Defs { speciesDefs = M.empty
   -- Mass action kinetic law is always available
                      , kineticLawDefs = M.fromList [("MA", massAction)]
                      , affinityNetworkDefs = M.empty
                      , processDefs = M.empty }
+
+emptyCombinedModel :: CombinedModel
+emptyCombinedModel = CombinedModel emptyBondCalculusModel emptyBondCalculusModel
 
 type Env = Map String SpeciesDefinition
 

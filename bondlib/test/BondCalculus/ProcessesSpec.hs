@@ -113,7 +113,7 @@ spec = do
           +> (-6.0) |> vect (Def "S" [] []) +> (-6.0) |> vect (Def "E" [] []))
         (actions affinityNetworkEnzyme (partialS +> partialE))
     it "can find the actions from a symbolic enzyme and substrate" $
-      actions affinityNetworkEnzyme (partialS' +> partialE')
+      actions affinityNetworkEnzyme (partialS' +> partialE' :: D' Double)
         `shouldNotBe`
         vectZero
     it "can find the S component from symbolic enzyme and substrate" $
@@ -134,5 +134,5 @@ spec = do
   describe "dPdt'" $ do
     it "gives nonzero dPdt for enzymes" $
       let tr = tracesGivenNetwork affinityNetworkEnzyme enzymeDefs
-      in dPdt' tr affinityNetworkEnzyme enzymeProc
+      in dPdt' tr affinityNetworkEnzyme (enzymeProc :: P' Double)
          `shouldNotBe` vectZero

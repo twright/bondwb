@@ -1,13 +1,21 @@
 {-# LANGUAGE ExistentialQuantification, RankNTypes, TypeSynonymInstances, FlexibleInstances #-}
 module BondCalculus.Base
   (Expression(..), Pretty(..), Nullable(..), DoubleExpression(..), BoolConc(..), Interval(..),
-   fromEndpoints, endpoints, inf, sup) where
+   Boundable(..), fromEndpoints, endpoints, singleValue, powerset) where
 
 import Text.Printf
 import AERN2.MP ()
 import AERN2.MP.Precision
 import qualified AERN2.MP.Ball as MPB
 import qualified AERN2.MP.Float as MPF
+
+import Debug.Trace
+
+-- utils
+
+powerset :: [a] -> [[a]]
+powerset []     = [[]]
+powerset (x:xs) = powerset xs ++ map (x:) (powerset xs)
 
 -- Pretty printing
 class (Show a) => Pretty a where
@@ -20,6 +28,29 @@ class Expression a where
 
 class (Num a, Floating a, Expression a) => DoubleExpression a where
   fromFloat :: Double -> a
+  fromInterval :: Double -> Double -> a
+  fromInterval x y = trace
+                     (printf "WARNING: casting interval %s to double "
+                              (show $ fromEndpoints (toRational x) (toRational y))) $
+                     fromFloat $ (x + y) / 2
+
+class Boundable a where
+    bounds :: a -> (Double, Double)
+    inf :: a -> Double
+    inf = fst.bounds
+    sup :: a -> Double
+    sup = snd.bounds
+
+singleValue :: Boundable a => a -> Maybe Double
+singleValue x | l == u    = Just l
+              | otherwise = Nothing
+    where (l, u) = bounds x
+
+instance Boundable Double where
+    bounds x = (x, x)
+
+instance Boundable Interval where
+    bounds = endpoints
 
 instance Expression Double where
 instance Expression String where
@@ -91,12 +122,6 @@ endpoints :: Interval -> (Double, Double)
 endpoints (Interval x) = (MPF.toDoubleDown l, MPF.toDoubleUp u)
     where (l, u) = MPB.endpoints x :: (MPF.MPFloat, MPF.MPFloat)
 
-inf :: Interval -> Double
-inf = fst . endpoints
-
-sup :: Interval -> Double
-sup = snd . endpoints
-
 instance Eq Interval where
     x == y = endpoints x == endpoints y
 
@@ -107,6 +132,7 @@ instance Show Interval where
 instance Expression Interval where
 instance DoubleExpression Interval where
     fromFloat = fromRational . toRational
+    fromInterval x y = fromEndpoints (toRational x) (toRational y)
 
 instance Num Interval where
   Interval x + Interval y = Interval (x + y)

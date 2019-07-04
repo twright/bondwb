@@ -47,6 +47,13 @@ dependencies:
 - hashable
 - hspec
 
+default-extensions:
+- FlexibleContexts
+- ConstraintKinds
+- FlexibleInstances
+- MonoLocalBinds
+- ScopedTypeVariables
+
 library:
   source-dirs: .
 

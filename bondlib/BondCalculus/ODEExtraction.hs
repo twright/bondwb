@@ -1,6 +1,10 @@
 module BondCalculus.ODEExtraction
-  (IVP(..), PrintStyle(..), matlabExpr, sympyExpr, matlabODE, vectorFieldToODEs, extractIVP, sympyODE, solveODEPython, printODEPython, sympySimplify, runPython) where
+  (IVP(..), PrintStyle(..), ODE(..), AsSage(..),
+  matlabExpr, sympyExpr, sageExpr, matlabODE, vectorFieldToODEs, sageODE, sageExprAbst,
+  sageExprAbst', extractIVP, sympyODE, solveODEPython, printODEPython,
+  sympySimplify, runPython, generateSage) where
 
+import BondCalculus.Base
 import BondCalculus.Symbolic
 import BondCalculus.Processes
 import BondCalculus.Vector
@@ -9,6 +13,7 @@ import qualified BondCalculus.AST as AST
 import qualified Data.HashMap.Strict as H
 import BondCalculus.Simulation (Trace)
 import Data.String.Utils
+import Text.Printf
 
 -- import qualified Control.Exception as X
 import qualified Data.Map as M
@@ -22,14 +27,14 @@ import System.IO.Unsafe
 import System.Process (readProcess)
 -- import Data.Maybe
 
-newtype IVP = IVP ([String], [SymbolicExpr], [Double]) deriving (Show, Eq)
-newtype ODE = ODE ([String], [SymbolicExpr])
+newtype IVP a = IVP ([String], [Expr (Atom a)], [a]) deriving (Show, Eq)
+newtype ODE a = ODE ([String], [Expr (Atom a)])
 
 -------------------------------
 -- MATLAB script output:
 -------------------------------
 
-extractODE :: AST.Env -> ConcreteAffinityNetwork -> P' -> ODE
+extractODE :: ExprConstant a => AST.Env -> ConcreteAffinityNetwork -> P' a -> ODE a
 extractODE env network p = vectorFieldToODEs p'
   where -- p' must be expressed in the same basis of p
         -- otherwise the variable order becomes
@@ -39,22 +44,22 @@ extractODE env network p = vectorFieldToODEs p'
         Vect v = dPdt' tr network p
         tr = tracesGivenNetwork network env
 
-extractIVP :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> IVP
+extractIVP :: ExprConstant a => AST.Env -> ConcreteAffinityNetwork -> P' a -> [a] -> IVP a
 extractIVP env network p = fromODEToIVP (extractODE env network p)
 
-vectorFieldToODEs :: P' -> ODE
+vectorFieldToODEs :: ExprConstant a => P' a -> ODE a
 vectorFieldToODEs v = ODE (vars, rhss)
   where
     vars = map (pretty.snd) kis
     rhss = map (simplify.fst) kis
     kis = toList v
 
-fromODEToIVP :: ODE -> [Double] -> IVP
+fromODEToIVP :: ODE a -> [a] -> IVP a
 fromODEToIVP (ODE (x,y)) z = IVP (x, y, z)
 
 -- modelToIVP :: BondCalculusModel SymbolicExpr -> IVP
 
-matlabODE :: IVP -> (Int,(Double,Double)) -> Either String String
+matlabODE :: IVP Double -> (Int,(Double,Double)) -> Either String String
 matlabODE ivp (n,(t0,tn)) =
   if any isNothing eqns
   then Left "An ODE equation has an unbound variable"
@@ -77,7 +82,137 @@ matlabODE ivp (n,(t0,tn)) =
         eqns = [fmap (\y -> xdot ++ " = " ++ y) (matlabExpr varmap rhs)
                | (xdot,rhs) <- zip xdots rhss]
 
-sympyODE :: IVP -> (Int,(Double,Double)) -> Either String String
+class Show a => AsSage a where
+    asSage :: a -> String
+
+instance AsSage Double where
+    asSage = show
+
+instance AsSage Interval where
+    asSage x = printf "RIF(%.20f, %.20f)" l u
+        where (l, u) = endpoints x
+              -- Do some fiddling with the endpoints to ensure sound enclosure
+            --   l' = l - 6e-21
+            --   u' = u + 6e-21
+
+sageExpr :: AsSage a => M.Map String String -> Expr (Atom a) -> Maybe String
+sageExpr mp (Atom (Var x)) = M.lookup x mp
+sageExpr mp (Atom (Const x)) = return $ asSage x
+sageExpr mp (x `Sum` y) = do
+    x' <- sageExpr mp x
+    y' <- sageExpr mp y
+    return $ x' ++ " + " ++ y'
+sageExpr mp (x `Prod` y) = do
+    x' <- sageExpr mp x
+    y' <- sageExpr mp y
+    return $ "(" ++ x' ++ ") * (" ++ y' ++ ")"
+sageExpr mp (x `Frac` y) = do
+    x' <- sageExpr mp x
+    y' <- sageExpr mp y
+    return $ "(" ++ x' ++ ") / (" ++ y' ++ ")"
+sageExpr mp (x `Pow` y) = do
+    x' <- sageExpr mp x
+    y' <- sageExpr mp y
+    return $ "(" ++ x' ++ ") ** (" ++ y' ++ ")"
+sageExpr mp (Abs x) = do
+    x' <- sageExpr mp x
+    return $ "abs(" ++ x' ++ ")"
+sageExpr mp (Sin x) = do
+    x' <- sageExpr mp x
+    return $ "sin(" ++ x' ++ ")"
+sageExpr mp (Cos x) = do
+    x' <- sageExpr mp x
+    return $ "sin(" ++ x' ++ ")"
+sageExpr mp (Tan x) = do
+    x' <- sageExpr mp x
+    return $ "tan(" ++ x' ++ ")"
+sageExpr mp (Exp x) = do
+    x' <- sageExpr mp x
+    return $ "exp(" ++ x' ++ ")"
+sageExpr mp (Log x) = do
+    x' <- sageExpr mp x
+    return $ "log(" ++ x' ++ ")"
+
+-- Convert a sage expression into a string with all non-simple double constants (e.g. intervals)
+-- abstracted by symbolic variables
+sageExprAbst' :: (AsSage a, Boundable a) => M.Map String String -> Expr (Atom a) -> Maybe (M.Map String String, String)
+sageExprAbst' = sageExprAbst M.empty
+
+sageExprAbst :: (AsSage a, Boundable a) => M.Map String String -> M.Map String String -> Expr (Atom a) -> Maybe (M.Map String String, String)
+sageExprAbst cmp mp (Atom (Var x)) = do
+    x' <- M.lookup x mp
+    return (cmp, x')
+sageExprAbst cmp mp (Atom (Const x)) = return $ case singleValue x of
+    Just 1.0    -> (cmp, "1")
+    Just (-1.0) -> (cmp, "-1")
+    Just 0.0    -> (cmp, "0")
+    Just v      -> (cmp, asSage v)
+    Nothing     -> (cmp', s)
+        where n = M.size cmp 
+              s = "a" ++ show n
+              cmp' = M.insert s (asSage x) cmp 
+sageExprAbst cmp mp (x `Sum` y) = f2 cmp mp x y $ \x' y' -> x' ++ " + " ++ y'
+sageExprAbst cmp mp (x `Prod` y) = f2 cmp mp x y $ \x' y' -> "(" ++ x' ++ ") * (" ++ y' ++ ")"
+sageExprAbst cmp mp (x `Frac` y) = f2 cmp mp x y $ \x' y' -> "(" ++ x' ++ ") / (" ++ y' ++ ")"
+sageExprAbst cmp mp (x `Pow` y) = f2 cmp mp x y $ \x' y' -> "(" ++ x' ++ ") ** (" ++ y' ++ ")"
+sageExprAbst cmp mp (Abs x) = f1 cmp mp x $ \x' -> "abs(" ++ x' ++ ")"
+sageExprAbst cmp mp (Sin x) = f1 cmp mp x $ \x' -> "sin(" ++ x' ++ ")"
+sageExprAbst cmp mp (Cos x) = f1 cmp mp x $ \x' -> "cos(" ++ x' ++ ")"
+sageExprAbst cmp mp (Tan x) = f1 cmp mp x $ \x' -> "tan(" ++ x' ++ ")"
+sageExprAbst cmp mp (Exp x) = f1 cmp mp x $ \x' -> "exp(" ++ x' ++ ")"
+sageExprAbst cmp mp (Log x) = f1 cmp mp x $ \x' -> "log(" ++ x' ++ ")"
+sageExprAbst cmp mp x = error $ "Support for converting expression " ++ show x ++ " to sage/sympy not implemented!"
+
+f2 cmp mp x y g = do
+    (cmp', x') <- sageExprAbst cmp mp x
+    (cmp'', y') <- sageExprAbst cmp' mp y
+    return (cmp'', g x' y')
+
+f1 cmp mp x g = do
+    (cmp', x') <- sageExprAbst cmp mp x
+    return (cmp', g x')
+
+-- This assumes we can reduce the ODEs to sage
+sageODE :: (AsSage a, Boundable a) => IVP a -> Either String String
+sageODE ivp@(IVP (vars, rhss, inits)) = case odeExprs of
+        Nothing -> Left "An ODE equation has an unbound variable"
+        Just (cmp, odes) -> Right $
+            "from sage.all import *\n" ++
+            "import sympy as sym\n\n" ++
+            "R, x = PolynomialRing(RIF, " ++ show nvars  ++ ", 'x').objgens()\n" ++
+            "xsym = sym.var(','.join(map('x{}'.format, range(0," ++ show nvars ++ "))))\n" ++
+            (if (M.size cmp) > 0
+             then "asym = sym.var(','.join(map('a{}'.format, range(0," ++ show (M.size cmp) ++ "))))\n"
+             else "asym = []\n") ++
+            "y0 = [" ++ L.intercalate ", " (map asSage inits) ++ "]\n" ++
+            "ysymraw = [" ++ L.intercalate ", " odes ++ "]\n" ++
+            "ysym = [sym.simplify(y1) for y1 in ysymraw]\n" ++
+            "ysage = [y1._sage_().substitute(" ++ subsExpr ++ ") for y1 in ysym]\n" ++
+            "try:\n" ++
+            "    y = vector([R(y1) for y1 in ysage])\n" ++
+            "except TypeError:\n" ++
+            "    y = None\n"
+            where subsExpr = L.intercalate ","
+                             [x ++ "=" ++ y | (x, y) <- M.toList cmp]
+    where
+    --   odeExprs' :: AsSage a => M.Map String String -> [Expr (Atom a)] -> Maybe (M.Map String String, [String])
+      odeExprs' cmp (x:xs) = do
+        (cmp', expr) <- sageExprAbst cmp varmap x 
+        (cmp'', exprs) <- odeExprs' cmp' xs
+        return (cmp'', expr:exprs)
+      odeExprs' cmp [] = Just (cmp, [])
+      odeExprs :: Maybe (M.Map String String, [String])
+      odeExprs = odeExprs' M.empty rhss
+      nvars = length vars
+      xvars = ["x" ++ show n | (n, _) <- zip [0..] vars]
+      varmap = M.fromList $ zip vars xvars
+    --   odes = map odeExpr rhss
+    --   odeExpr rhs = do
+    --     expr <- sageExpr varmap rhs
+    --     return $ "sym.simplify(" ++ expr ++ ")"
+
+
+sympyODE :: IVP Double -> (Int,(Double,Double)) -> Either String String
 sympyODE ivp (n,(t0,tn)) =
   if any isNothing eqns
   then Left "An ODE equation has an unbound variable"
@@ -115,7 +250,7 @@ sympyODE ivp (n,(t0,tn)) =
 
 data PrintStyle = Plain | Pretty | LaTeX | MathML deriving (Eq)
 
-sympyODEPrint :: ODE -> PrintStyle -> Either String String
+sympyODEPrint :: ODE Double -> PrintStyle -> Either String String
 sympyODEPrint ode style =
   if any isNothing eqns
   then Left "An ODE equation has an unbound variable"
@@ -212,7 +347,7 @@ sympyExpr mp (Log x) = do
 runPython :: String -> IO String
 runPython = readProcess "python3" ["-q"]
 
-callSolveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> (Int, (Double, Double)) -> IO String
+callSolveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> [Double] -> (Int, (Double, Double)) -> IO String
 callSolveODEPython env network p inits tr = case sympyODE (extractIVP env network p inits) tr of
   Right script -> do
     putStrLn $ "Python script:\n\n" ++ script
@@ -220,7 +355,21 @@ callSolveODEPython env network p inits tr = case sympyODE (extractIVP env networ
     runPython script
   Left _ -> undefined
 
-callPrintODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> PrintStyle -> IO String
+generateSage :: (ExprConstant a, AsSage a)
+             => String
+             -> AST.Env
+             -> ConcreteAffinityNetwork
+             -> P' a
+             -> [a]
+             -> IO String
+generateSage filename env network p inits = case sageODE (extractIVP env network p inits) of
+  Right script -> do
+    putStrLn $ "Sage script:\n\n" ++ script
+    writeFile filename script
+    return script
+  Left _ -> undefined
+
+callPrintODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> PrintStyle -> IO String
 callPrintODEPython env network p style = case sympyODEPrint (extractODE env network p) style of
   Right script -> do
     -- putStrLn $ "Python script:\n\n" ++ script
@@ -228,7 +377,7 @@ callPrintODEPython env network p style = case sympyODEPrint (extractODE env netw
     runPython script
   Left _ -> undefined
 
-solveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> [Double] -> (Int, (Double, Double)) -> Trace
+solveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> [Double] -> (Int, (Double, Double)) -> Trace
 solveODEPython env network p inits tr@(n,(t0,tn))
   = let raw = unsafePerformIO (callSolveODEPython env network p inits tr)
         ts = [t0 + fromIntegral i*(tn-t0)/fromIntegral n | i <- [0..n]]
@@ -242,7 +391,7 @@ sympySimplify s = unsafePerformIO (runPython script)
   where script = "from sympy import simplify, sympify\nimport re\n" ++
                  "print(simplify(sympify(re.sub(r'([0-9]+)\\.0(?![0-9]*[1-9])', r'\\1', " ++ show s ++ "))))"
 
-printODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' -> PrintStyle -> String
+printODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> PrintStyle -> String
 printODEPython env network p style
   = let raw = unsafePerformIO (callPrintODEPython env network p style)
     in raw

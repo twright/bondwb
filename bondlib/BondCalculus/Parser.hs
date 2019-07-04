@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module BondCalculus.Parser where
 
 import Data.Foldable
@@ -16,6 +17,7 @@ import Data.Bifunctor
 -- import Text.Megaparsec.Error (Dec)
 -- import Control.Applicative
 
+import BondCalculus.Base
 import BondCalculus.AST hiding ((<|>))
 import BondCalculus.Symbolic
 import Data.Void
@@ -23,8 +25,17 @@ import Data.Void
 -- We need to define a Parser type synonym in megaparsec >= 6.0 
 type Parser = Parsec Void String
 
-parseFile :: String -> String -> Either (ParseErrorBundle String Void) BondCalculusModel
+parseFile :: DoubleExpression a => String -> String -> Either (ParseErrorBundle String Void) (BondCalculusModel a)
 parseFile = runParser model
+
+parseFileCombined :: String -> String -> Either (ParseErrorBundle String Void) CombinedModel
+parseFileCombined = runParser combinedModel
+
+combinedModel :: Parser CombinedModel
+combinedModel = do
+    x <- lookAhead model
+    y <- model
+    return $ CombinedModel x y
 
 -- Species:
 
@@ -107,8 +118,20 @@ definitionName = (lexeme . try) (p >>= check)
                                       ++ " cannot be used, as it is reserved"
                   else return x
 
-number :: Parser Double
-number =  LEX.signed spaceConsumer (toRealFloat <$> lexeme LEX.scientific)
+number :: (Num a, DoubleExpression a) => Parser a
+number = fromFloat <$> real <|> uncurry fromInterval <$> interval
+
+real :: Parser Double
+real = LEX.signed spaceConsumer $ toRealFloat <$> lexeme LEX.scientific
+
+interval :: Parser (Double, Double)
+interval = do
+    _ <- symbol "["
+    x <- real
+    _ <- symbol "," <|> symbol ".."
+    y <- real
+    _ <- symbol "]"
+    return (x, y)
 
 prefix :: Parser Prefix
 prefix = lexeme $ do
@@ -213,7 +236,7 @@ species :: Parser Species
 species = restriction <|> parallel
 
 -- Processes:
-processComponent :: Parser (Conc, Species)
+processComponent :: DoubleExpression a => Parser (a, Species)
 processComponent = do
   c <- brackets number
   s <- species
@@ -226,7 +249,7 @@ affinityNetworkAppl = do
   let rates' = fromMaybe [] rates
   return $ AffinityNetworkAppl name rates'
 
-processLiteral :: Parser AbstractProcess
+processLiteral :: DoubleExpression a => Parser (AbstractProcess a)
 processLiteral = do
   components <- processComponent `sepBy` symbol "||"
   _ <- symbol "with"
@@ -237,31 +260,28 @@ processLiteral = do
 -- process :: Parser AbstractProcess
 -- process = fold <$> processComponent `sepBy` symbol "||"
 
-process :: Parser AbstractProcess
+process :: DoubleExpression a => Parser (AbstractProcess a)
 process = fold <$> processCompositionList
 
-processCompositionList :: Parser [AbstractProcess]
+processCompositionList :: (DoubleExpression a, Num a) => Parser [AbstractProcess a]
 processCompositionList = (:[]) <$> processLiteral
                      <|> proc `sepBy1'` symbol "||"
-    where proc :: Parser AbstractProcess
-          proc = wrappedProcess
+    where proc = wrappedProcess
              <|> namedProcess
              <|> mkProcess mempty . (:[]) <$> processComponent
              <|> (\x -> mkProcess x []) <$> affinityNetworkAppl
-          wrappedProcess :: Parser AbstractProcess
           wrappedProcess = do
               _ <- symbol "(" 
               p <- processLiteral
               _ <- symbol ")"
               return p
-          namedProcess :: Parser AbstractProcess
           namedProcess = ProcessAppl <$> definitionName
 
 
 
 -- Symbolic expressions
 
-symbExpr :: Parser SymbolicExpr
+symbExpr :: (DoubleExpression a, Num (Expr (Atom a)), DoubleExpression (Expr (Atom a))) => Parser (Expr (Atom a))
 symbExpr = makeExprParser symbTerm symbExprTable
   where symbExprTable = [ [ prefixOp "-" negate
                           , prefixOp "+" id ]
@@ -274,7 +294,7 @@ symbExpr = makeExprParser symbTerm symbExprTable
         binaryOp name f = InfixL (f <$ symbol name)
         prefixOp name f = Prefix (f <$ symbol name)
 
-symbTerm :: Parser SymbolicExpr
+symbTerm :: (DoubleExpression a, Num (Expr (Atom a)), DoubleExpression (Expr (Atom a))) => Parser (Expr (Atom a))
 symbTerm = parens symbExpr
        <|> symbol "sin"   *> (sin    <$> symbTerm)
        <|> symbol "sinh"  *> (sinh   <$> symbTerm)
@@ -318,7 +338,7 @@ kineticLawDef = do
 concreteKineticLawDef :: Parser (String, RateLawFamily)
 concreteKineticLawDef = second concretifyKineticLaw <$> kineticLawDef
 
-processDef :: Parser (String, AbstractProcess)
+processDef :: DoubleExpression a => Parser (String, AbstractProcess a)
 processDef = do
   _ <- symbol "process"
   name <- definitionName
@@ -383,7 +403,7 @@ speciesDef = do
   else fail $ "Definition of " ++ name ++ " which binds " ++ show locs
               ++ " contains unbound locations."
 
-definition :: Parser BondCalculusModel
+definition :: DoubleExpression a => Parser (BondCalculusModel a)
 definition = sDef <|> pDef <|> aDef <|> kDef
   where -- we use a real empty model, rather than the default template as we
         -- will combine with this as unit later
@@ -393,5 +413,5 @@ definition = sDef <|> pDef <|> aDef <|> kDef
         kDef = (\(n,x) -> addKineticLawDef n x z) <$> concreteKineticLawDef
         aDef = (\(n,x) -> addAffinityNetworkDef n x z) <$> affinityNetworkDef
 
-model :: Parser BondCalculusModel
+model :: DoubleExpression a => Parser (BondCalculusModel a)
 model = foldl combineModels emptyBondCalculusModel <$> many definition

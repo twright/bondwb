@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 844130189e2f8658993ed774ebab4b123a28c5672455830c5d628485461d808a
+-- hash: a2366514d5c334de85fc5ec73cd33ac213386bf24d506a0bb153d69ca13d4fc4
 
 name:           bondlib
 version:        0.7.0.0
@@ -42,6 +42,7 @@ library
       Paths_bondlib
   hs-source-dirs:
       ./.
+  default-extensions: FlexibleContexts ConstraintKinds FlexibleInstances MonoLocalBinds ScopedTypeVariables
   build-depends:
       Chart
     , MissingH
@@ -81,6 +82,7 @@ test-suite bondlib-test
       Paths_bondlib
   hs-source-dirs:
       test
+  default-extensions: FlexibleContexts ConstraintKinds FlexibleInstances MonoLocalBinds ScopedTypeVariables
   ghc-options: -Wall -O2 -fprof-auto -fwarn-tabs -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Chart

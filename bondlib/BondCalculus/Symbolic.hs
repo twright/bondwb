@@ -1,6 +1,6 @@
-{-# LANGUAGE GADTSyntax, TypeSynonymInstances, FlexibleInstances, RankNTypes, IncoherentInstances, MultiParamTypeClasses, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE GADTSyntax, TypeSynonymInstances, ConstraintKinds, FlexibleInstances, RankNTypes, IncoherentInstances, MultiParamTypeClasses, FlexibleContexts, UndecidableInstances #-}
 
-module BondCalculus.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicVars(..), SymbolicExpr, var, val, simplify, sumToList, prodToList, applyVar,factors) where
+module BondCalculus.Symbolic (Atom(..), Expr(..), Symbolic(..), SymbolicVars(..), SymbolicExpr, ExprConstant, var, val, valf, simplify, sumToList, prodToList, applyVar,factors) where
 
 import qualified Data.Map as M
 import BondCalculus.Base
@@ -42,6 +42,18 @@ data Expr a where
 type ExprEnv k = M.Map String k
 type SymbolicExpr = Expr (Atom Double)
 type IntervalSymbolicExpr = Expr (Atom Interval)
+type ExprConstant a = ( DoubleExpression a
+                      , Eq a
+                      , Nullable a
+                      , Num a
+                      , Show a
+                      , Fractional (Expr (Atom a))
+                      , Floating (Expr (Atom a))
+                    --   , Symbolic k (Expr (Atom a))
+                      , Symbolic a (Expr (Atom a))
+                      , Expression (Expr (Atom a))
+                      , Nullable (Expr (Atom a))
+                      , Boundable a )
 
 applyVar :: M.Map String (Atom a) -> Expr (Atom a) -> Expr (Atom a)
 applyVar m = fmap f
@@ -180,8 +192,14 @@ instance Num SymbolicExpr where
   fromInteger a = val (fromIntegral a)
   signum        = Sign
 
-instance Nullable SymbolicExpr where
-  isnull = (== val 0)
+-- instance Nullable SymbolicExpr where
+--   isnull = (== val 0)
+
+-- instance Nullable (Expr (Atom Interval)) where
+--   isnull = (== valf 0)
+
+instance (Nullable a, DoubleExpression a, Eq a) => Nullable (Expr (Atom a)) where
+  isnull = (== valf 0)
 
 instance Fractional SymbolicExpr where
   Atom (Const a) / Atom (Const b) = val (a/b)

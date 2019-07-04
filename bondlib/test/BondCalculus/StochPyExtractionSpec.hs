@@ -9,11 +9,14 @@ import BondCalculus.StochPyExtraction
 import BondCalculus.Symbolic hiding (Abs, var, val)
 import qualified BondCalculus.Symbolic as Symb
 import BondCalculus.Vector
-import BondCalculus.Examples (rabbitModel)
+import qualified BondCalculus.Examples as EX
 import BondCalculus.AST
 import BondCalculus.Processes (concretifyAffSpec, tracesGivenNetwork)
 import Debug.Trace
 import Data.Either
+
+rabbitModel :: BondCalculusModel Double
+rabbitModel = EX.rabbitModel
 
 var :: String -> SymbolicExpr
 var = Symb.var
