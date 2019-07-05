@@ -99,20 +99,20 @@ spec = do
   describe "sageExprAbst" $ do
     it "translates including variables" $
       sageExprAbst' (M.fromList [("x", "y"), ("y","z")])
-                   ((var "x" + var "y") * var "x" :: SymbolicExpr)
+                   ((var "x" + var "y") * var "x" :: SymbolicExpr Double)
         `shouldBe`
         Just (M.empty, "(y + z) * (y)")
     it "handles variable not found" $
       sageExprAbst' (M.fromList [("x", "y"), ("y","z")])
-                   ((var "x" + var "y") * var "w" :: SymbolicExpr)
+                   ((var "x" + var "y") * var "w" :: SymbolicExpr Double)
         `shouldBe`
         Nothing
     it "translates absolute value" $
       sageExprAbst' (M.fromList [("x", "a"), ("y", "b")])
-                    (var "x" * abs(var "y") :: SymbolicExpr)
+                    (var "x" * abs(var "y") :: SymbolicExpr Double)
         `shouldBe` Just (M.empty, "(a) * (b)")
     it "translates double" $
-        sageExprAbst' (M.fromList [("x", "x")]) (val 2.0 * var "x" :: SymbolicExpr)
+        sageExprAbst' (M.fromList [("x", "x")]) (val 2.0 * var "x" :: SymbolicExpr Double)
         `shouldBe`
         Just (M.empty, "(2.0) * (x)")
     it "translates singleton interval" $
@@ -130,4 +130,4 @@ spec = do
     it "translates a simple ODE to python sage code" $
       sageODE ode
       `shouldBe`
-      Right ""
+      Right "from sage.all import *\nimport sympy as sym\n\nR, x = PolynomialRing(RIF, 2, 'x').objgens()\nxsym = sym.var(','.join(map('x{}'.format, range(0,2))))\nasym = []\ny0 = [2.0, 1.0]\nysymraw = [x0 + (-1) * ((x1) * (x0)), (x1) * (x0) + (-1) * (x1)]\nysym = [sym.simplify(y1) for y1 in ysymraw]\nysage = [y1._sage_().substitute() for y1 in ysym]\ntry:\n    y = vector([R(y1) for y1 in ysage])\nexcept TypeError:\n    y = None\n"

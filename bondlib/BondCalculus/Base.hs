@@ -142,7 +142,7 @@ instance Num Interval where
   negate (Interval x) = Interval (negate x)
   signum (Interval x) = Interval (signum x)
 instance Fractional Interval where
-  Interval x / Interval y = Interval x / Interval y
+  Interval x / Interval y = Interval (x / y)
   fromRational x = fromEndpoints x x
 instance Floating Interval where
   pi = Interval pi

@@ -15,9 +15,9 @@ import BondCalculus.Base
 import BondCalculus.Symbolic hiding (var, val)
 import qualified BondCalculus.Symbolic as Symb
 
-var :: String -> SymbolicExpr
+var :: String -> SymbolicExpr Double
 var = Symb.var
-val :: Double -> SymbolicExpr
+val :: Double -> SymbolicExpr Double
 val = Symb.val
 
 instance Arbitrary (Vect Integer Double) where

@@ -54,6 +54,9 @@ default-extensions:
 - MonoLocalBinds
 - ScopedTypeVariables
 
+ghc-options:
+- -Wall
+
 library:
   source-dirs: .
 

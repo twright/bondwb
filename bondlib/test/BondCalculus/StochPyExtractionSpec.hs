@@ -18,9 +18,9 @@ import Data.Either
 rabbitModel :: BondCalculusModel Double
 rabbitModel = EX.rabbitModel
 
-var :: String -> SymbolicExpr
+var :: String -> SymbolicExpr Double
 var = Symb.var
-val :: Double -> SymbolicExpr
+val :: Double -> SymbolicExpr Double
 val = Symb.val
 
 spec :: SpecWith ()

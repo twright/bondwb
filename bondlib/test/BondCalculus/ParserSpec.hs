@@ -19,7 +19,7 @@ a `shouldParseModel` b = a
                          (\m -> speciesDefs m == speciesDefs b
                              && affinityNetworkDefs m == affinityNetworkDefs b
                              && processDefs m == processDefs b)
-a `shouldParseSym` b = a `shouldParse` (b :: SymbolicExpr)
+a `shouldParseSym` b = a `shouldParse` (b :: SymbolicExpr Double)
 
 rabbitModel :: BondCalculusModel Double
 rabbitModel = EX.rabbitModel

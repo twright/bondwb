@@ -10,9 +10,9 @@ import BondCalculus.ODEExtraction (sympyExpr)
 import BondCalculus.Symbolic hiding (var, val)
 import qualified BondCalculus.Symbolic as Symb
 
-var :: String -> SymbolicExpr
+var :: String -> SymbolicExpr Double
 var = Symb.var
-val :: Double -> SymbolicExpr
+val :: Double -> SymbolicExpr Double
 val = Symb.val
 
 spec :: SpecWith ()
@@ -105,6 +105,10 @@ spec = do
     it "can bring coefficients inside fractions" $
       simplify (var "z" * (var "x" / var "y"))
         `shouldBe` simplify ((var "z" * var "x") / var "y")
+    it "can take constants inside fractions coefficients" $
+      simplify (2.0 * (var "x" / (var "x" + var "y")))
+        `shouldBe`
+        ((2.0 * var "x") / (var "x" + var "y"))
     it "can simplify separated fractions with coefficients" $
       simplify (2.0 * (var "x" / (var "x" + var "y"))
               + 2.0 * (var "y" / (var "x" + var "y")))

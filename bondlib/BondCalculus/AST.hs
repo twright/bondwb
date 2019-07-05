@@ -237,7 +237,7 @@ data AffinityNetworkDefinition = AffinityNetworkDef
 data KineticLawDefinition = KineticLawDef
   { kinParms :: [Name]
   , kinArgs :: [Name]
-  , kinBody :: Symb.SymbolicExpr }
+  , kinBody :: Symb.SymbolicExpr Double }
   deriving (Eq, Ord, Show)
 
 concretifyKineticLaw :: KineticLawDefinition -> RateLawFamily

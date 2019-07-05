@@ -57,7 +57,7 @@ vectorFieldToODEs v = ODE (vars, rhss)
 fromODEToIVP :: ODE a -> [a] -> IVP a
 fromODEToIVP (ODE (x,y)) z = IVP (x, y, z)
 
--- modelToIVP :: BondCalculusModel SymbolicExpr -> IVP
+-- modelToIVP :: BondCalculusModel (SymbolicExpr Double) -> IVP
 
 matlabODE :: IVP Double -> (Int,(Double,Double)) -> Either String String
 matlabODE ivp (n,(t0,tn)) =
@@ -281,7 +281,7 @@ sympyODEPrint ode style =
       eqns = [fmap (mkeqn xdot) (sympyExpr varmap rhs)
              | (xdot,rhs) <- zip xdots rhss]
 
-matlabExpr :: M.Map String String -> SymbolicExpr -> Maybe String
+matlabExpr :: M.Map String String -> SymbolicExpr Double -> Maybe String
 matlabExpr mp (Atom (Var x)) = M.lookup x mp
 matlabExpr _ (Atom (Const x)) = return $ show x
 matlabExpr mp (x `Sum` y) = do
@@ -301,7 +301,7 @@ matlabExpr mp (Abs x) = do
   return $ "abs(" ++ x' ++ ")"
 
 
-sympyExpr :: M.Map String String -> SymbolicExpr -> Maybe String
+sympyExpr :: M.Map String String -> SymbolicExpr Double -> Maybe String
 sympyExpr mp (Atom (Var x)) = M.lookup x mp
 sympyExpr _ (Atom (Const x)) = return $ show x
 sympyExpr mp (x `Sum` y) = do

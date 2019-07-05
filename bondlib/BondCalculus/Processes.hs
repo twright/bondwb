@@ -265,7 +265,7 @@ partial env (Mixture ((c,spec):xs)) = fromList
 partial env (React network p) = hide (networkSites network) $ partial env p
 partial _ (Mixture []) = vectZero
 
-speciesVar :: Species -> SymbolicExpr
+speciesVar :: Species -> SymbolicExpr Double
 speciesVar s = var $ "[" ++ pretty (normalForm s) ++ "]"
 
 embedProcess :: Process -> P

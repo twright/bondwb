@@ -44,7 +44,7 @@ reactions :: (Vector k (ProcessVect k), Show k, DoubleExpression k) => (Species 
 reactions tr network p = simplify $ dPdt'' reaction tr network p
 
 type ConcVect = Vect String Conc
-newtype ReactionSystem = ReactionSystem ([String], [(SymbolicExpr, ConcVect, ConcVect)], [Double])
+newtype ReactionSystem = ReactionSystem ([String], [(SymbolicExpr Double, ConcVect, ConcVect)], [Double])
   deriving (Show, Eq, Ord)
 
 extractReactionSystem :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> [Double] -> ReactionSystem
