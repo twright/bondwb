@@ -1,8 +1,8 @@
-{-# LANGUAGE GADTSyntax, TypeSynonymInstances, ConstraintKinds, FlexibleInstances, RankNTypes, IncoherentInstances, MultiParamTypeClasses, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE GADTSyntax, TypeSynonymInstances, AllowAmbiguousTypes, ScopedTypeVariables, ConstraintKinds, FlexibleInstances, RankNTypes, IncoherentInstances, MultiParamTypeClasses, FlexibleContexts, UndecidableInstances #-}
 
 module BondCalculus.Symbolic
-  (Atom(..), Expr(..), Symbolic(..), SymbolicVars(..), SymbolicExpr(..), ExprConstant,
-   var, val, valf, vali, simplify, sumToList, prodToList, applyVar,factors) where
+  (Atom(..), Expr(..), Symbolic(..), SymbolicVars(..), SymbolicExpr, ExprConstant,
+   var, valf, vali, simplify, sumToList, prodToList, applyVar,factors) where
 
 import qualified Data.Map as M
 import BondCalculus.Base
@@ -41,8 +41,6 @@ data Expr a where
   Sign  :: Expr a -> Expr a
   deriving (Show, Eq, Ord)
 
-type ExprEnv k = M.Map String k
-type SymbolicExpr a = Expr (Atom a)
 type ExprConstant a = ( DoubleExpression a
                       , Eq a
                       , Ord a
@@ -57,6 +55,9 @@ type ExprConstant a = ( DoubleExpression a
                       -- , Nullable (SymbolicExpr a)
                       , Boundable a )
 
+type ExprEnv k = M.Map String k
+type SymbolicExpr a = Expr (Atom a)
+
 applyVar :: M.Map String (Atom a) -> SymbolicExpr a -> SymbolicExpr a
 applyVar m = fmap f
   where f (Var name) = fromMaybe (Var name) (M.lookup name m)
@@ -65,11 +66,16 @@ applyVar m = fmap f
 var :: String -> SymbolicExpr a
 var = Atom . Var
 
-val :: a -> SymbolicExpr a
-val = Atom . Const
+instance ExpressionOver a (Atom a) where
+    val = Const
 
-valf :: DoubleExpression a => Double -> SymbolicExpr a
-valf = val . fromFloat
+instance ExpressionOver a (SymbolicExpr a) where
+    val = Atom . Const
+
+valf :: forall a. (DoubleExpression a) => Double -> SymbolicExpr a
+valf x = val y
+    where y :: a
+          y = fromFloat x
 
 vali :: Double -> Double -> Expr (Atom Interval)
 vali x y = val $ fromEndpoints (toRational x) (toRational y)
@@ -106,7 +112,7 @@ instance ExprConstant a => Num (SymbolicExpr a) where
     | c == d && a == f && simplify (e + b) == simplify c = a
     | otherwise = Sum l r
   l@(a `Frac` c) + r@(b `Frac` d)
-    | c == d && simplify (a + b) == simplify c = val 1.0
+    | c == d && simplify (a + b) == simplify c = 1.0
     | otherwise = Sum l r
   a@(Atom (Const x)) + b = case singleValue x of
     Just 0.0 -> b
@@ -118,8 +124,8 @@ instance ExprConstant a => Num (SymbolicExpr a) where
 
   Atom(Const 1.0) * a = a
   a * Atom(Const 1.0) = a
-  Atom(Const 0.0) * _ = val 0.0
-  _ * Atom(Const 0.0) = val 0.0
+  Atom(Const 0.0) * _ = 0.0
+  _ * Atom(Const 0.0) = 0.0
 
   -- simple products
   Atom(Const a) * Atom(Const b) = val (a*b)
@@ -147,10 +153,10 @@ instance ExprConstant a => Num (SymbolicExpr a) where
     | x == y = x**(a + b)
     | otherwise = Prod l r
   x * r@(y `Pow` b)
-    | x == y = x**(val 1 + b)
+    | x == y = x**(1 + b)
     | otherwise = Prod x r
   l@(x `Pow` a) * y
-    | x == y = x**(a + valf 1)
+    | x == y = x**(a + 1)
     | otherwise = Prod l y
 
   -- products of fractions
@@ -161,7 +167,7 @@ instance ExprConstant a => Num (SymbolicExpr a) where
 
   -- negation
   negate (Atom (Const a)) = val (-a)
-  negate a      = val (-1) * a
+  negate a      = (-1) * a
 
   -- absolute values
   abs (Atom (Const a)) = val (abs a)
@@ -178,7 +184,7 @@ instance ExprConstant a => Num (SymbolicExpr a) where
 instance (Nullable a, DoubleExpression a, Eq a) => Nullable (SymbolicExpr a) where
   isnull = (== valf 0)
 
-instance ExprConstant a => Fractional (SymbolicExpr a) where
+instance forall s . ExprConstant s => Fractional (SymbolicExpr s) where
   Atom (Const a) / Atom (Const b) = val (a/b)
   -- Atom (Const 0.0) / _ = val 0.0
   Frac a b / Frac c d = (a * d) `frac_` (b * c)
@@ -190,7 +196,7 @@ instance ExprConstant a => Fractional (SymbolicExpr a) where
   a / b = a `frac_` b
 
   recip        = (1/)
-  fromRational a = val (fromRational a)
+  fromRational a = val (fromRational a :: s)
 
 -- expression division helper
 frac_ :: ExprConstant a => SymbolicExpr a -> SymbolicExpr a -> SymbolicExpr a
@@ -199,7 +205,7 @@ a `frac_` b | a == b = valf 1.0
   
 
 instance ExprConstant a => Floating (SymbolicExpr a) where
-  pi     = val pi
+  pi     = valf pi
   a ** b = a `Pow` b
   exp (Log x) = x
   exp  x  = Exp x
@@ -222,6 +228,8 @@ instance ExprConstant a => Floating (SymbolicExpr a) where
 class SymbolicVars a where
   freeVars :: a -> [String]
 
+-- Symbolic k a means that given an ExprEnv looking up ks,
+-- we can eval an a to get a k
 class SymbolicVars a => Symbolic k a where
   eval :: ExprEnv k -> a -> Either [String] k
 
@@ -229,17 +237,26 @@ instance SymbolicVars (Atom a) where
   freeVars (Const _) = []
   freeVars (Var x) = [x]
 
-instance Symbolic a (Atom a) where
-  eval _ (Const x) = Right x
+-- redundant!
+-- instance Symbolic a (Atom a) where
+--   eval _ (Const x) = Right x
+--   eval env (Var v) = case M.lookup v env of
+--                        Just x -> Right x
+--                        Nothing -> Left ["Variable " ++ v ++ " used but not defined."]
+
+-- a = Atom b
+instance (ExpressionOver b k) => Symbolic k (Atom b) where
+  eval _ (Const y) = Right $ val y
   eval env (Var v) = case M.lookup v env of
                        Just x -> Right x
                        Nothing -> Left ["Variable " ++ v ++ " used but not defined."]
 
-instance DoubleExpression k => Symbolic k (Atom Double) where
-  eval _ (Const x) = Right $ fromFloat x
-  eval env (Var v) = case M.lookup v env of
-                       Just x -> Right x
-                       Nothing -> Left ["Variable " ++ v ++ " used but not defined."]
+-- also redundant! (since DoubleExpression k => ExpressionOver Double k)
+-- instance DoubleExpression k => Symbolic k (Atom Double) where
+--   eval _ (Const x) = Right $ fromFloat x
+--   eval env (Var v) = case M.lookup v env of
+--                        Just x -> Right x
+--                        Nothing -> Left ["Variable " ++ v ++ " used but not defined."]
 
 instance Foldable Expr where
   foldMap f (Atom x) = f x
@@ -331,7 +348,7 @@ msetIntersect :: (Eq a) => [a] -> [a] -> [a]
 msetIntersect xs ys = concat [zipWith (curry fst) (filter (==x) xs) (filter (==x) ys) | x <- L.nub (xs `L.intersect` ys)]
 
 factors :: ExprConstant a => SymbolicExpr a -> (a, [SymbolicExpr a])
-factors x@(a `Prod` b) = (a0*b0, L.sort $ as ++ bs)
+factors (a `Prod` b) = (a0*b0, L.sort $ as ++ bs)
   where (a0, as) = factors a
         (b0, bs) = factors b
 factors x@(a `Pow` Atom (Const b)) = case singleValue b of
@@ -356,16 +373,17 @@ factors (Atom (Const x)) = (x, [])
 factors x = (1.0, [x])
 
 -- simplification passes
-simps :: ExprConstant a => [SymbolicExpr a -> SymbolicExpr a]
+simps :: (ExprConstant a) => [SymbolicExpr a -> SymbolicExpr a]
 simps = [simp0, simp1, simp2, simp2a, simp3, simp4, simp5, simp6, simp7,
-         simp8, simp9, simp11, simp12, simp13, simp14, simp15,
+         simp8, simp9, simp10, simp11, simp12, simp13, simp14, simp15,
          simp16]
   where 
+    -- simp0 :: SymbolicExpr a -> SymbolicExpr a
     simp0 (Atom x) = Atom x
 
     simp0 (Atom (Const a) `Frac` Atom (Const b)) = val (a/b)
     simp0 (a@(Atom (Const x)) `Frac` b) = case singleValue x of
-      Just 0.0 -> val 0.0
+      Just 0.0 -> 1
       _        -> a `Frac` b
     simp0 x = x
 
@@ -394,13 +412,13 @@ simps = [simp0, simp1, simp2, simp2a, simp3, simp4, simp5, simp6, simp7,
 
     simp3 (a@(Atom(Const x)) `Prod` b) = case singleValue x of
       Just 1.0 -> b
-      Just 0.0 -> valf 0
+      Just 0.0 -> 0
       _        -> a `Prod` b
     simp3 x = x
 
     simp4 (a `Prod` b@(Atom(Const y))) = case singleValue y of
       Just 1.0 -> b
-      Just 0.0 -> valf 0
+      Just 0.0 -> 0
       _        -> b `Prod` a
     simp4 x = x
 
@@ -415,12 +433,12 @@ simps = [simp0, simp1, simp2, simp2a, simp3, simp4, simp5, simp6, simp7,
     simp5 x = x
         
     simp6 z@(x `Prod` (y `Pow` b))
-      | x == y = x**(val (fromRational 1) + b)
+      | x == y = x**(1 + b)
       | otherwise = z
     simp6 x = x
 
     simp7 z@((x `Pow` a) `Prod` y)
-      | x == y = x**(a + val (fromRational 1))
+      | x == y = x**(a + 1)
       | otherwise = z
     simp7 x = x
 
@@ -437,18 +455,18 @@ simps = [simp0, simp1, simp2, simp2a, simp3, simp4, simp5, simp6, simp7,
     simp9 x = x
 
     simp10 y@(Atom(Const x) `Sum` _) = case singleValue x of
-      Just 0.0 -> valf 0
+      Just 0.0 -> 0
       _        -> y
     simp10 x = x
 
     simp11 (a `Prod` b)
       | a' > b' = b' * a'
-      | a' == b' = a' ** fromFloat 2.0
+      | a' == b' = a' ** 2
       | otherwise = a' * b'
       where a' = simplify a
             b' = simplify b
     simp11 y@(Atom(Const x) `Sum` _) = case singleValue x of
-      Just 0.0 -> valf 0
+      Just 0.0 -> 0
       _        -> y
     simp11 x = x
 
@@ -469,26 +487,26 @@ simps = [simp0, simp1, simp2, simp2a, simp3, simp4, simp5, simp6, simp7,
       `Sum`   b `Prod` (d `Pow` Atom(Const y)))
       = case (singleValue x, singleValue y) of
           (Just (-1.0), Just (-1.0))
-            | c == d && simplify (a + b) == c -> valf 1.0
+            | c == d && simplify (a + b) == c -> 1
             | otherwise -> z
           _ -> z
     simp13 x = x
 
     simp14 (Sum a b)
       | a' > b' = b' + a'
-      | a' == b' = fromFloat 2.0 * a'
+      | a' == b' = 2 * a'
       | otherwise = a' + b'
       where a' = simplify a
             b' = simplify b
     simp14 y@(a `Pow` Atom(Const x)) = case singleValue x of
-      Just 0.0 -> valf 1.0
+      Just 0.0 -> 1
       Just 1.0 -> a
       _ -> y
     simp14 x = x
 
     simp15 y@(Atom(Const x) `Pow` _) = case singleValue x of
-      Just 0.0 -> valf 0.0
-      Just 1.0 -> valf 1.0
+      Just 0.0 -> 0
+      Just 1.0 -> 0
       _ -> y
     simp15 x = x
 

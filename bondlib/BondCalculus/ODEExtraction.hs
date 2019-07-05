@@ -34,17 +34,19 @@ newtype ODE a = ODE ([String], [Expr (Atom a)])
 -- MATLAB script output:
 -------------------------------
 
-extractODE :: ExprConstant a => AST.Env -> ConcreteAffinityNetwork -> P' a -> ODE a
+extractODE :: (ExprConstant a) => AST.Env -> ConcreteAffinityNetwork a -> P' a -> ODE a
 extractODE env network p = vectorFieldToODEs p'
   where -- p' must be expressed in the same basis of p
         -- otherwise the variable order becomes
         -- inconsistient, and we get extra variables
+        -- p' :: Vect AST.Species (SymbolicExpr a)
         p' = fromList [(p'coeff i, i) | (_,i) <- toList p]
+        -- p'coeff :: AST.Species -> SymbolicExpr a
         p'coeff i = fromMaybe 0.0 (H.lookup i v)
         Vect v = dPdt' tr network p
         tr = tracesGivenNetwork network env
 
-extractIVP :: ExprConstant a => AST.Env -> ConcreteAffinityNetwork -> P' a -> [a] -> IVP a
+extractIVP :: ExprConstant a => AST.Env -> ConcreteAffinityNetwork a -> P' a -> [a] -> IVP a
 extractIVP env network p = fromODEToIVP (extractODE env network p)
 
 vectorFieldToODEs :: ExprConstant a => P' a -> ODE a
@@ -57,7 +59,7 @@ vectorFieldToODEs v = ODE (vars, rhss)
 fromODEToIVP :: ODE a -> [a] -> IVP a
 fromODEToIVP (ODE (x,y)) z = IVP (x, y, z)
 
--- modelToIVP :: BondCalculusModel (SymbolicExpr Double) -> IVP
+-- modelToIVP :: BondCalculusModel SymbolicExpr Double -> IVP
 
 matlabODE :: IVP Double -> (Int,(Double,Double)) -> Either String String
 matlabODE ivp (n,(t0,tn)) =
@@ -347,7 +349,7 @@ sympyExpr mp (Log x) = do
 runPython :: String -> IO String
 runPython = readProcess "python3" ["-q"]
 
-callSolveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> [Double] -> (Int, (Double, Double)) -> IO String
+callSolveODEPython :: AST.Env -> ConcreteAffinityNetwork Double -> P' Double -> [Double] -> (Int, (Double, Double)) -> IO String
 callSolveODEPython env network p inits tr = case sympyODE (extractIVP env network p inits) tr of
   Right script -> do
     putStrLn $ "Python script:\n\n" ++ script
@@ -358,7 +360,7 @@ callSolveODEPython env network p inits tr = case sympyODE (extractIVP env networ
 generateSage :: (ExprConstant a, AsSage a)
              => String
              -> AST.Env
-             -> ConcreteAffinityNetwork
+             -> ConcreteAffinityNetwork a
              -> P' a
              -> [a]
              -> IO String
@@ -369,7 +371,7 @@ generateSage filename env network p inits = case sageODE (extractIVP env network
     return script
   Left _ -> undefined
 
-callPrintODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> PrintStyle -> IO String
+callPrintODEPython :: AST.Env -> ConcreteAffinityNetwork Double -> P' Double -> PrintStyle -> IO String
 callPrintODEPython env network p style = case sympyODEPrint (extractODE env network p) style of
   Right script -> do
     -- putStrLn $ "Python script:\n\n" ++ script
@@ -377,7 +379,7 @@ callPrintODEPython env network p style = case sympyODEPrint (extractODE env netw
     runPython script
   Left _ -> undefined
 
-solveODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> [Double] -> (Int, (Double, Double)) -> Trace
+solveODEPython :: AST.Env -> ConcreteAffinityNetwork Double -> P' Double -> [Double] -> (Int, (Double, Double)) -> Trace
 solveODEPython env network p inits tr@(n,(t0,tn))
   = let raw = unsafePerformIO (callSolveODEPython env network p inits tr)
         ts = [t0 + fromIntegral i*(tn-t0)/fromIntegral n | i <- [0..n]]
@@ -391,7 +393,7 @@ sympySimplify s = unsafePerformIO (runPython script)
   where script = "from sympy import simplify, sympify\nimport re\n" ++
                  "print(simplify(sympify(re.sub(r'([0-9]+)\\.0(?![0-9]*[1-9])', r'\\1', " ++ show s ++ "))))"
 
-printODEPython :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> PrintStyle -> String
+printODEPython :: AST.Env -> ConcreteAffinityNetwork Double -> P' Double -> PrintStyle -> String
 printODEPython env network p style
   = let raw = unsafePerformIO (callPrintODEPython env network p style)
     in raw

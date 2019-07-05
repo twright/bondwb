@@ -51,11 +51,14 @@ default-extensions:
 - FlexibleContexts
 - ConstraintKinds
 - FlexibleInstances
+# - IncoherentInstances
 - MonoLocalBinds
 - ScopedTypeVariables
+- MultiParamTypeClasses
 
 ghc-options:
 - -Wall
+- -fprint-potential-instances
 
 library:
   source-dirs: .

@@ -25,7 +25,7 @@ import Data.Void
 -- We need to define a Parser type synonym in megaparsec >= 6.0 
 type Parser = Parsec Void String
 
-parseFile :: DoubleExpression a => String -> String -> Either (ParseErrorBundle String Void) (BondCalculusModel a)
+parseFile :: ExprConstant a => String -> String -> Either (ParseErrorBundle String Void) (BondCalculusModel a)
 parseFile = runParser model
 
 parseFileCombined :: String -> String -> Either (ParseErrorBundle String Void) CombinedModel
@@ -242,7 +242,7 @@ processComponent = do
   s <- species
   return (c, s)
 
-affinityNetworkAppl :: Parser AffinityNetworkSpec
+affinityNetworkAppl :: DoubleExpression a => Parser (AffinityNetworkSpec a)
 affinityNetworkAppl = do
   name <- definitionName
   rates <- optional $ parens $ number `sepBy` comma
@@ -281,7 +281,7 @@ processCompositionList = (:[]) <$> processLiteral
 
 -- Symbolic expressions
 
-symbExpr :: (DoubleExpression a, Num (Expr (Atom a)), DoubleExpression (Expr (Atom a))) => Parser (Expr (Atom a))
+symbExpr :: (ExprConstant a) => Parser (Expr (Atom a))
 symbExpr = makeExprParser symbTerm symbExprTable
   where symbExprTable = [ [ prefixOp "-" negate
                           , prefixOp "+" id ]
@@ -294,7 +294,7 @@ symbExpr = makeExprParser symbTerm symbExprTable
         binaryOp name f = InfixL (f <$ symbol name)
         prefixOp name f = Prefix (f <$ symbol name)
 
-symbTerm :: (DoubleExpression a, Num (Expr (Atom a)), DoubleExpression (Expr (Atom a))) => Parser (Expr (Atom a))
+symbTerm :: forall a . (ExprConstant a) => Parser (Expr (Atom a))
 symbTerm = parens symbExpr
        <|> symbol "sin"   *> (sin    <$> symbTerm)
        <|> symbol "sinh"  *> (sinh   <$> symbTerm)
@@ -312,11 +312,11 @@ symbTerm = parens symbExpr
        <|> symbol "log"   *> (log    <$> symbTerm)
        <|> symbol "abs"   *> (abs    <$> symbTerm)
        <|> symbol "sign"  *> (signum <$> symbTerm)
-       <|> val <$> number
+       <|> (val :: a -> Expr(Atom a)) <$> number
        <|> var <$> symbIdentifier
 
 -- Definitions:
-kineticLawDef :: Parser (String, KineticLawDefinition)
+kineticLawDef :: ExprConstant a => Parser (String, KineticLawDefinition a)
 kineticLawDef = do
   _ <- symbol "kinetic"
   _ <- symbol "law"
@@ -335,7 +335,7 @@ kineticLawDef = do
   else fail $ "Definition of " ++ name ++ " which binds "
               ++ show (params ++ args) ++ " contains unbound variables."
 
-concreteKineticLawDef :: Parser (String, RateLawFamily)
+concreteKineticLawDef :: ExprConstant a => Parser (String, RateLawFamily a)
 concreteKineticLawDef = second concretifyKineticLaw <$> kineticLawDef
 
 processDef :: DoubleExpression a => Parser (String, AbstractProcess a)
@@ -350,19 +350,19 @@ processDef = do
 siteList :: Parser [String]
 siteList = identifier `sepBy1` symbol "+"
 
-rateLawParam :: Parser RateLawParam
+rateLawParam :: DoubleExpression a => Parser (RateLawParam a)
 rateLawParam = variable <|> value
   where variable = fmap RateLawParamVar identifier
         value    = fmap RateLawParamVal number
 
-rateLawAppl :: Parser RateLawSpec
+rateLawAppl :: DoubleExpression a => Parser (RateLawSpec a)
 rateLawAppl = do
   name <- definitionName
   params <- optional $ parens $ rateLawParam `sepBy` comma
   let params' = fromMaybe [] params
   return $ RateLawAppl name params'
 
-affinity :: Parser Affinity
+affinity :: DoubleExpression a => Parser (Affinity a)
 affinity = do
   sites <- siteList `sepBy1` comma
   _ <- symbol "at"
@@ -370,7 +370,7 @@ affinity = do
   rateLaw <- rateLawAppl
   return $ Affinity rateLaw sites
 
-affinityNetworkDef :: Parser (String, AffinityNetworkDefinition)
+affinityNetworkDef :: DoubleExpression a => Parser (String, AffinityNetworkDefinition a)
 affinityNetworkDef = do
   _ <- symbol "affinity"
   _ <- symbol "network"
@@ -403,7 +403,7 @@ speciesDef = do
   else fail $ "Definition of " ++ name ++ " which binds " ++ show locs
               ++ " contains unbound locations."
 
-definition :: DoubleExpression a => Parser (BondCalculusModel a)
+definition :: ExprConstant a => Parser (BondCalculusModel a)
 definition = sDef <|> pDef <|> aDef <|> kDef
   where -- we use a real empty model, rather than the default template as we
         -- will combine with this as unit later
@@ -413,5 +413,5 @@ definition = sDef <|> pDef <|> aDef <|> kDef
         kDef = (\(n,x) -> addKineticLawDef n x z) <$> concreteKineticLawDef
         aDef = (\(n,x) -> addAffinityNetworkDef n x z) <$> affinityNetworkDef
 
-model :: DoubleExpression a => Parser (BondCalculusModel a)
+model :: ExprConstant a => Parser (BondCalculusModel a)
 model = foldl combineModels emptyBondCalculusModel <$> many definition

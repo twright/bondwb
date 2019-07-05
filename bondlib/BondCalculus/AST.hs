@@ -5,7 +5,7 @@ module BondCalculus.AST
   Species(..),
   Name,
   Conc,
-  Rate,
+--   Rate,
   Location,
   Prefix(..),
   Syntax(..),
@@ -27,6 +27,7 @@ module BondCalculus.AST
   BondCalculusModel(..),
   KineticLawDefinition(..),
   CombinedModel(..),
+  RateLawFn,
   concretify,
   pretty,
   maxLoc,
@@ -81,11 +82,12 @@ data CombinedModel = CombinedModel { modelDouble :: BondCalculusModel Double
 -- Core concepts
 type Name = String
 type Conc = Double
-type Rate = Double
+-- type Rate = Double
 
 -- Rate laws
-newtype RateLaw = RateLaw (forall k . (DoubleExpression k) => [k] -> k)
-type RateLawFamily = [Rate] -> RateLaw
+type RateLawFn a = forall k . (ExpressionOver a k, Num k, Fractional k, Floating k, Eq k, DoubleExpression k) => [k] -> k
+newtype RateLaw a = RateLaw (RateLawFn a)
+type RateLawFamily a = [a] -> RateLaw a
 
 class (Pretty a, Expression a) => Syntax a where
   relocate :: Location -> Location -> a -> a
@@ -128,42 +130,42 @@ prefLoc (Unlocated _) = Nothing
 
 type PrefixSpecies = (Prefix, Abstraction)
 
-data RateLawParam = RateLawParamVar String
-                  | RateLawParamVal Rate
+data RateLawParam a = RateLawParamVar String
+                    | RateLawParamVal a
                     deriving (Eq, Ord, Show)
 
-data RateLawSpec = RateLawAppl String [RateLawParam]
+data RateLawSpec a = RateLawAppl String [RateLawParam a]
                 --  | RateLawFn RateLaw
                  deriving (Eq, Ord, Show)
 
-data Affinity = Affinity { affRateLaw :: RateLawSpec
-                         , affSites   :: [[Name]] }
+data Affinity a = Affinity { affRateLaw :: RateLawSpec a
+                           , affSites   :: [[Name]] }
                 deriving (Eq, Ord, Show)
 
-instance Arbitrary RateLawParam where
+instance Arbitrary (RateLawParam Double) where
     arbitrary = oneof [ liftM RateLawParamVar (oneof $ map return ["s", "t", "u"])
                       , liftM RateLawParamVal arbitrary ]
 
-instance Arbitrary RateLawSpec where
+instance Arbitrary (RateLawSpec Double) where
     arbitrary = oneof [ liftM (RateLawAppl "MA" . (:[])) arbitrary
                       , liftM2 (\x y -> RateLawAppl "MM" [x, y]) arbitrary arbitrary ]
 
-instance Arbitrary Affinity where
+instance Arbitrary (Affinity Double) where
     arbitrary = liftM2 Affinity arbitrary arbitrary
 
-data ConcreteAffinity = ConcreteAffinity { cAffRateLaw :: RateLaw
-                                         , cAffSites   :: [[Name]] }
+data ConcreteAffinity a = ConcreteAffinity { cAffRateLaw :: RateLaw a
+                                           , cAffSites   :: [[Name]] }
 
-type AffinityNetwork = [Affinity]
+type AffinityNetwork a = [Affinity a]
 
-type ConcreteAffinityNetwork = [ConcreteAffinity]
+type ConcreteAffinityNetwork a = [ConcreteAffinity a]
 
-data AffinityNetworkSpec = AffinityNetworkAppl String [Rate]
-                         | AffinityNetworkSpec AffinityNetwork
-                         | AffinityNetworkCompo AffinityNetworkSpec AffinityNetworkSpec
-                         deriving (Ord, Show)
+data AffinityNetworkSpec a = AffinityNetworkAppl String [a]
+                           | AffinityNetworkSpec (AffinityNetwork a)
+                           | AffinityNetworkCompo (AffinityNetworkSpec a) (AffinityNetworkSpec a)
+                           deriving (Ord, Show)
 
-instance Arbitrary AffinityNetworkSpec where
+instance Arbitrary (AffinityNetworkSpec Double) where
     arbitrary = sized arbitrary'
         where arbitrary' 0 = oneof [appl, spec]
               arbitrary' n = oneof [appl,
@@ -173,7 +175,7 @@ instance Arbitrary AffinityNetworkSpec where
               appl = liftM2 AffinityNetworkAppl (oneof $ map return ["A", "B", "C"]) arbitrary
               spec = liftM AffinityNetworkSpec arbitrary
 
-instance Eq AffinityNetworkSpec where
+instance Ord a => Eq (AffinityNetworkSpec a) where
     l == m = normalizeAffinityNetworkSpec l == normalizeAffinityNetworkSpec m
 
 normalizeAffinityNetworkSpec (AffinityNetworkCompo x y) = (L.sort (xs1 ++ ys1), L.sort (xs2 ++ ys2))
@@ -182,27 +184,27 @@ normalizeAffinityNetworkSpec (AffinityNetworkCompo x y) = (L.sort (xs1 ++ ys1), 
 normalizeAffinityNetworkSpec (AffinityNetworkAppl s rs) = ([(s, rs)], [])
 normalizeAffinityNetworkSpec (AffinityNetworkSpec ys) = ([], L.sort ys)
 
-instance Semigroup AffinityNetworkSpec where
+instance Semigroup (AffinityNetworkSpec a) where
     AffinityNetworkSpec xs <> AffinityNetworkSpec ys = AffinityNetworkSpec (xs ++ ys)
     x <> y = AffinityNetworkCompo x y
 
-instance Monoid AffinityNetworkSpec where
+instance Monoid (AffinityNetworkSpec a) where
     mempty = AffinityNetworkSpec []
 
 data AbstractProcess a =
-    Process AffinityNetworkSpec [(a, Species)]
+    Process (AffinityNetworkSpec a) [(a, Species)]
   | ProcessAppl String
   | ProcessCompo (AbstractProcess a) (AbstractProcess a)
   deriving (Ord, Show)
 
-mkProcess :: Num a => AffinityNetworkSpec -> [(a, Species)] -> AbstractProcess a
+mkProcess :: Num a => AffinityNetworkSpec a -> [(a, Species)] -> AbstractProcess a
 mkProcess x ys = Process x (normalizeConcSpecs ys)
 
 normalizeConcSpecs :: Num a => [(a, Species)] -> [(a, Species)]
 normalizeConcSpecs ys = [ (sum [c | (c, w) <- ys, w == s], s)
                         | s <- L.sort $ L.nub $ map snd ys ]
 
-type ProcNF a = ([String], AffinityNetworkSpec, [(a, Species)])
+type ProcNF a = ([String], AffinityNetworkSpec a, [(a, Species)])
 
 normalizeProc :: Num a => AbstractProcess a -> ProcNF a
 normalizeProc (Process x ys) = ([], x, normalizeConcSpecs ys)
@@ -213,7 +215,7 @@ normalizeProc (ProcessCompo p1 p2) = (L.sort (ps1 ++ ps2),
     where (ps1, x1, ys1) = normalizeProc p1
           (ps2, x2, ys2) = normalizeProc p2
 
-instance (Num a, Eq a) => Eq (AbstractProcess a) where
+instance (Num a, Eq a, Ord a) => Eq (AbstractProcess a) where
     Process x1 ys1 == Process x2 ys2 = x1 == x2 && normalizeConcSpecs ys1 == normalizeConcSpecs ys2
 
 instance Num a => Semigroup (AbstractProcess a) where
@@ -229,29 +231,31 @@ data SpeciesDefinition = SpeciesDef
   , specBody :: Species }
   deriving (Eq, Ord, Show)
 
-data AffinityNetworkDefinition = AffinityNetworkDef
+data AffinityNetworkDefinition a = AffinityNetworkDef
   { affArgs :: [Name]
-  , affBody :: AffinityNetwork }
+  , affBody :: AffinityNetwork a }
   deriving (Eq, Ord, Show)
 
-data KineticLawDefinition = KineticLawDef
+data KineticLawDefinition a = KineticLawDef
   { kinParms :: [Name]
   , kinArgs :: [Name]
-  , kinBody :: Symb.SymbolicExpr Double }
+  , kinBody :: Symb.SymbolicExpr a }
   deriving (Eq, Ord, Show)
 
-concretifyKineticLaw :: KineticLawDefinition -> RateLawFamily
+concretifyKineticLaw :: forall a . Symb.ExprConstant a => KineticLawDefinition a -> RateLawFamily a
 concretifyKineticLaw (KineticLawDef params args body) params' = RateLaw f
-  where f :: DoubleExpression k => [k] -> k 
+  where --f :: ExpressionOver k a => [k] -> k 
+        f :: RateLawFn a
         f args' = case Symb.eval (M.fromList $ zip args args') body' of
           Left err -> error $ concat err
           Right x  -> x
-        body' = simplify $ Symb.applyVar (M.fromList $ zip params (map Symb.Const params')) body
+        body' :: Symb.SymbolicExpr a
+        body' = simplify $ Symb.applyVar (M.fromList $ zip params (map val params')) body
 
 data BondCalculusModel a = Defs
   { speciesDefs         :: Env
-  , affinityNetworkDefs :: Map String AffinityNetworkDefinition
-  , kineticLawDefs      :: Map String RateLawFamily
+  , affinityNetworkDefs :: Map String (AffinityNetworkDefinition a)
+  , kineticLawDefs      :: Map String (RateLawFamily a)
   , processDefs         :: Map String (AbstractProcess a) }
 
 instance Show a => Show (BondCalculusModel a) where
@@ -260,7 +264,7 @@ instance Show a => Show (BondCalculusModel a) where
                                 ++ " M.empty "
                                 ++ show p
 
-instance (Num a, Eq a) => Eq (BondCalculusModel a) where
+instance (Num a, Eq a, Ord a) => Eq (BondCalculusModel a) where
   m == n = speciesDefs m         == speciesDefs n
         && affinityNetworkDefs m == affinityNetworkDefs n
         && processDefs m         == processDefs n
@@ -269,12 +273,12 @@ addSpeciesDef :: String -> SpeciesDefinition -> BondCalculusModel a -> BondCalcu
 addSpeciesDef name def (Defs s a k p) = Defs (M.insert name def s) a k p
 
 addAffinityNetworkDef :: String
-                      -> AffinityNetworkDefinition
+                      -> AffinityNetworkDefinition a
                       -> BondCalculusModel a
                       -> BondCalculusModel a
 addAffinityNetworkDef name def (Defs s a k p) = Defs s (M.insert name def a) k p
 
-addKineticLawDef :: String -> RateLawFamily -> BondCalculusModel a -> BondCalculusModel a
+addKineticLawDef :: String -> RateLawFamily a -> BondCalculusModel a -> BondCalculusModel a
 addKineticLawDef name def (Defs s a k p) = Defs s a (M.insert name def k) p
 
 addProcessDef :: String -> AbstractProcess a -> BondCalculusModel a -> BondCalculusModel a
@@ -286,11 +290,11 @@ combineModels (Defs s1 a1 k1 p1) (Defs s2 a2 k2 p2) = Defs (s1 `M.union` s2)
                                                            (k1 `M.union` k2)
                                                            (p1 `M.union` p2)
 
-massAction :: RateLawFamily
-massAction [m] = RateLaw $ \xs -> product (fromFloat m:xs)
+massAction :: Symb.ExprConstant a => RateLawFamily a
+massAction [m] = RateLaw $ \xs -> product (val m:xs)
 massAction _ = error "Wrong number of parameters provided to mass action kinetic law"
 
-emptyBondCalculusModel :: BondCalculusModel a
+emptyBondCalculusModel :: Symb.ExprConstant a => BondCalculusModel a
 emptyBondCalculusModel = Defs { speciesDefs = M.empty
   -- Mass action kinetic law is always available
                      , kineticLawDefs = M.fromList [("MA", massAction)]

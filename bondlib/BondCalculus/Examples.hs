@@ -41,7 +41,7 @@ import Prelude hiding ((*>))
 import BondCalculus.Symbolic
 import qualified Data.Map as M
 
--- massAction :: RateLawFamily
+-- massAction :: RateLawFamily Double
 -- massAction [k] xs = k * product xs
 -- massAction _ _ = error "mass action called with wrong arguments"
 
@@ -53,17 +53,17 @@ defsCH2 = M.fromList [
             ("Right", SpeciesDef [] [1] $ mkSum [(Unlocated "joinR", mkAbs 0 $ Def "RightBound" [] [0,1])]),
             ("RightBound", SpeciesDef [] [0,1] $ mkSum [(Located "unjoinR" 0, mkAbsBase $ Def "Right" [] [1])])
           ]
-affinityNetworkCH2 :: ConcreteAffinityNetwork
+affinityNetworkCH2 :: ConcreteAffinityNetwork Double
 affinityNetworkCH2 = [ ConcreteAffinity (massAction [2]) [["joinL"], ["joinR"]], ConcreteAffinity (massAction [1]) [["unjoinL", "unjoinR"]] ]
 
 simCH2 :: Trace
 simCH2 = simulate defsCH2 affinityNetworkCH2 0.1 0 (1.0 |> vect (Def "CH2" [] []))
 
-logistic :: RateLawFamily
+logistic :: RateLawFamily Double
 logistic [b, k] = RateLaw $ \[r] -> fromFloat b * r * (1 - r/fromFloat k)
 logistic _ = error "logistic called with wrong arguments"
 
-functional :: RateLawFamily
+functional :: RateLawFamily Double
 functional [beta, h] = RateLaw $ \[f, r] -> fromFloat beta * f * r / (1 + fromFloat beta * fromFloat h * r)
 functional _ = error "functional called with wrong arguments"
 
@@ -77,14 +77,14 @@ rabbitDefs = M.fromList
   , ("Blue", SpeciesDef [] [] $ mkSum [ (Unlocated "reproduceBlue", mkAbsBase $ Def "Blue" [] [] <|> Def "Blue" [] [])
                                    , (Unlocated "beEaten", mkAbsBase Nil)]) ]
 
-affinityNetworkRabbits :: ConcreteAffinityNetwork
+affinityNetworkRabbits :: ConcreteAffinityNetwork Double
 affinityNetworkRabbits =
   [ ConcreteAffinity (massAction [2]) [["reproduceRed"]]
   , ConcreteAffinity (massAction [3]) [["reproduceBlue"]]
   , ConcreteAffinity (functional [100, 2]) [["eat"], ["beEaten"]]
   , ConcreteAffinity (massAction [0.01]) [["die"]] ]
 
-affinityNetworkLogisticRabbits :: ConcreteAffinityNetwork
+affinityNetworkLogisticRabbits :: ConcreteAffinityNetwork Double
 affinityNetworkLogisticRabbits =
   [ ConcreteAffinity (logistic [2, 150]) [["reproduceRed"]]
   , ConcreteAffinity (logistic [3, 100]) [["reproduceBlue"]]
@@ -97,7 +97,7 @@ simRabbits = simulate rabbitDefs affinityNetworkRabbits 0.01 0 (1.0 |> vect (Def
 simLogisticRabbits :: Trace
 simLogisticRabbits = simulate rabbitDefs affinityNetworkLogisticRabbits 0.01 0 (1.0 |> vect (Def "Red" [] []) +> 1.0 |> vect (Def "Blue" [] []) +> 1.0 |> vect (Def "Fox" [] []))
 
-affinityNetworkEnzyme :: ConcreteAffinityNetwork
+affinityNetworkEnzyme :: ConcreteAffinityNetwork Double
 affinityNetworkEnzyme =
   [ ConcreteAffinity (massAction [1]) [["e"], ["s"]]
   , ConcreteAffinity (massAction [2]) [["x", "r"]]
@@ -215,7 +215,7 @@ partialEnzymeMM
   +> var "[E]" |> vect (Def "E" [] [] :* mkAbsBase (Def "E" [] [])
                                       :* [Unlocated "e"])
 
-affinityNetworkPolymer :: ConcreteAffinityNetwork
+affinityNetworkPolymer :: ConcreteAffinityNetwork Double
 affinityNetworkPolymer =
   [ ConcreteAffinity (massAction [2]) [["grow"]]
   , ConcreteAffinity (massAction [1]) [["shrink"]] ]

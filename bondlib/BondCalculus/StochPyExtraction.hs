@@ -40,14 +40,14 @@ reaction = multilinear react' <$> filter (/=vectZero)
         target (_ :* spec') = spec'
         sourceVect xs = foldl (+>) vectZero (map (embed.source) xs)
 
-reactions :: (Vector k (ProcessVect k), Show k, DoubleExpression k) => (Species -> MTS) -> ConcreteAffinityNetwork -> ProcessVect k -> ReactionVect k
+reactions :: (Vector k (ProcessVect k), Show k, DoubleExpression k, ExpressionOver Double k) => (Species -> MTS) -> ConcreteAffinityNetwork Double -> ProcessVect k -> ReactionVect k
 reactions tr network p = simplify $ dPdt'' reaction tr network p
 
 type ConcVect = Vect String Conc
 newtype ReactionSystem = ReactionSystem ([String], [(SymbolicExpr Double, ConcVect, ConcVect)], [Double])
   deriving (Show, Eq, Ord)
 
-extractReactionSystem :: AST.Env -> ConcreteAffinityNetwork -> P' Double -> [Double] -> ReactionSystem
+extractReactionSystem :: AST.Env -> ConcreteAffinityNetwork Double -> P' Double -> [Double] -> ReactionSystem
 extractReactionSystem env network p inits = ReactionSystem (vars, transitions, inits)
   where tr = tracesGivenNetwork network env
         vars = map (pretty.simplify.snd) (toList p)
@@ -124,7 +124,7 @@ stochPyModel (ReactionSystem (vars, transitions, inits)) h =
       initlines = [y ++ " = " ++ show (y0/h) | (y,y0) <- zip species inits]
 
 
-generateStochPy :: String -> AST.Env -> ConcreteAffinityNetwork -> P' Double -> Double -> [Double] -> IO String
+generateStochPy :: String -> AST.Env -> ConcreteAffinityNetwork Double -> P' Double -> Double -> [Double] -> IO String
 generateStochPy filename env network p h inits = case stochPyModel (extractReactionSystem env network p inits) h of
   Right script -> do
     -- putStrLn $ "Python script:\n\n" ++ script
@@ -132,7 +132,7 @@ generateStochPy filename env network p h inits = case stochPyModel (extractReact
     return script
   Left _ -> undefined
 
-simulateStochPy :: String -> Int -> AST.Env -> ConcreteAffinityNetwork -> P' Double -> Double -> [Double] -> IO Trace
+simulateStochPy :: String -> Int -> AST.Env -> ConcreteAffinityNetwork Double -> P' Double -> Double -> [Double] -> IO Trace
 simulateStochPy method steps env network p h inits = case stochPyModel (extractReactionSystem env network p inits) h of
   Right stochpy -> do
     -- putStrLn $ "Python script:\n\n" ++ script
