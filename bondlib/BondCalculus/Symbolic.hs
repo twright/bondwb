@@ -1,5 +1,3 @@
-{-# LANGUAGE GADTSyntax, TypeSynonymInstances, AllowAmbiguousTypes, ScopedTypeVariables, ConstraintKinds, FlexibleInstances, RankNTypes, IncoherentInstances, MultiParamTypeClasses, FlexibleContexts, UndecidableInstances #-}
-
 module BondCalculus.Symbolic
   (Atom(..), Expr(..), Symbolic(..), SymbolicVars(..), SymbolicExpr, ExprConstant,
    var, valf, vali, simplify, sumToList, prodToList, applyVar,factors) where
@@ -374,173 +372,113 @@ factors x = (1.0, [x])
 
 -- simplification passes
 simps :: (ExprConstant a) => [SymbolicExpr a -> SymbolicExpr a]
-simps = [simp0, simp1, simp2, simp2a, simp3, simp4, simp5, simp6, simp7,
-         simp8, simp9, simp10, simp11, simp12, simp13, simp14, simp15,
-         simp16]
+simps = [simpAtom, simpProd, simpFrac, simpSum, simpPow, simpElem]
   where 
-    -- simp0 :: SymbolicExpr a -> SymbolicExpr a
-    simp0 (Atom x) = Atom x
+    simpAtom (Atom x) = Atom x
+    simpAtom x = x
 
-    simp0 (Atom (Const a) `Frac` Atom (Const b)) = val (a/b)
-    simp0 (a@(Atom (Const x)) `Frac` b) = case singleValue x of
-      Just 0.0 -> 1
-      _        -> a `Frac` b
-    simp0 x = x
-
-    simp1 (Frac a b `Frac` Frac c d) = (a * d) / (b * c)
-    simp1 (Frac a b `Frac` c) = a / (b * c)
-    simp1 (a `Frac` b@(Atom (Const x))) = case singleValue x of
-      Just 1.0 -> a
-      _        -> a `Frac` b
-    simp1 x = x
-
-    simp2 (Frac a b) = simplify a' / simplify b'
-      where (a0,as) = factors a
-            (b0,bs) = factors b
-            as' = L.sort (val (a0/b0):as)
+    simpFrac (Atom (Const a) `Frac` Atom (Const b)) = val (a/b)
+    simpFrac (a@(Atom (Const (SingleValue 0.0))) `Frac` b) = 1
+    simpFrac (Frac a b `Frac` Frac c d) = (a * d) / (b * c)
+    simpFrac (Frac a b `Frac` c) = a / (b * c)
+    simpFrac (a `Frac` b@(Atom (Const (SingleValue 1.0)))) = a
+    simpFrac (Frac (factors -> (a0, as)) (factors -> (b0, bs))) = simplify a' / simplify b'
+      where as' = L.sort (val (a0/b0):as)
             bs' = L.sort bs
             as'' = as' L.\\ bs'
             bs'' = bs' L.\\ as'
             a' = trace ("as'' = " ++ show as'') product as''
             b' = product bs''
-    simp2 x = x
+    simpFrac x = x
 
-    simp2a (Frac a b `Prod` Frac c d) = (a * c) / (b * d)
-    simp2a (b `Prod` (a `Frac` c)) = (a * b) / c
-    simp2a ((a `Frac` c) `Prod` b) = (b * a) / c
-    simp2a x = x
-
-    simp3 (a@(Atom(Const x)) `Prod` b) = case singleValue x of
-      Just 1.0 -> b
-      Just 0.0 -> 0
-      _        -> a `Prod` b
-    simp3 x = x
-
-    simp4 (a `Prod` b@(Atom(Const y))) = case singleValue y of
-      Just 1.0 -> b
-      Just 0.0 -> 0
-      _        -> b `Prod` a
-    simp4 x = x
-
-    simp5 (Atom(Const a) `Prod` Atom(Const b)) = val (a*b)
-    simp5 (y `Prod` Log x) = Log (x**y)
-    simp5 (Log x `Prod` y) = Log (x**y)
-    simp5 (a `Prod` (b `Sum` c)) = (a*b) + (a*c)
-    simp5 ((a `Sum` b) `Prod` c) = (a*c) + (b*c)
-    simp5 z@((x `Pow` a) `Prod` (y `Pow` b))
+    simpProd (Frac a b `Prod` Frac c d) = (a * c) / (b * d)
+    simpProd (b `Prod` (a `Frac` c)) = (a * b) / c
+    simpProd ((a `Frac` c) `Prod` b) = (b * a) / c
+    simpProd (a@(Atom(Const (SingleValue 1.0))) `Prod` b) = b
+    simpProd (a@(Atom(Const (SingleValue 0.0))) `Prod` b) = 0
+    simpProd (a `Prod` b@(Atom(Const (SingleValue 1.0)))) = b
+    simpProd (a `Prod` b@(Atom(Const (SingleValue 1.0)))) = 0
+    simpProd (Atom(Const a) `Prod` Atom(Const b)) = val (a*b)
+    simpProd (y `Prod` Log x) = Log (x**y)
+    simpProd (Log x `Prod` y) = Log (x**y)
+    simpProd (a `Prod` (b `Sum` c)) = (a*b) + (a*c)
+    simpProd ((a `Sum` b) `Prod` c) = (a*c) + (b*c)
+    simpProd z@((x `Pow` a) `Prod` (y `Pow` b))
       | x == y = x**(a + b)
-      | otherwise = z
-    simp5 x = x
-        
-    simp6 z@(x `Prod` (y `Pow` b))
+    simpProd z@(x `Prod` (y `Pow` b))
       | x == y = x**(1 + b)
-      | otherwise = z
-    simp6 x = x
-
-    simp7 z@((x `Pow` a) `Prod` y)
+    simpProd z@((x `Pow` a) `Prod` y)
       | x == y = x**(a + 1)
-      | otherwise = z
-    simp7 x = x
+    simpProd z@((a `Prod` (c `Pow` Atom(Const (SingleValue (-1.0))))) `Prod` b)
+        = simplify (b * a) / simplify c
+    simpProd z@(b `Prod` (a `Prod` (c `Pow` Atom(Const (SingleValue (-1.0))))))
+        = simplify (b * a) / simplify c
+    simpProd ((simplify -> a) `Prod` (simplify -> b))
+      | a >  b = b * a
+      | a == b = a ** 2
+      | a <  b = a * b
+    simpProd x = x
 
-    simp8 z@((a `Prod` (c `Pow` Atom(Const x))) `Prod` b)
-      = case singleValue x of 
-        Just (-1.0) -> simplify (b * a) / simplify c
-        _           -> z
-    simp8 x = x
+    simpSum y@(Atom(Const (SingleValue 0.0)) `Sum` _) = 0
+    simpSum a@(Atom(Const (SingleValue 0.0)) `Sum` b) = b
+    simpSum (Atom(Const a) `Sum` Atom(Const b)) = val (a+b)
+    simpSum (((e `Prod` a) `Frac` c) `Sum` ((f `Prod` b) `Frac` d))
+        | c == d && e == f && simplify (a + b) == simplify c = e
+        | c == d && a == b && simplify (e + f) == simplify c = a
+        | c == d && e == b && simplify (a + f) == simplify c = e
+        | c == d && a == f && simplify (e + b) == simplify c = a
+    simpSum ((a `Frac` c) `Sum` (b `Frac` d))
+        | Atom (Const x) <- simplify (c / d)
+        = (val x * a + b) / d 
+    simpSum z@((e `Prod ` a) `Prod` (c `Pow` Atom(Const (SingleValue (-1))))
+      `Sum`  (f `Prod` b) `Prod` (d `Pow` Atom(Const (SingleValue (-1)))))
+        | c == d && e == f && simplify (a + b) == c = e
+        | c == d && a == b && simplify (e + f) == c = a
+        | c == d && e == b && simplify (a + f) == c = e
+        | c == d && a == f && simplify (e + b) == c = a
+    simpSum z@(a `Prod` (c `Pow` Atom(Const (SingleValue (-1))))
+      `Sum`   b `Prod` (d `Pow` Atom(Const (SingleValue (-1)))))
+        | c == d && simplify (a + b) == c = 1
+    simpSum (Sum (simplify -> a) (simplify -> b))
+      | a >  b = b + a
+      | a == b = 2 * a
+      | a <  b = a + b
+    simpSum x = x
 
-    simp9 z@(b `Prod` (a `Prod` (c `Pow` Atom(Const x))))
-      = case singleValue x of 
-        Just (-1.0) -> simplify (b * a) / simplify c
-        _           -> z
-    simp9 x = x
+    simpPow y@(a `Pow` Atom(Const (SingleValue 0))) = 1
+    simpPow y@(a `Pow` Atom(Const (SingleValue 1))) = a
+    simpPow y@(Atom(Const (SingleValue 0)) `Pow` _) = 0
+    simpPow y@(Atom(Const (SingleValue 1)) `Pow` _) = 1
+    simpPow (Atom (Const a) `Pow` Atom(Const b)) = val a ** val b
+    simpPow ((x `Prod` y) `Pow` a) = (x ** a) * (y ** a)
+    simpPow ((x `Pow` a) `Pow` b) = x ** (a * b)
+    simpPow ((simplify -> a) `Pow` (simplify -> b)) = a**b
+    simpPow x = x
 
-    simp10 y@(Atom(Const x) `Sum` _) = case singleValue x of
-      Just 0.0 -> 0
-      _        -> y
-    simp10 x = x
+    simpElem (Abs (Atom (Const x))) = val (abs x)
 
-    simp11 (a `Prod` b)
-      | a' > b' = b' * a'
-      | a' == b' = a' ** 2
-      | otherwise = a' * b'
-      where a' = simplify a
-            b' = simplify b
-    simp11 y@(Atom(Const x) `Sum` _) = case singleValue x of
-      Just 0.0 -> 0
-      _        -> y
-    simp11 x = x
+    simpElem (Log (Exp x)) = x
+    simpElem (Exp (Log x)) = x
+    simpElem (Exp (Atom (Const x))) = val (exp x)
+    simpElem (Log (Atom (Const x))) = val (log x)
 
-    simp12 (Atom(Const a) `Sum` Atom(Const b)) = val (a+b)
-    simp12 z@((e `Prod ` a) `Prod` (c `Pow` Atom(Const x))
-      `Sum`  (f `Prod` b) `Prod` (d `Pow` Atom(Const y)))
-      = case (singleValue x, singleValue y) of
-          (Just (-1.0), Just (-1.0))
-            | c == d && e == f && simplify (a + b) == c -> e
-            | c == d && a == b && simplify (e + f) == c -> a
-            | c == d && e == b && simplify (a + f) == c -> e
-            | c == d && a == f && simplify (e + b) == c -> a
-            | otherwise -> z
-          _ -> z
-    simp12 x = x
-    
-    simp13 z@(a `Prod` (c `Pow` Atom(Const x))
-      `Sum`   b `Prod` (d `Pow` Atom(Const y)))
-      = case (singleValue x, singleValue y) of
-          (Just (-1.0), Just (-1.0))
-            | c == d && simplify (a + b) == c -> 1
-            | otherwise -> z
-          _ -> z
-    simp13 x = x
-
-    simp14 (Sum a b)
-      | a' > b' = b' + a'
-      | a' == b' = 2 * a'
-      | otherwise = a' + b'
-      where a' = simplify a
-            b' = simplify b
-    simp14 y@(a `Pow` Atom(Const x)) = case singleValue x of
-      Just 0.0 -> 1
-      Just 1.0 -> a
-      _ -> y
-    simp14 x = x
-
-    simp15 y@(Atom(Const x) `Pow` _) = case singleValue x of
-      Just 0.0 -> 0
-      Just 1.0 -> 0
-      _ -> y
-    simp15 x = x
-
-    simp16 (Atom (Const a) `Pow` Atom(Const b)) = val a ** val b
-    simp16 ((x `Prod` y) `Pow` a) = (x ** a) * (y ** a)
-    simp16 ((x `Pow` a) `Pow` b) = x ** (a * b)
-    simp16 (a `Pow` b) = a'**b'
-      where a' = simplify a
-            b' = simplify b
-
-    simp16 (Abs (Atom (Const x))) = val (abs x)
-
-    simp16 (Log (Exp x)) = x
-    simp16 (Exp (Log x)) = x
-    simp16 (Exp (Atom (Const x))) = val (exp x)
-    simp16 (Log (Atom (Const x))) = val (log x)
-
-    simp16 (Exp x) = exp $ simplify x
-    simp16 (Log x) = log $ simplify x
-    simp16 (Sin x) = sin $ simplify x
-    simp16 (SinH x) = sinh $ simplify x
-    simp16 (ASin x) = asin $ simplify x
-    simp16 (ASinH x) = asinh $ simplify x
-    simp16 (Cos x) = cos $ simplify x
-    simp16 (CosH x) = cosh $ simplify x
-    simp16 (ACos x) = acos $ simplify x
-    simp16 (ACosH x) = acosh $ simplify x
-    simp16 (Tan x) = tan $ simplify x
-    simp16 (TanH x) = tanh $ simplify x
-    simp16 (ATan x) = atan $ simplify x
-    simp16 (ATanH x) = atanh $ simplify x
-    simp16 (Abs x) = abs $ simplify x
-    simp16 (Sign x) = signum $ simplify x
-    simp16 x = x
+    simpElem (Exp x) = exp $ simplify x
+    simpElem (Log x) = log $ simplify x
+    simpElem (Sin x) = sin $ simplify x
+    simpElem (SinH x) = sinh $ simplify x
+    simpElem (ASin x) = asin $ simplify x
+    simpElem (ASinH x) = asinh $ simplify x
+    simpElem (Cos x) = cos $ simplify x
+    simpElem (CosH x) = cosh $ simplify x
+    simpElem (ACos x) = acos $ simplify x
+    simpElem (ACosH x) = acosh $ simplify x
+    simpElem (Tan x) = tan $ simplify x
+    simpElem (TanH x) = tanh $ simplify x
+    simpElem (ATan x) = atan $ simplify x
+    simpElem (ATanH x) = atanh $ simplify x
+    simpElem (Abs x) = abs $ simplify x
+    simpElem (Sign x) = signum $ simplify x
+    simpElem x = x
 
 instance ExprConstant a => Expression (SymbolicExpr a) where
   simplify s | s == s' = trace ("stopped at s=" ++ show s) s

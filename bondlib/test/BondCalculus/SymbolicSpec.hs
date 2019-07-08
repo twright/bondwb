@@ -7,13 +7,14 @@ import Data.Either
 import Data.Bifunctor
 import BondCalculus.ODEExtraction (sympyExpr)
 
-import BondCalculus.Symbolic hiding (var, val)
+import qualified BondCalculus.Base as Base
+import BondCalculus.Symbolic hiding (var)
 import qualified BondCalculus.Symbolic as Symb
 
 var :: String -> SymbolicExpr Double
 var = Symb.var
 val :: Double -> SymbolicExpr Double
-val = Symb.val
+val = Base.val
 
 spec :: SpecWith ()
 spec = do
@@ -108,7 +109,7 @@ spec = do
     it "can take constants inside fractions coefficients" $
       simplify (2.0 * (var "x" / (var "x" + var "y")))
         `shouldBe`
-        ((2.0 * var "x") / (var "x" + var "y"))
+        ((var "x" * 2.0) / (var "x" + var "y"))
     it "can simplify separated fractions with coefficients" $
       simplify (2.0 * (var "x" / (var "x" + var "y"))
               + 2.0 * (var "y" / (var "x" + var "y")))

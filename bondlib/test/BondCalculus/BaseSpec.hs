@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module BondCalculus.BaseSpec (spec) where
 
 import Test.Hspec

@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns, MultiParamTypeClasses, FlexibleContexts #-}
-
 module BondCalculus.NumericalMethods
   (explicitEuler, rungeKutta4, fixedPoint, implicitEuler, implicitTrapezoidal,
    adamsMoulton2, adamsMoulton3, adaptiveAM3, adaptiveModifiedAM3,

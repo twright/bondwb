@@ -112,17 +112,17 @@ spec = do
                     (var "x" * abs(var "y") :: SymbolicExpr Double)
         `shouldBe` Just (M.empty, "(a) * (b)")
     it "translates double" $
-        sageExprAbst' (M.fromList [("x", "x")]) (val 2.0 * var "x" :: SymbolicExpr Double)
+        sageExprAbst' (M.fromList [("x", "x")]) (2 * var "x" :: SymbolicExpr Double)
         `shouldBe`
         Just (M.empty, "(2.0) * (x)")
     it "translates singleton interval" $
         sageExprAbst' (M.fromList [("x", "x")])
-                      (valf 2.0 * var "x" :: Expr (Atom Interval))
+                      (2 * var "x" :: SymbolicExpr Interval)
         `shouldBe`
         Just (M.empty, "(2.0) * (x)")
     it "translates interval" $
         sageExprAbst' (M.fromList [("x", "x")])
-                      (val (fromEndpoints 2.0 3.0) * var "x" :: Expr (Atom Interval))
+                      (val (fromEndpoints 2.0 3.0) * var "x" :: SymbolicExpr Interval)
         `shouldBe`
         Just ( M.fromList [("a0", "RIF(2.00000000000000000000, 3.00000000000000000000)")]
              , "(a0) * (x)" )

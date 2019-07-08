@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveFunctor, GeneralizedNewtypeDeriving, FlexibleContexts, FunctionalDependencies, UndecidableInstances, InstanceSigs, MonoLocalBinds #-}
+{-# LANGUAGE UndecidableInstances, IncoherentInstances #-}
 
 module BondCalculus.Vector (Tensor(..), Vector(..), Vect(..), (><), vect, (*>), delta, toList, fromList, multilinear, support) where
 

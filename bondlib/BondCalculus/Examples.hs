@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts, ConstraintKinds #-}
 module BondCalculus.Examples
   (
   simCH2,

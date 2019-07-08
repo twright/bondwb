@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric, FlexibleInstances, BangPatterns, RankNTypes, FlexibleContexts, ExistentialQuantification #-}
 module BondCalculus.AST
   (
   Abstraction(..),

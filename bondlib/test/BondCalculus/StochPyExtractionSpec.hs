@@ -6,7 +6,8 @@ import Test.Hspec
 -- import Data.Map (Map)
 import qualified Data.Map as M
 import BondCalculus.StochPyExtraction
-import BondCalculus.Symbolic hiding (Abs, var, val)
+import qualified BondCalculus.Base as Base
+import BondCalculus.Symbolic hiding (Abs, var)
 import qualified BondCalculus.Symbolic as Symb
 import BondCalculus.Vector
 import qualified BondCalculus.Examples as EX
@@ -21,7 +22,7 @@ rabbitModel = EX.rabbitModel
 var :: String -> SymbolicExpr Double
 var = Symb.var
 val :: Double -> SymbolicExpr Double
-val = Symb.val
+val = Base.val
 
 spec :: SpecWith ()
 spec = do

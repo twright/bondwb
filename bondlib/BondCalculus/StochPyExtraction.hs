@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts, MonoLocalBinds #-}
 module BondCalculus.StochPyExtraction
   (stochPyModel, generateStochPy, reaction, ReactionVect, reactions, ReactionSystem(..), extractReactionSystem, fromIVPToStochPyModel, simulateStochPy) where
 

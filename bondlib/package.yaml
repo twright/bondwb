@@ -55,6 +55,20 @@ default-extensions:
 - MonoLocalBinds
 - ScopedTypeVariables
 - MultiParamTypeClasses
+- ViewPatterns
+- PatternSynonyms
+- ParallelListComp
+- TransformListComp
+- GADTs
+- GeneralizedNewtypeDeriving
+- DeriveGeneric
+- BangPatterns
+- RankNTypes
+- ExistentialQuantification
+- DeriveDataTypeable
+- FunctionalDependencies
+- DeriveFunctor
+- TypeSynonymInstances
 
 ghc-options:
 - -Wall

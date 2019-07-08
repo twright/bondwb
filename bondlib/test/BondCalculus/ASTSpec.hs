@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module BondCalculus.ASTSpec (spec) where
 
 import Test.Hspec
@@ -306,13 +305,13 @@ spec = do
       `shouldBe`
       AffinityNetworkAppl "R" [3] <> AffinityNetworkAppl "S" [1, 2]
     xit "eq compo identity" $
-      property $ \(x :: AffinityNetworkSpec) ->
+      property $ \(x :: AffinityNetworkSpec Double) ->
         x <> mempty `shouldBe` x 
     xit "eq compo commutativity" $
-      property $ \(x :: AffinityNetworkSpec) (y :: AffinityNetworkSpec) ->
+      property $ \(x :: AffinityNetworkSpec Double) (y :: AffinityNetworkSpec Double) ->
         x <> y `shouldBe` y <> x 
     xit "eq compo associativity" $
-      property $ \(x :: AffinityNetworkSpec) (y :: AffinityNetworkSpec) (z :: AffinityNetworkSpec) ->
+      property $ \(x :: AffinityNetworkSpec Double) (y :: AffinityNetworkSpec Double) (z :: AffinityNetworkSpec Double) ->
         x <> (y <> z) `shouldBe` (x <> y) <> z
   describe "AbstractProcess" $
     describe "normalizeProcess" $

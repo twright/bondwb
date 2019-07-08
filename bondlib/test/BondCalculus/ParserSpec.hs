@@ -6,6 +6,7 @@ import Text.Megaparsec
 import Test.QuickCheck
 import BondCalculus.AST
 import BondCalculus.Parser
+import BondCalculus.Base
 import Data.Hashable (hash)
 import qualified BondCalculus.Examples as EX
 import BondCalculus.Examples (rabbitSource)
@@ -202,7 +203,8 @@ spec = do
         , Affinity (RateLawAppl "MA" [RateLawParamVar "k2"])
                    [["bindA"], ["cobindA"]]
         , Affinity (RateLawAppl "MA" [RateLawParamVar "l2"])
-                   [["unbindA", "counbindA"]]])
+                   [["unbindA", "counbindA"]]]
+         :: AffinityNetworkDefinition Double)
   describe "processDef" $ do
     it "should parse the process definition for a genetic XOR gate" $
       parse processDef ""
@@ -236,9 +238,9 @@ spec = do
       it "parses vars" $
         parse symbTerm "" "x" `shouldParseSym` var "x"
       it "parses decimal vals" $
-        parse symbTerm "" "2.1" `shouldParseSym` val 2.1
+        parse symbTerm "" "2.1" `shouldParseSym` 2.1
       it "parses integral vals" $
-        parse symbTerm "" "2" `shouldParseSym` val 2
+        parse symbTerm "" "2" `shouldParseSym` 2
       it "parses sines" $
         parse symbTerm "" "sin x" `shouldParseSym` sin (var "x")
       it "parses cosines" $
@@ -258,7 +260,7 @@ spec = do
           `shouldParseSym` (sin (var "x") + cos (var "y"))
       it "parses products" $
         parse symbExpr "" "2*x*y"
-          `shouldParseSym` (val 2 * var "x" * var "y")
+          `shouldParseSym` (2 * var "x" * var "y")
       it "parses nested expessions" $
         parse symbExpr "" "2 * cos (x + y) + sin(z * w)"
           `shouldParseSym` ((2 * cos (var "x" + var "y"))

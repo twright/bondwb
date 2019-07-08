@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module BondCalculus.VectorSpec (spec) where
 
 import Prelude hiding ((*>), (<>))
@@ -10,15 +8,16 @@ import Test.QuickCheck
 import BondCalculus.Vector
 -- import BondCalculus.Symbolic
 import Test.QuickCheck.Arbitrary
-import BondCalculus.Base
+import BondCalculus.Base hiding (val)
+import qualified BondCalculus.Base as Base
 
-import BondCalculus.Symbolic hiding (var, val)
+import BondCalculus.Symbolic hiding (var)
 import qualified BondCalculus.Symbolic as Symb
 
 var :: String -> SymbolicExpr Double
 var = Symb.var
 val :: Double -> SymbolicExpr Double
-val = Symb.val
+val = Base.val
 
 instance Arbitrary (Vect Integer Double) where
   arbitrary = sized genVect

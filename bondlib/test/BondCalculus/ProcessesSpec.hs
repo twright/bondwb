@@ -4,20 +4,21 @@ import Prelude hiding ((*>), (<>))
 
 import Test.Hspec
 import BondCalculus.AST
-import BondCalculus.Base
+import BondCalculus.Base hiding (val)
+import qualified BondCalculus.Base as Base
 import BondCalculus.Processes
 -- import Data.Map (Map)
 import qualified Data.Map as M
 import BondCalculus.Vector
 import BondCalculus.Examples
 
-import BondCalculus.Symbolic hiding (var, val)
+import BondCalculus.Symbolic hiding (var)
 import qualified BondCalculus.Symbolic as Symb
 
 var :: String -> SymbolicExpr Double
 var = Symb.var
 val :: Double -> SymbolicExpr Double
-val = Symb.val
+val = Base.val
 
 spec :: SpecWith ()
 spec = do

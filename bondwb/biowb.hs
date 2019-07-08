@@ -14,8 +14,6 @@
 
 -- You should have received a copy of the GNU General Public License
 -- along with BondWB.  If not, see <http://www.gnu.org/licenses/>.
-{-# LANGUAGE TypeSynonymInstances, ConstraintKinds, FlexibleInstances, RankNTypes, FlexibleContexts #-}
-
 import BondCalculus.Plot
 import BondCalculus.AST
 import BondCalculus.Symbolic (ExprConstant)

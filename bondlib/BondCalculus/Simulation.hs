@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module BondCalculus.Simulation
   (
   Trace,

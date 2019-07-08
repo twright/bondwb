@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
-
 module BondCalculus.Transitions
   (Transition(..), MTS, TransitionSemantics(..),
    TransitionSemanticsFiltered(..), PrefixFilter, (--:), (-->)) where

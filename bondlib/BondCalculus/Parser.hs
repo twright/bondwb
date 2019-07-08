@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module BondCalculus.Parser where
 
 import Data.Foldable

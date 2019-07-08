@@ -1,5 +1,4 @@
-{-# LANGUAGE  FlexibleInstances, BangPatterns, MultiParamTypeClasses, TypeSynonymInstances, FlexibleContexts, MonoLocalBinds #-}
-
+{-# LANGUAGE IncoherentInstances #-}
 module BondCalculus.Processes (Process(..), Affinity(..), ProcessVect,
   InteractionVect, DirectionVect, ConcreteAffinityNetwork, SymbolicModel,
   SymbolicDef, ConcreteModel, ConcreteDef, P, D, P', D',
@@ -91,8 +90,8 @@ react = multilinear react' <$> filter (/=vectZero)
         source (spec :* _) = spec
         target (_ :* spec') = spec'
 
-actions :: (Vector k (DirectionVect k), Nullable (DirectionVect k), DoubleExpression k, Show k) =>
-           ConcreteAffinityNetwork k -> InteractionVect k -> ProcessVect k
+actions :: (ExpressionOver m k, Vector k (DirectionVect k), Nullable (DirectionVect k), DoubleExpression k, Show k) =>
+           ConcreteAffinityNetwork m -> InteractionVect k -> ProcessVect k
 actions = actions' react
 
 -- actions, but without specifying how to compute reactions

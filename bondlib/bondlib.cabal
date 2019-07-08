@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f478a6cc3bdfea5d39cc441798587afd403e2ce8fdeef92223b4b0852974b1e7
+-- hash: ab2b4913e4bfcc85fb844c3af3d771161d9bd14996b09d321cafc4f6e2f702f4
 
 name:           bondlib
 version:        0.7.0.0
@@ -42,7 +42,7 @@ library
       Paths_bondlib
   hs-source-dirs:
       ./.
-  default-extensions: FlexibleContexts ConstraintKinds FlexibleInstances MonoLocalBinds ScopedTypeVariables MultiParamTypeClasses
+  default-extensions: FlexibleContexts ConstraintKinds FlexibleInstances MonoLocalBinds ScopedTypeVariables MultiParamTypeClasses ViewPatterns PatternSynonyms ParallelListComp TransformListComp GADTs GeneralizedNewtypeDeriving DeriveGeneric BangPatterns RankNTypes ExistentialQuantification DeriveDataTypeable FunctionalDependencies DeriveFunctor TypeSynonymInstances
   ghc-options: -Wall -fprint-potential-instances
   build-depends:
       Chart
@@ -83,7 +83,7 @@ test-suite bondlib-test
       Paths_bondlib
   hs-source-dirs:
       test
-  default-extensions: FlexibleContexts ConstraintKinds FlexibleInstances MonoLocalBinds ScopedTypeVariables MultiParamTypeClasses
+  default-extensions: FlexibleContexts ConstraintKinds FlexibleInstances MonoLocalBinds ScopedTypeVariables MultiParamTypeClasses ViewPatterns PatternSynonyms ParallelListComp TransformListComp GADTs GeneralizedNewtypeDeriving DeriveGeneric BangPatterns RankNTypes ExistentialQuantification DeriveDataTypeable FunctionalDependencies DeriveFunctor TypeSynonymInstances
   ghc-options: -Wall -fprint-potential-instances -Wall -O2 -fprof-auto -fwarn-tabs -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Chart

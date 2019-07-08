@@ -1,7 +1,7 @@
-{-# LANGUAGE ExistentialQuantification, RankNTypes, TypeSynonymInstances, IncoherentInstances, UndecidableInstances, FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances, IncoherentInstances #-}
 module BondCalculus.Base
   (Expression(..), Pretty(..), Nullable(..), DoubleExpression(..), ExpressionOver(..), BoolConc(..), Interval(..),
-   Boundable(..), fromEndpoints, endpoints, singleValue, powerset) where
+   Boundable(..), pattern SingleValue, fromEndpoints, endpoints, singleValue, powerset) where
 
 import Text.Printf
 import AERN2.MP ()
@@ -72,6 +72,8 @@ class Boundable a where
     inf = fst.bounds
     sup :: a -> Double
     sup = snd.bounds
+
+pattern SingleValue x <- (singleValue -> Just x)
 
 singleValue :: Boundable a => a -> Maybe Double
 singleValue x | l == u    = Just l
@@ -194,5 +196,5 @@ instance Floating Interval where
     acosh (Interval _) = error "not implemented"
     atanh (Interval _) = error "not implemented"
     log (Interval x) = Interval (log x)
-instance Nullable Interval where
-    isnull = (== fromRational 0) . abs
+-- instance Nullable Interval where
+--     isnull = (== fromRational 0) . abs
