@@ -15,6 +15,7 @@ import Data.Scientific (toRealFloat)
 import Data.Bifunctor
 -- import Text.Megaparsec.Error (Dec)
 -- import Control.Applicative
+import Text.Megaparsec.Debug
 
 import BondCalculus.Base
 import BondCalculus.AST hiding ((<|>))
@@ -118,10 +119,19 @@ definitionName = (lexeme . try) (p >>= check)
                   else return x
 
 number :: (Num a, DoubleExpression a) => Parser a
-number = fromFloat <$> real <|> uncurry fromInterval <$> interval
+number = fromFloat <$> dbg "real" real <|> uncurry fromInterval <$> dbg "interval" interval
+    -- _ <- lookAhead $ do
+    --     _ <- symbol "["
+    --     _ <- manyTill (anySingleBut ']') (try intervalSep)
+    --     _ <- manyTill (anySingleBut ']') (symbol "]")
+    --     return ()
+    
 
 real :: Parser Double
 real = LEX.signed spaceConsumer $ toRealFloat <$> lexeme LEX.scientific
+
+intervalSep :: Parser ()
+intervalSep = symbol "," <|> symbol ".." >> return ()
 
 interval :: Parser (Double, Double)
 interval = do
@@ -235,10 +245,10 @@ species :: Parser Species
 species = restriction <|> parallel
 
 -- Processes:
-processComponent :: DoubleExpression a => Parser (a, Species)
-processComponent = do
-  c <- brackets number
-  s <- species
+processComponent :: (DoubleExpression a, Show a) => Parser (a, Species)
+processComponent = dbg "processComponent" $ do
+  c <- dbg "number" (try number) <|> dbg "real" (brackets (fromFloat <$> real))
+  s <- dbg "species" species
   return (c, s)
 
 affinityNetworkAppl :: DoubleExpression a => Parser (AffinityNetworkSpec a)
@@ -248,8 +258,8 @@ affinityNetworkAppl = do
   let rates' = fromMaybe [] rates
   return $ AffinityNetworkAppl name rates'
 
-processLiteral :: DoubleExpression a => Parser (AbstractProcess a)
-processLiteral = do
+processLiteral :: (DoubleExpression a, Show a) => Parser (AbstractProcess a)
+processLiteral = dbg "processLiteral" $ do
   components <- processComponent `sepBy` symbol "||"
   _ <- symbol "with"
   _ <- symbol "network"
@@ -259,23 +269,23 @@ processLiteral = do
 -- process :: Parser AbstractProcess
 -- process = fold <$> processComponent `sepBy` symbol "||"
 
-process :: DoubleExpression a => Parser (AbstractProcess a)
+process :: (DoubleExpression a, Show a) => Parser (AbstractProcess a)
 process = fold <$> processCompositionList
 
-processCompositionList :: (DoubleExpression a, Num a) => Parser [AbstractProcess a]
-processCompositionList = (:[]) <$> processLiteral
+processCompositionList :: (DoubleExpression a, Num a, Show a) => Parser [AbstractProcess a]
+processCompositionList = (:[]) <$> try processLiteral
                      <|> proc `sepBy1'` symbol "||"
     where proc = wrappedProcess
              <|> namedProcess
              <|> mkProcess mempty . (:[]) <$> processComponent
              <|> (\x -> mkProcess x []) <$> affinityNetworkAppl
+            --  <|> processLiteral
           wrappedProcess = do
               _ <- symbol "(" 
               p <- processLiteral
               _ <- symbol ")"
               return p
           namedProcess = ProcessAppl <$> definitionName
-
 
 
 -- Symbolic expressions
@@ -337,7 +347,7 @@ kineticLawDef = do
 concreteKineticLawDef :: ExprConstant a => Parser (String, RateLawFamily a)
 concreteKineticLawDef = second concretifyKineticLaw <$> kineticLawDef
 
-processDef :: DoubleExpression a => Parser (String, AbstractProcess a)
+processDef :: (DoubleExpression a, Show a) => Parser (String, AbstractProcess a)
 processDef = do
   _ <- symbol "process"
   name <- definitionName

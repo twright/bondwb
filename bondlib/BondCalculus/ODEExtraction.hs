@@ -182,6 +182,7 @@ sageODE ivp@(IVP (vars, rhss, inits)) = case odeExprs of
             "from sage.all import *\n" ++
             "import sympy as sym\n\n" ++
             "R, x = PolynomialRing(RIF, " ++ show nvars  ++ ", 'x').objgens()\n" ++
+            "xsr = [SR.var(str(x1)) for x1 in x]\n" ++
             "xsym = sym.var(','.join(map('x{}'.format, range(0," ++ show nvars ++ "))))\n" ++
             (if (M.size cmp) > 0
              then "asym = sym.var(','.join(map('a{}'.format, range(0," ++ show (M.size cmp) ++ "))))\n"
@@ -189,13 +190,19 @@ sageODE ivp@(IVP (vars, rhss, inits)) = case odeExprs of
             "y0 = [" ++ L.intercalate ", " (map asSage inits) ++ "]\n" ++
             "ysymraw = [" ++ L.intercalate ", " odes ++ "]\n" ++
             "ysym = [sym.simplify(y1) for y1 in ysymraw]\n" ++
-            "ysage = [y1._sage_().substitute(" ++ subsExpr ++ ") for y1 in ysym]\n" ++
+            "ysr = [y1._sage_().substitute(" ++ subsExpr ++ ") for y1 in ysym]\n" ++
+            "varmap = {" ++ L.intercalate ", " varmappings ++ "}\n" ++
+            "varmapsr = {" ++ L.intercalate ", " varmappingssr ++ "}\n" ++
             "try:\n" ++
-            "    y = vector([R(y1) for y1 in ysage])\n" ++
+            "    y = vector([R(y1) for y1 in ysr])\n" ++
             "except TypeError:\n" ++
             "    y = None\n"
             where subsExpr = L.intercalate ","
                              [x ++ "=" ++ y | (x, y) <- M.toList cmp]
+                  varmappings = [ "'" ++ p ++ "': x[" ++ show i ++ "]"
+                                | p <- vars | i <- [0..] ]
+                  varmappingssr = [ "'" ++ p ++ "': xsr[" ++ show i ++ "]"
+                                  | p <- vars | i <- [0..] ]
     where
     --   odeExprs' :: AsSage a => M.Map String String -> [Expr (Atom a)] -> Maybe (M.Map String String, [String])
       odeExprs' cmp (x:xs) = do

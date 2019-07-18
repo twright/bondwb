@@ -11,6 +11,7 @@ import Data.Hashable (hash)
 import qualified BondCalculus.Examples as EX
 import BondCalculus.Examples (rabbitSource)
 import BondCalculus.Symbolic
+import Data.Either
 
 -- a `shouldParseNf` b = a `parseSatisfies` (\p -> normalForm p == normalForm b)
 -- shouldParseModel :: Parser (BondCalculusModel Double) -> BondCalculusModel a
@@ -220,6 +221,56 @@ spec = do
                 , (0.1, Def "TranscriptionFactor" ["cobindA", "counbindA"] [])
                 , (0.1, Def "TranscriptionFactor" ["cobindB", "counbindB"] [])
                 , (0.0, Def "Product" [] []) ] :: AbstractProcess Double )
+  describe "processComponents" $ do
+    it "should parse a single double process component" $
+      parse processComponent "" "[1.0] Strand"
+        `shouldParse`
+        (1.0 :: Double, Def "Strand" [] [])
+    it "should parse a single trivial interval process component" $
+      parse processComponent "" "[1.0] Strand"
+        `shouldParse`
+        (1.0 :: Interval, Def "Strand" [] [])
+    it "should parse a single trivial interval process component" $
+      parse processComponent "" "[1.0 .. 2.5] Strand"
+        `shouldParse`
+        (fromEndpoints 1.0 2.5 :: Interval, Def "Strand" [] [])
+  describe "process" $ do
+    it "should parse the process expression for a genetic XOR gate" $
+      parse process ""
+        ("[1.0] Strand"
+      ++ " || [0.1] TranscriptionFactor(cobindA, counbindA)"
+      ++ " || [0.1] TranscriptionFactor(cobindB, counbindB)"
+      ++ " || [0.0] Product")
+      `shouldParse`
+      (mkProcess mempty
+                 [ (1.0, Def "Strand" [] [])
+                 , (0.1, Def "TranscriptionFactor" ["cobindA", "counbindA"] [])
+                 , (0.1, Def "TranscriptionFactor" ["cobindB", "counbindB"] [])
+                 , (0.0, Def "Product" [] []) ] :: AbstractProcess Double)
+    it ("should parse the process expression for a genetic XOR gate " ++
+        "with an interval concentration") $
+      fmap show (parse (process :: Parser (AbstractProcess Interval)) ""
+        ("[1.0] Strand"
+      ++ " || [0.1, 0.5] TranscriptionFactor(cobindA, counbindA)"
+      ++ " || [0.2 .. 0.7] TranscriptionFactor(cobindB, counbindB)"
+      ++ " || [0.0] Product"))
+      `shouldParse`
+        ("Process (AffinityNetworkSpec []) [([0.100000 .. 0.500000],"++
+         "Def \"TranscriptionFactor\" [\"cobindA\",\"counbindA\"] []),"++
+         "([1.000000 .. 1.000000],Def \"Strand\" [] []),([0.000000 .. 0.000000],"++
+         "Def \"Product\" [] []),([0.200000 .. 0.700000],Def \"TranscriptionFactor\""++
+         " [\"cobindB\",\"counbindB\"] [])]")
+    -- We use pretty printing to check equality due to having no better way
+    -- of checking approximate equality of floats
+    --   (mkProcess mempty
+    --              [ (fromFloat 1.0,
+    --                 Def "Strand" [] [])
+    --              , (fromEndpoints 0.1 0.5,
+    --                 Def "TranscriptionFactor" ["cobindA", "counbindA"] [])
+    --              , (fromEndpoints 0.2 0.7,
+    --                 Def "TranscriptionFactor" ["cobindB", "counbindB"] [])
+    --              , (fromFloat 0.0,
+    --                 Def "Product" [] []) ] :: AbstractProcess Interval)
   describe "model" $ do
     it "should parse the mass action rabbit growth model" $
       parse model "" rabbitSource `shouldParseModel` rabbitModel
@@ -228,6 +279,15 @@ spec = do
       parse number "" "2.1" `shouldParse` (2.1 :: Double)
     it "parses integers" $
       parse number "" "2" `shouldParse` (2.0 :: Double)
+    it "parses interval basic" $
+      parse number "" "[2 .. 2.5]"
+      `shouldParse` (fromEndpoints 2 2.5 :: Interval)
+    it "parses interval basic with a comma" $
+      parse number "" "[2, 2.5]"
+      `shouldParse` (fromEndpoints 2 2.5 :: Interval)
+    it "parses double as interval" $
+      parse number "" "2.5"
+      `shouldParse` (fromFloat 2.5 :: Interval)
   describe "symbolic" $ do
     describe "symbIdentifier" $ do
       it "parses lowercase identifiers" $
