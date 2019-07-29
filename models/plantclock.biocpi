@@ -1,0 +1,51 @@
+species Gene(c,t,dM,d,i;) = c -> (Gene(c,t,dM,d,i;) | MRNA(t,dM,d,i;));
+
+species MRNA(t,dM,d,i;) = dM -> 0 + t -> (MRNA(t,dM,d,i;) | Protein(d,i;));
+
+species Protein(d,i;) = d -> 0 + i -> Protein(d,i;);
+
+species Time = beTime -> Time;
+
+species Clock = t -> (Clock | Time);
+
+kinetic law Hill02(v, k1,k2; G,I1,I2) = v / (1 + (I1/k1)**2 + (I2/k2)**2);
+
+kinetic law Hill03(v, k1,k2,k3; G,I1,I2,I3) = v / (1 + (I1/k1)**2 + (I2/k2)**2 + (I3/k3)**2);
+
+kinetic law Hill12(v1,v2, k1,k2,k3; G,A,I1,I2) = (v1 + v2*A**2/(k3**2 + A**2)) / (1 + (I1/k1)**2 + (I2/k2)**2);
+
+affinity network Aff(v1,va2,vb2,v3,v4,d1,d2,d3,d4,f1,f2,f3,f4,p1,p2,p3,p4,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10) = {
+	cCL,iP97,iP51 at rate Hill02(v1,k1,k2);
+	dMCL at rate MA(f1);
+	dCL at rate MA(d1);
+	tCL at rate MA(p1);
+
+	cP97,iCL,iP51,iEL at rate Hill12(va2,vb2,k4,k5,k3);
+	dMP97 at rate MA(f2);
+	dP97 at rate MA(d2);
+	tP97 at rate MA(p2);
+
+	cP51,iCL,iP51 at rate Hill02(v3,k6,k7);
+	dMP51 at rate MA(k3);
+	dP51 at rate MA(f3);
+	tP51 at rate MA(p3);
+
+	cEL,iCL,iP51,iEL at rate Hill03(v4,k8,k9,k10);
+	dMEL at rate MA(f4);
+	dEL at rate MA(d4);
+	tEL at rate MA(p4);
+	
+	t at rate MA(1);
+}
+
+process Pi = [1.0] Gene(cCL,tCL,dMCL,dCL,iCL) 
+		  || [1.0] Gene(cP97,tP97,dMP97,dP97,iP97) 
+		  || [1.0] Gene(cP51,tP51,dMP51,dP51,iP51) 
+		  || [1.0] Gene(cEL,tEL,dMEL,dEL,iEL) 
+		  || [1.0] Clock
+			 with network
+	         Aff(7.6,1.3,1.5,1,1.5,
+	             0.68,0.3,0.78,0.38,
+	             0.53,0.35,0.56,0.57,
+	             1.18,1.0,0.64,1.0,
+	             0.16,1.2,0.24,0.23,0.30,0.46,2.0,0.36,1.9,1.9);

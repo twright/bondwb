@@ -183,6 +183,8 @@ sageODE ivp@(IVP (vars, rhss, inits)) = case odeExprs of
             "import sympy as sym\n\n" ++
             "R, x = PolynomialRing(RIF, " ++ show nvars  ++ ", 'x').objgens()\n" ++
             "xsr = [SR.var(str(x1)) for x1 in x]\n" ++
+            "for v in xsr:\n"++
+            "   assume(v, 'real')\n"++
             "xsym = sym.var(','.join(map('x{}'.format, range(0," ++ show nvars ++ "))))\n" ++
             (if (M.size cmp) > 0
              then "asym = sym.var(','.join(map('a{}'.format, range(0," ++ show (M.size cmp) ++ "))))\n"

@@ -1,0 +1,52 @@
+continuous reachability
+{
+ state var mCL, pCL, mP97, pP97, mP51, pP51, mEL, pEL,t
+
+ par
+ {
+   v1 = 4.58  v2a = 1.27  v2b = 1.48  v3 = 1.0  v4 = 1.47
+   k1l = 0.53  k2 = 0.35  k3 = 0.56  k4 = 0.57
+   p1 = 0.76  p1l = 0.42  p2 = 1.01  p3 = 0.64  p4 = 1.01  p1T = 1.18
+   d1 = 0.68  d2l = 0.3  d3l = 0.78  d4l = 0.38
+   K1 = 0.16  K2 = 1.2  K3 = 0.24  K4 = 0.23  K5 = 0.3  K6 = 0.46  K7 = 2.0  K8 = 0.36  K9 = 1.9  K10 = 1.9
+ }
+	
+ setting
+ {
+  fixed steps 0.01
+  time 1
+  remainder estimation 1e-2
+  identity precondition
+  gnuplot octagon t,pEL
+  fixed orders 5
+  cutoff 1e-6
+  precision 50
+  output plantclock24
+  print on
+ }
+	
+ nonpoly ode {200} {
+  mCL'  = v1/(1 + (pP97/K1)^2 + (pP51/K2)^2) - k1l*mCL
+  pCL'  = p1T*mCL - d1*pCL
+  mP97' = (v2a + v2b*pCL^2/(K3^2 + pCL^2))/(1 + (pP51/K4)^2 + (pEL/K5)^2) - k2*mP97
+  pP97' = p2*mP97 - d2l*pP97
+  mP51' = v3/(1 + (pCL/K6)^2 + (pP51/K7)^2) - k3*mP51
+  pP51' = p3*mP51 - d3l*pP51
+  mEL'  = v4/(1 + (pCL/K8)^2 + (pP51/K9)^2 + (pEL/K10)^2) - k4*mEL
+  pEL'  = p4*mEL - d4l*pEL
+  t'    = 1
+ }
+ 
+ init
+ {    
+   pCL in [0,0.1]
+   pP97 in [0,0]
+   pP51 in [0,0]
+   pEL in [0,0]
+   mCL  in [0,0]
+   mP97 in [0,0]
+   mP51 in [0,0]
+   mEL  in [0,0]
+   t    in [0,0]
+ }
+}
