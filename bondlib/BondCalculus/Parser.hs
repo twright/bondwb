@@ -119,7 +119,7 @@ definitionName = (lexeme . try) (p >>= check)
                   else return x
 
 number :: (Num a, DoubleExpression a) => Parser a
-number = fromFloat <$> dbg "real" real <|> uncurry fromInterval <$> dbg "interval" interval
+number = fromFloat <$> real <|> uncurry fromInterval <$> interval
     -- _ <- lookAhead $ do
     --     _ <- symbol "["
     --     _ <- manyTill (anySingleBut ']') (try intervalSep)
@@ -246,9 +246,9 @@ species = restriction <|> parallel
 
 -- Processes:
 processComponent :: (DoubleExpression a, Show a) => Parser (a, Species)
-processComponent = dbg "processComponent" $ do
-  c <- dbg "number" (try number) <|> dbg "real" (brackets (fromFloat <$> real))
-  s <- dbg "species" species
+processComponent = do
+  c <- (try number) <|> (brackets (fromFloat <$> real))
+  s <- species
   return (c, s)
 
 affinityNetworkAppl :: DoubleExpression a => Parser (AffinityNetworkSpec a)
@@ -259,7 +259,7 @@ affinityNetworkAppl = do
   return $ AffinityNetworkAppl name rates'
 
 processLiteral :: (DoubleExpression a, Show a) => Parser (AbstractProcess a)
-processLiteral = dbg "processLiteral" $ do
+processLiteral = do
   components <- processComponent `sepBy` symbol "||"
   _ <- symbol "with"
   _ <- symbol "network"
@@ -340,7 +340,7 @@ kineticLawDef = do
   _ <- semi
   let unboundVars = filter (`notElem` (params ++ args)) $ freeVars body
   if null unboundVars
-  then return (name, KineticLawDef params args body)
+  then return (name, KineticLawDef name params args body)
   else fail $ "Definition of " ++ name ++ " which binds "
               ++ show (params ++ args) ++ " contains unbound variables."
 
@@ -356,8 +356,11 @@ processDef = do
   _ <- semi
   return (name, p)
 
+siteSep :: Parser String
+siteSep = symbol "+" <|> (notFollowedBy (symbol "||") >> symbol "|")
+
 siteList :: Parser [String]
-siteList = identifier `sepBy1` symbol "+"
+siteList = identifier `sepBy1` siteSep
 
 rateLawParam :: DoubleExpression a => Parser (RateLawParam a)
 rateLawParam = variable <|> value
@@ -373,7 +376,7 @@ rateLawAppl = do
 
 affinity :: DoubleExpression a => Parser (Affinity a)
 affinity = do
-  sites <- siteList `sepBy1` comma
+  sites <- siteList `sepBy1` (symbol "||" <|> comma)
   _ <- symbol "at"
   _ <- symbol "rate"
   rateLaw <- rateLawAppl

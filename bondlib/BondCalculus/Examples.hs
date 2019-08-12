@@ -59,11 +59,11 @@ simCH2 :: Trace
 simCH2 = simulate defsCH2 affinityNetworkCH2 0.1 0 (1.0 |> vect (Def "CH2" [] []))
 
 logistic :: RateLawFamily Double
-logistic [b, k] = RateLaw $ \[r] -> fromFloat b * r * (1 - r/fromFloat k)
+logistic [b, k] = RateLawWithExpr (RateLaw $ \[r] -> fromFloat b * r * (1 - r/fromFloat k)) (show "L(" ++ show b ++ "," ++ show k ++")")
 logistic _ = error "logistic called with wrong arguments"
 
 functional :: RateLawFamily Double
-functional [beta, h] = RateLaw $ \[f, r] -> fromFloat beta * f * r / (1 + fromFloat beta * fromFloat h * r)
+functional [beta, h] = RateLawWithExpr (RateLaw $ \[f, r] -> fromFloat beta * f * r / (1 + fromFloat beta * fromFloat h * r)) ("F(" ++ show beta ++ "," ++ show h ++ ")")
 functional _ = error "functional called with wrong arguments"
 
 rabbitDefs :: Env

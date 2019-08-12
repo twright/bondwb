@@ -175,8 +175,8 @@ f1 cmp mp x g = do
     return (cmp', g x')
 
 -- This assumes we can reduce the ODEs to sage
-sageODE :: (AsSage a, Boundable a) => IVP a -> Either String String
-sageODE ivp@(IVP (vars, rhss, inits)) = case odeExprs of
+sageODE :: (AsSage a, Boundable a) => IVP a -> String -> Either String String
+sageODE ivp@(IVP (vars, rhss, inits)) network = case odeExprs of
         Nothing -> Left "An ODE equation has an unbound variable"
         Just (cmp, odes) -> Right $
             "from sage.all import *\n" ++
@@ -195,6 +195,7 @@ sageODE ivp@(IVP (vars, rhss, inits)) = case odeExprs of
             "ysr = [y1._sage_().substitute(" ++ subsExpr ++ ") for y1 in ysym]\n" ++
             "varmap = {" ++ L.intercalate ", " varmappings ++ "}\n" ++
             "varmapsr = {" ++ L.intercalate ", " varmappingssr ++ "}\n" ++
+            "affinity_network = \"" ++ network ++ "\"\n" ++
             "try:\n" ++
             "    y = vector([R(y1) for y1 in ysr])\n" ++
             "except TypeError:\n" ++
@@ -373,7 +374,7 @@ generateSage :: (ExprConstant a, AsSage a)
              -> P' a
              -> [a]
              -> IO String
-generateSage filename env network p inits = case sageODE (extractIVP env network p inits) of
+generateSage filename env network p inits = case sageODE (extractIVP env network p inits) (pretty network) of
   Right script -> do
     putStrLn $ "Sage script:\n\n" ++ script
     writeFile filename script

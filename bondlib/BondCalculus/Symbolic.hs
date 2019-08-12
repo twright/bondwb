@@ -45,6 +45,7 @@ type ExprConstant a = ( DoubleExpression a
                       , Nullable a
                       , Num a
                       , Show a
+                      , Pretty a
                       -- , Fractional (SymbolicExpr a)
                       -- , Floating (SymbolicExpr a)
                     --   , Symbolic k (SymbolicExpr a)

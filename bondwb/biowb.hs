@@ -55,6 +55,7 @@ data Command = PlotArgs String Double Double Double Double Double Double Double 
              | LoadArgs String
              | SaveStochPyArgs String Double String
              | SaveSageArgs String String
+             | ShowProcessArgs String
              | PlotStochPyArgs String Double Int String
              | PlotUptoEpsilonArgs String Double Double Double Double Double Double Double Double
              | ODEsPrettyArgs String
@@ -115,6 +116,10 @@ commands = [
         <$> argument str  (metavar "process")
         <*> argument str (metavar "filename")
     , "Save Sage script." ),
+    ( "show"
+    , ShowProcessArgs
+        <$> argument str  (metavar "process")
+    , "Show parsed process." ),
     ( "savestochpy"
     , SaveStochPyArgs
         <$> argument str  (metavar "process")
@@ -169,9 +174,15 @@ cmd (PlotUptoEpsilonArgs name start end tolabs tolrel h hmin hmax epsilon) =
     applyConcrete name $ \env (network, _, p) ->
         let simulator = simulateUptoEpsilon epsilon env network tolabs tolrel h hmin hmax start p
         in plotTrace $ takeWhile ((<=end).fst) simulator
+-- save sage model
 cmd (SaveSageArgs name filename) =
     applySymbolic modelInterval name $ \env (network, _, p, inits) ->
         generateSage filename env network p inits >> return ()
+-- reproduce process
+cmd (ShowProcessArgs name) =
+    applySymbolic modelInterval name $ \env (network, _, p, inits) -> do
+        putStrLn $ "model = (" ++ pretty p ++ " : " ++ pretty network ++ ")"
+        return ()
 -- plot Guillespie SSA traces via StochPy
 cmd (PlotStochPyArgs name step n method) =
     applySymbolic modelDouble name $ \env (network, _, p, inits) -> do

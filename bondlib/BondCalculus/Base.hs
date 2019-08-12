@@ -86,6 +86,15 @@ instance Boundable Double where
 instance Boundable Interval where
     bounds = endpoints
 
+instance Pretty Interval where
+    pretty x = case singleValue x of
+                   Just v  -> show v
+                   Nothing -> "[" ++ show a ++ ".. " ++ show b ++ "]"
+        where (a, b) = bounds x
+
+instance Pretty Double where
+    pretty = show
+
 instance Expression Double where
 instance Expression String where
 instance Expression Integer where

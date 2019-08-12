@@ -26,6 +26,7 @@ module BondCalculus.AST
   BondCalculusModel(..),
   KineticLawDefinition(..),
   CombinedModel(..),
+  RateLawWithExpr(..),
   RateLawFn,
   concretify,
   pretty,
@@ -86,7 +87,9 @@ type Conc = Double
 -- Rate laws
 type RateLawFn a = forall k . (ExpressionOver a k, Num k, Fractional k, Floating k, Eq k, DoubleExpression k) => [k] -> k
 newtype RateLaw a = RateLaw (RateLawFn a)
-type RateLawFamily a = [a] -> RateLaw a
+data RateLawWithExpr a = RateLawWithExpr { rateLawFn :: RateLaw a
+                                         , rateLawExpr :: String }
+type RateLawFamily a = [a] -> RateLawWithExpr a
 
 class (Pretty a, Expression a) => Syntax a where
   relocate :: Location -> Location -> a -> a
@@ -152,7 +155,7 @@ instance Arbitrary (RateLawSpec Double) where
 instance Arbitrary (Affinity Double) where
     arbitrary = liftM2 Affinity arbitrary arbitrary
 
-data ConcreteAffinity a = ConcreteAffinity { cAffRateLaw :: RateLaw a
+data ConcreteAffinity a = ConcreteAffinity { cAffRateLaw :: RateLawWithExpr a
                                            , cAffSites   :: [[Name]] }
 
 type AffinityNetwork a = [Affinity a]
@@ -163,6 +166,33 @@ data AffinityNetworkSpec a = AffinityNetworkAppl String [a]
                            | AffinityNetworkSpec (AffinityNetwork a)
                            | AffinityNetworkCompo (AffinityNetworkSpec a) (AffinityNetworkSpec a)
                            deriving (Ord, Show)
+
+instance Show (RateLawWithExpr a) where
+    show = rateLawExpr
+
+instance Pretty (RateLawWithExpr a) where
+    pretty = rateLawExpr
+
+instance Show (ConcreteAffinity a) where
+    show (ConcreteAffinity rl sites) = "(" ++ show rl ++ ", "  ++ show sites ++ ")"
+
+instance Pretty Name where
+    pretty x = x
+
+instance Pretty [Name] where
+    pretty = L.intercalate "|" . map pretty
+
+instance Pretty [[Name]] where
+    pretty = L.intercalate " || " . map pretty
+
+instance Pretty (ConcreteAffinity a) where
+    pretty (ConcreteAffinity rl sites) = prl ++ " at rate " ++ psites
+        where prl = pretty rl
+              psites = pretty sites
+
+instance Pretty (ConcreteAffinityNetwork a) where
+    pretty xs = "{ " ++ inner ++ " }"
+        where inner = L.intercalate "; " (map pretty xs)
 
 instance Arbitrary (AffinityNetworkSpec Double) where
     arbitrary = sized arbitrary'
@@ -236,20 +266,23 @@ data AffinityNetworkDefinition a = AffinityNetworkDef
   deriving (Eq, Ord, Show)
 
 data KineticLawDefinition a = KineticLawDef
-  { kinParms :: [Name]
+  { kinName :: Name
+  , kinParms :: [Name]
   , kinArgs :: [Name]
   , kinBody :: Symb.SymbolicExpr a }
   deriving (Eq, Ord, Show)
 
 concretifyKineticLaw :: forall a . Symb.ExprConstant a => KineticLawDefinition a -> RateLawFamily a
-concretifyKineticLaw (KineticLawDef params args body) params' = RateLaw f
+concretifyKineticLaw (KineticLawDef name params args body) params' = RateLawWithExpr (RateLaw f) expr
   where --f :: ExpressionOver k a => [k] -> k 
         f :: RateLawFn a
         f args' = case Symb.eval (M.fromList $ zip args args') body' of
           Left err -> error $ concat err
           Right x  -> x
         body' :: Symb.SymbolicExpr a
-        body' = simplify $ Symb.applyVar (M.fromList $ zip params (map val params')) body
+        body' = simplify $ Symb.applyVar varmap body
+        expr = name ++ "(" ++ L.intercalate ", " (map pretty params') ++ ")"
+        varmap = M.fromList $ zip params (map val params')
 
 data BondCalculusModel a = Defs
   { speciesDefs         :: Env
@@ -290,7 +323,8 @@ combineModels (Defs s1 a1 k1 p1) (Defs s2 a2 k2 p2) = Defs (s1 `M.union` s2)
                                                            (p1 `M.union` p2)
 
 massAction :: Symb.ExprConstant a => RateLawFamily a
-massAction [m] = RateLaw $ \xs -> product (val m:xs)
+massAction [m] = RateLawWithExpr (RateLaw $ \xs -> product (val m:xs))
+                                 ("MA(" ++ show m ++ ")")
 massAction _ = error "Wrong number of parameters provided to mass action kinetic law"
 
 emptyBondCalculusModel :: Symb.ExprConstant a => BondCalculusModel a

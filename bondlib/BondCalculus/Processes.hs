@@ -105,7 +105,7 @@ actions' react' network !potential = L.foldl' (+>) vectZero [
       effect  = react' directs
   in trace(show magnitude ++ " * " ++ show (zip3 sites' concs directs) ++ " : " ++ pretty effect) $ if not $ isnull magnitude then magnitude |> effect else vectZero
   --  if any (not.isnull) concs then law concs |> react directs else vectZero
-  | ConcreteAffinity (RateLaw law) sites <- network ]
+  | ConcreteAffinity (RateLawWithExpr (RateLaw law) _) sites <- network ]
   where Vect h     = potential
         potential' = Vect $ H.filter (not.isnull) h
 
@@ -176,7 +176,8 @@ tracesGivenNetwork network = trace ("prefLists = " ++ show prefLists) (transFilt
     validPref :: PrefixFilter
     validPref x = trace ("testing potential " ++ show x) (L.sort x `elem` prefListSubsets)
 
-concretifyAffSpec :: BondCalculusModel a
+concretifyAffSpec :: Pretty a
+                  => BondCalculusModel a
                   -> AffinityNetworkSpec a
                   -> Either String (ConcreteAffinityNetwork a)
 concretifyAffSpec model@(Defs _ a _ _) (AffinityNetworkAppl name rates)
@@ -200,22 +201,31 @@ networkFromList affsOrErrors = case errors of
   where errors = [e | Left e <- affsOrErrors]
         affs   = [aff | Right aff <- affsOrErrors]
 
-applyAff :: BondCalculusModel a -> Affinity a -> [String] -> [a] -> Either String (ConcreteAffinity a)
+applyAff :: Pretty a
+         => BondCalculusModel a
+         -> Affinity a
+         -> [String]
+         -> [a]
+         -> Either String (ConcreteAffinity a)
 applyAff model (Affinity rls sites) params rates
   = second (`ConcreteAffinity` map L.sort sites) $ applyRateLawSpec model rls params rates
 
-applyRateLawSpec :: BondCalculusModel a
+applyRateLawSpec :: Pretty a
+                 => BondCalculusModel a
                  -> RateLawSpec a
                  -> [String]
                  -> [a] -- the rates
-                 -> Either String (RateLaw a)
+                 -> Either String (RateLawWithExpr a)
 applyRateLawSpec (Defs _ _ m _) (RateLawAppl name params) affParams rates
   = case M.lookup name m of
       Nothing -> Left $ "Kinetic law " ++ name ++ " does not exist."
       Just rlf -> if any isNothing args
                   then Left $ "Kinetic law " ++ name ++ " applied to "
                                ++ "variables which do not exist."
-                  else Right $ rlf $ map (fromMaybe undefined) args
+                  else Right $ let rlf' = rlf $ map (fromMaybe undefined) args
+                                --    expr = "(" ++ paramStrs ++ ")"
+                                --    paramStrs = L.intercalate "," (map show rates) 
+                                in rlf'
     where vals = zip affParams rates
           applyRate (RateLawParamVal x) = Just x
           applyRate (RateLawParamVar n) = L.lookup n vals
