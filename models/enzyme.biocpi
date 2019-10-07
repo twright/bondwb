@@ -4,10 +4,25 @@ species S = s(l) -> p@l -> P;
 
 species P = 0;
 
-affinity network M(k1,m1,k2) = {
-  e, s at rate MA(k1);
-  x + r at rate MA(m1);
-  x + p at rate MA(k2);
+affinity network M1(k1,m1,k2) = {
+  e || s at rate MA(k1);
+  x | r at rate MA(m1);
+  x | p at rate MA(k2);
 }
 
-process Pi = [0.1] E || [1.0] S with network M(1.0, 0.1, 0.5);
+affinity network M2(m1,k2) = {
+  x | r at rate MA(m1);
+  x | p at rate MA(k2);
+}
+
+affinity network M3(m1,k2) = {
+  e || s at rate MA([0.100000 .. 0.100000]);
+  x | r at rate MA(m1);
+  x | p at rate MA(k2);
+}
+
+process Pi1 = [0.1] E || [1.0] S with network M1(1.0, 0.1, 0.5);
+
+process Pi2 = [0.1] E || [1.0] S with network M2(0.1, 0.5);
+
+process Pi3 = [1.0] S with network M1(1.0, 0.1, 0.5);

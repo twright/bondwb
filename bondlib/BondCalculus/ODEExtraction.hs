@@ -57,7 +57,7 @@ vectorFieldToODEs v = ODE (vars, rhss)
     kis = toList v
 
 fromODEToIVP :: ODE a -> [a] -> IVP a
-fromODEToIVP (ODE (x,y)) z = IVP (x, y, z)
+fromODEToIVP (ODE (x,y)) z = IVP (x, y, take (length x) z)
 
 -- modelToIVP :: BondCalculusModel SymbolicExpr Double -> IVP
 
@@ -91,7 +91,7 @@ instance AsSage Double where
     asSage = show
 
 instance AsSage Interval where
-    asSage x = printf "RIF(%.20f, %.20f)" l u
+    asSage x = printf "RIF('[%.20f .. %.20f]')" l u
         where (l, u) = endpoints x
               -- Do some fiddling with the endpoints to ensure sound enclosure
             --   l' = l - 6e-21
@@ -176,12 +176,12 @@ f1 cmp mp x g = do
 
 -- This assumes we can reduce the ODEs to sage
 sageODE :: (AsSage a, Boundable a) => IVP a -> String -> Either String String
-sageODE ivp@(IVP (vars, rhss, inits)) network = case odeExprs of
+sageODE (IVP (vars, rhss, inits)) network = case odeExprs of
         Nothing -> Left "An ODE equation has an unbound variable"
         Just (cmp, odes) -> Right $
             "from sage.all import *\n" ++
             "import sympy as sym\n\n" ++
-            "R, x = PolynomialRing(RIF, " ++ show nvars  ++ ", 'x').objgens()\n" ++
+            "R, x = PolynomialRing(RIF, " ++ show nvars ++ ", ', '.join(map('x{}'.format, range(0, " ++ show nvars ++ ")))).objgens()\n" ++
             "xsr = [SR.var(str(x1)) for x1 in x]\n" ++
             "for v in xsr:\n"++
             "   assume(v, 'real')\n"++

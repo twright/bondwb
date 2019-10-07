@@ -186,6 +186,25 @@ spec = do
                      (Located "unbound" l,
                       mkAbsBase $ Def "Unbound"
                                   ["bind", "unbind", "bound", "unbound"] [l])])
+  describe "affinityNetwork" $ do
+    it "should parse an affinity network application" $
+      parse affinityNetwork "" "Aff(1, 2, 3)"
+        `shouldParse` AffinityNetworkAppl "Aff" [1.0 :: Double, 2.0, 3.0]
+    it "should parse an affinity network literal" $
+      parse affinityNetwork "" "{ e || s at rate MA(1); }"
+        `shouldParse` AffinityNetworkSpec [Affinity
+                                           (RateLawAppl
+                                            "MA"
+                                            [RateLawParamVal (1.0 :: Double)])
+                                           [["e"], ["s"]]]
+    it "should parse an affinity network literal with an interval rate" $
+      parse affinityNetwork "" "{ e || s at rate MA([2.0 .. 3.5]); }"
+        `shouldParse` AffinityNetworkSpec [Affinity
+                                           (RateLawAppl
+                                            "MA"
+                                            [RateLawParamVal
+                                             (fromEndpoints 2.0 3.5)])
+                                           [["e"], ["s"]]]
   describe "affinityNetworkDef" $ do
     it "should parse the affinity network definition for a genetic XOR gate" $
       parse affinityNetworkDef ""
@@ -271,6 +290,20 @@ spec = do
     --                 Def "TranscriptionFactor" ["cobindB", "counbindB"] [])
     --              , (fromFloat 0.0,
     --                 Def "Product" [] []) ] :: AbstractProcess Interval)
+    it "should parse an expression with an affinity network composed in" $
+      parse (process :: Parser (AbstractProcess Double)) "" "[1] S || { e || s at rate MA(1); }"
+        `shouldParse`
+        mkProcess (AffinityNetworkSpec
+                   [Affinity (RateLawAppl "MA" [RateLawParamVal 1.0])
+                             [["e"], ["s"]]])
+                  [(1.0, Def "S" [] [])]
+    it "should parse an expression with an affinity network composed in when surrounded in brackets" $
+      parse (process :: Parser (AbstractProcess Double)) "" "([1] S || { e || s at rate MA(1); })"
+        `shouldParse`
+        mkProcess (AffinityNetworkSpec
+                   [Affinity (RateLawAppl "MA" [RateLawParamVal 1.0])
+                             [["e"], ["s"]]])
+                  [(1.0, Def "S" [] [])]
   describe "model" $ do
     it "should parse the mass action rabbit growth model" $
       parse model "" rabbitSource `shouldParseModel` rabbitModel
@@ -288,6 +321,11 @@ spec = do
     it "parses double as interval" $
       parse number "" "2.5"
       `shouldParse` (fromFloat 2.5 :: Interval)
+    it "soundly parsers an inprecicely represenable double as an interval" $
+      fmap endpoints (parse number "" "0.333333333333333333333333333333333333333333")
+        `parseSatisfies`
+        (\(l, u) -> toRational l <= (0.333333333333333333333333333333333333333333 :: Rational)
+        && toRational u >= (0.333333333333333333333333333333333333333333 :: Rational))
   describe "symbolic" $ do
     describe "symbIdentifier" $ do
       it "parses lowercase identifiers" $

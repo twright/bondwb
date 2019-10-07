@@ -3,6 +3,8 @@ module BondCalculus.Base
   (Expression(..), Pretty(..), Nullable(..), DoubleExpression(..), ExpressionOver(..), BoolConc(..), Interval(..),
    Boundable(..), pattern SingleValue, fromEndpoints, endpoints, singleValue, powerset) where
 
+-- import Prelude hiding (fromRational)
+-- import qualified Prelude as P
 import Text.Printf
 import AERN2.MP ()
 import AERN2.MP.Precision
@@ -57,6 +59,12 @@ instance (Nullable a) => ExpressionOver a BoolConc where
 
 class (Num a, Floating a, Expression a) => DoubleExpression a where
     fromFloat :: Double -> a
+    -- fromRational :: Rational -> a
+    -- fromRational = fromFloat . fromRational
+    fromRationalEndpoints :: Rational -> Rational -> a
+    fromRationalEndpoints x y = fromInterval
+                                (fromRational x)
+                                (fromRational y) 
     fromInterval :: Double -> Double -> a
     fromInterval x y = trace
                         (printf "WARNING: casting interval %s to double "
@@ -68,6 +76,9 @@ class (Num a, Floating a, Expression a) => DoubleExpression a where
 
 class Boundable a where
     bounds :: a -> (Double, Double)
+    rationalBounds :: a -> (Rational, Rational)
+    rationalBounds x = (toRational l, toRational u)
+        where (l, u) = bounds x 
     inf :: a -> Double
     inf = fst.bounds
     sup :: a -> Double
@@ -85,11 +96,14 @@ instance Boundable Double where
 
 instance Boundable Interval where
     bounds = endpoints
+    rationalBounds (Interval x) = ( toRational $ MPF.toDoubleDown l
+                                  , toRational $ MPF.toDoubleDown u )
+        where (l, u) = MPB.endpoints x :: (MPF.MPFloat, MPF.MPFloat)
 
 instance Pretty Interval where
     pretty x = case singleValue x of
                    Just v  -> show v
-                   Nothing -> "[" ++ show a ++ ".. " ++ show b ++ "]"
+                   Nothing -> "[" ++ show a ++ " .. " ++ show b ++ "]"
         where (a, b) = bounds x
 
 instance Pretty Double where
@@ -160,8 +174,8 @@ newtype Interval = Interval MPB.MPBall deriving (Ord)
 
 fromEndpoints :: Rational -> Rational -> Interval
 fromEndpoints l u = Interval $ MPB.fromEndpoints l' u'
-    where l' = MPF.fromRationalUp defaultPrecision l
-          u' = MPF.fromRationalDown defaultPrecision u
+    where l' = MPF.fromRationalDown defaultPrecision l
+          u' = MPF.fromRationalUp defaultPrecision u
 
 -- NOTE: toDouble rounds upwards so this is conservative
 endpoints :: Interval -> (Double, Double)
@@ -179,6 +193,7 @@ instance Expression Interval where
 instance DoubleExpression Interval where
     fromFloat = fromRational . toRational
     fromInterval x y = fromEndpoints (toRational x) (toRational y)
+    fromRationalEndpoints = fromEndpoints
 
 instance Num Interval where
     Interval x + Interval y = Interval (x + y)

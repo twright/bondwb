@@ -31,8 +31,9 @@ library:
 
 executables:
   bondwb:
-    main:                biowb.hs
+    main:                bondwb.hs
     # source-dirs:         app
+    other-modules: BondCalculus.ArgListParser
     ghc-options:
     - -threaded
     - -rtsopts

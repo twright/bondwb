@@ -124,10 +124,10 @@ spec = do
         sageExprAbst' (M.fromList [("x", "x")])
                       (val (fromEndpoints 2.0 3.0) * var "x" :: SymbolicExpr Interval)
         `shouldBe`
-        Just ( M.fromList [("a0", "RIF(2.00000000000000000000, 3.00000000000000000000)")]
+        Just ( M.fromList [("a0", "RIF('[2.00000000000000000000 .. 3.00000000000000000000]')")]
              , "(a0) * (x)" )
   describe "sageODE" $ do
     it "translates a simple ODE to python sage code" $
-      sageODE ode
+      sageODE ode "{ a || b at rate MA(2) }"
       `shouldBe`
-      Right "from sage.all import *\nimport sympy as sym\n\nR, x = PolynomialRing(RIF, 2, 'x').objgens()\nxsym = sym.var(','.join(map('x{}'.format, range(0,2))))\nasym = []\ny0 = [2.0, 1.0]\nysymraw = [x0 + (-1) * ((x1) * (x0)), (x1) * (x0) + (-1) * (x1)]\nysym = [sym.simplify(y1) for y1 in ysymraw]\nysage = [y1._sage_().substitute() for y1 in ysym]\ntry:\n    y = vector([R(y1) for y1 in ysage])\nexcept TypeError:\n    y = None\n"
+      Right "from sage.all import *\nimport sympy as sym\n\nR, x = PolynomialRing(RIF, 2, ', '.join(map('x{}'.format, range(0, 2)))).objgens()\nxsr = [SR.var(str(x1)) for x1 in x]\nfor v in xsr:\n   assume(v, 'real')\nxsym = sym.var(','.join(map('x{}'.format, range(0,2))))\nasym = []\ny0 = [2.0, 1.0]\nysymraw = [x0 + (-1) * ((x1) * (x0)), (x1) * (x0) + (-1) * (x1)]\nysym = [sym.simplify(y1) for y1 in ysymraw]\nysr = [y1._sage_().substitute() for y1 in ysym]\nvarmap = {'R': x[0], 'F': x[1]}\nvarmapsr = {'R': xsr[0], 'F': xsr[1]}\naffinity_network = \"{ a || b at rate MA(2) }\"\ntry:\n    y = vector([R(y1) for y1 in ysr])\nexcept TypeError:\n    y = None\n"

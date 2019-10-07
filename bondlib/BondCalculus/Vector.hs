@@ -47,7 +47,11 @@ class (Eq k, Num k, Fractional k, Nullable k) => Vector k v | v -> k where
 -- (technically, Vect i BoolConc is a module rather than
 -- a vector space)
 support :: (Vector k (Vect i k), Hashable i, Ord i) => Vect i k -> Vect i BoolConc
-support v = fromList [(NonZero, i) | (k,i) <- toList v, not (isnull k)]
+support v = fromList [(NonZero, i) | (k,i) <- toList v] --, not (isnull k)]
+-- Don't bother to check if a process is zero!
+-- This means that we continue to include zero concentration
+-- species of a vector in support in order to extract
+-- ODEs which may be used with different initial conditions than 
 
 -- A fancified tuple for forming cartesian products of basis elements
 data Tensor a b =  a :* b

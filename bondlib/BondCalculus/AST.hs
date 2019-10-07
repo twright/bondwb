@@ -186,13 +186,13 @@ instance Pretty [[Name]] where
     pretty = L.intercalate " || " . map pretty
 
 instance Pretty (ConcreteAffinity a) where
-    pretty (ConcreteAffinity rl sites) = prl ++ " at rate " ++ psites
+    pretty (ConcreteAffinity rl sites) = psites ++ " at rate " ++ prl
         where prl = pretty rl
               psites = pretty sites
 
 instance Pretty (ConcreteAffinityNetwork a) where
     pretty xs = "{ " ++ inner ++ " }"
-        where inner = L.intercalate "; " (map pretty xs)
+        where inner = L.intercalate " " $ map ((++";") . pretty) xs
 
 instance Arbitrary (AffinityNetworkSpec Double) where
     arbitrary = sized arbitrary'
@@ -225,6 +225,13 @@ data AbstractProcess a =
   | ProcessAppl String
   | ProcessCompo (AbstractProcess a) (AbstractProcess a)
   deriving (Ord, Show)
+
+instance Pretty a => Pretty (AbstractProcess a) where
+    pretty (Process net concSpecs) = cs ++ " with network " ++ show net
+        where cs = L.intercalate " || " css
+              css = ["[" ++ pretty c ++ "] " ++ pretty s | (c, s) <- concSpecs]
+    pretty (ProcessAppl s) = s
+    pretty (ProcessCompo x y) = "(" ++ pretty x ++ ") || (" ++ pretty y ++ ")"
 
 mkProcess :: Num a => AffinityNetworkSpec a -> [(a, Species)] -> AbstractProcess a
 mkProcess x ys = Process x (normalizeConcSpecs ys)
@@ -324,7 +331,7 @@ combineModels (Defs s1 a1 k1 p1) (Defs s2 a2 k2 p2) = Defs (s1 `M.union` s2)
 
 massAction :: Symb.ExprConstant a => RateLawFamily a
 massAction [m] = RateLawWithExpr (RateLaw $ \xs -> product (val m:xs))
-                                 ("MA(" ++ show m ++ ")")
+                                 ("MA(" ++ pretty m ++ ")")
 massAction _ = error "Wrong number of parameters provided to mass action kinetic law"
 
 emptyBondCalculusModel :: Symb.ExprConstant a => BondCalculusModel a

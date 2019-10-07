@@ -119,7 +119,8 @@ definitionName = (lexeme . try) (p >>= check)
                   else return x
 
 number :: (Num a, DoubleExpression a) => Parser a
-number = fromFloat <$> real <|> uncurry fromInterval <$> interval
+number = fromRational <$> rational
+     <|> uncurry fromRationalEndpoints <$> interval
     -- _ <- lookAhead $ do
     --     _ <- symbol "["
     --     _ <- manyTill (anySingleBut ']') (try intervalSep)
@@ -127,18 +128,30 @@ number = fromFloat <$> real <|> uncurry fromInterval <$> interval
     --     return ()
     
 
+rational :: Parser Rational
+rational = LEX.signed spaceConsumer $ toRational <$> lexeme LEX.scientific
+
 real :: Parser Double
 real = LEX.signed spaceConsumer $ toRealFloat <$> lexeme LEX.scientific
 
 intervalSep :: Parser ()
 intervalSep = symbol "," <|> symbol ".." >> return ()
 
-interval :: Parser (Double, Double)
-interval = do
+intervalDouble :: Parser (Double, Double)
+intervalDouble = do
     _ <- symbol "["
     x <- real
     _ <- symbol "," <|> symbol ".."
     y <- real
+    _ <- symbol "]"
+    return (x, y)
+
+interval :: Parser (Rational, Rational)
+interval = do
+    _ <- symbol "["
+    x <- rational
+    _ <- symbol "," <|> symbol ".."
+    y <- rational
     _ <- symbol "]"
     return (x, y)
 
@@ -258,12 +271,20 @@ affinityNetworkAppl = do
   let rates' = fromMaybe [] rates
   return $ AffinityNetworkAppl name rates'
 
+affinityNetworkLiteral :: DoubleExpression a
+                       => Parser (AffinityNetworkSpec a)
+affinityNetworkLiteral = AffinityNetworkSpec <$> affinityNetworkBody
+
+affinityNetwork :: DoubleExpression a
+                => Parser (AffinityNetworkSpec a)
+affinityNetwork = affinityNetworkAppl <|> affinityNetworkLiteral
+
 processLiteral :: (DoubleExpression a, Show a) => Parser (AbstractProcess a)
 processLiteral = do
   components <- processComponent `sepBy` symbol "||"
   _ <- symbol "with"
   _ <- symbol "network"
-  network <- affinityNetworkAppl
+  network <- affinityNetwork
   return $ Process network components
 
 -- process :: Parser AbstractProcess
@@ -274,15 +295,15 @@ process = fold <$> processCompositionList
 
 processCompositionList :: (DoubleExpression a, Num a, Show a) => Parser [AbstractProcess a]
 processCompositionList = (:[]) <$> try processLiteral
-                     <|> proc `sepBy1'` symbol "||"
+                     <|> foldl1 (++) <$> proc `sepBy1'` symbol "||"
     where proc = wrappedProcess
-             <|> namedProcess
-             <|> mkProcess mempty . (:[]) <$> processComponent
-             <|> (\x -> mkProcess x []) <$> affinityNetworkAppl
+             <|> (:[]) <$> namedProcess
+             <|> (:[]) <$> mkProcess mempty . (:[]) <$> processComponent
+             <|> (\x -> [mkProcess x []]) <$> affinityNetwork
             --  <|> processLiteral
           wrappedProcess = do
               _ <- symbol "(" 
-              p <- processLiteral
+              p <- processCompositionList
               _ <- symbol ")"
               return p
           namedProcess = ProcessAppl <$> definitionName
@@ -382,7 +403,8 @@ affinity = do
   rateLaw <- rateLawAppl
   return $ Affinity rateLaw sites
 
-affinityNetworkDef :: DoubleExpression a => Parser (String, AffinityNetworkDefinition a)
+affinityNetworkDef :: DoubleExpression a
+                   => Parser (String, AffinityNetworkDefinition a)
 affinityNetworkDef = do
   _ <- symbol "affinity"
   _ <- symbol "network"
@@ -390,10 +412,14 @@ affinityNetworkDef = do
   rates <- optional $ parens $ identifier `sepBy` comma
   let rates' = fromMaybe [] rates
   _ <- symbol "="
-  affinities <- braces $ many $ do aff <- affinity
-                                   _ <- semi
-                                   return aff
+  affinities <- affinityNetworkBody
   return (name, AffinityNetworkDef rates' affinities)
+
+affinityNetworkBody :: DoubleExpression a
+                    => Parser (AffinityNetwork a)
+affinityNetworkBody = braces $ many $ do aff <- affinity
+                                         _ <- semi
+                                         return aff
 
 speciesDef :: Parser (String, SpeciesDefinition)
 speciesDef = do
