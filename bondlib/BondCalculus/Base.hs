@@ -170,7 +170,19 @@ instance (Num a, Eq a) => Nullable a where
     isnull = (==) 0 
 
 -- AERN2 based intervals -- MPBall
-newtype Interval = Interval MPB.MPBall deriving (Ord)
+newtype Interval = Interval MPB.MPBall -- deriving (Ord)
+
+-- use a mixture of lexicographical and interval ordering
+-- we really cannot have interval ordering as an partially defined
+-- operation and this is just needed for internal code reasons,
+-- not for safety
+instance Ord Interval where
+    x <= y | xu <= yl  = True
+           | yu < xl = False
+           | otherwise = (xl, xu) <= (yl, yu)
+        where (xl, xu) = endpoints x
+              (yl, yu) = endpoints y
+
 
 fromEndpoints :: Rational -> Rational -> Interval
 fromEndpoints l u = Interval $ MPB.fromEndpoints l' u'
