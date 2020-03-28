@@ -1,0 +1,39 @@
+FROM thomasdwright/bondwb-env:latest 
+
+RUN mkdir -p /workspace/bin
+RUN mkdir -p /workspace/home
+RUN mkdir -p /workspace/home/src
+WORKDIR /workspace
+ARG USERNAME=dev
+RUN useradd -m $USERNAME
+RUN cp /root/.local/bin/* /workspace/bin/ && chown -R dev:dev /workspace
+ENV SHELL /bin/zsh
+ENV PATH /workspace/bin:$PATH
+# RUN cp /root/.local/bin/hie /usr/local/bin/hie
+# RUN cd haskell-ide-engine && stack ./install.hs build-doc
+
+ENV HOME /workspace/home
+
+# [Optional] Add sudo support
+RUN apt-get install -y sudo \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# ** Anything else you want to do like clean up goes here **
+
+# Set the default user
+USER $USERNAME
+
+WORKDIR $HOME
+
+# RUN stack setup
+# RUN stack build --stack-yaml=stack-native.yaml
+RUN stack install cabal-install
+
+ENV PATH=/workspace/home/.local/bin:$PATH
+
+
+# USER stack
+# ENV HOME /home/user
+# CMD ["bash"]
+ENTRYPOINT ["/usr/local/sbin/pid1"]

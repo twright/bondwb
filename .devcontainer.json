@@ -1,0 +1,6 @@
+// See https://aka.ms/vscode-remote/devcontainer.json for format details.
+{
+    "dockerFile": "DockerfileHIE",
+    // "runArgs": ["-u", "dev"],
+	"extensions": ["alanz.vscode-hie-server", "Docker"]
+}

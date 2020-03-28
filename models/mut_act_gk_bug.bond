@@ -1,0 +1,12 @@
+species S = ssynthR -> (S | R);
+
+species R = decayR -> 0
+          + epsynthR -> (R | R);
+           
+kinetic law G(f,u,v,J,K; R) = (v - u*R + v*J + u*R*K + ((v - u*R + v*J + u*R*K)**2 - 4*(v - u*R) * u*R * K)**0.5);
+
+affinity network N(k0, k1, k2, k3, k4, j3, j4) = {
+    epsynthR at rate G(k0,k3,k4,j3,j4);
+}
+
+process Pi = [0.0] S || [0.0] R with network N(0.4,0.01,1,1,0.2,0.05,0.05);

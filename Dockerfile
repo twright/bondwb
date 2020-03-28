@@ -84,6 +84,20 @@ RUN 2to3 -w /usr/local/lib/python3.6/dist-packages/stochpy/modules/PyscesMiniMod
 #RUN rm ./stack.yaml && mv ./stack-native.yaml ./stack.yaml
 # --RUN stack build && stack install
 
+# Haskell IDE engine
+RUN apt-get update && apt-get install -y libicu-dev libtinfo-dev libgmp-dev
+RUN git clone https://github.com/haskell/haskell-ide-engine --recurse-submodules
+RUN mkdir -p /root/.local/bin
+RUN apt-get update && apt-get install -y dnsutils apt-utils
+RUN cd haskell-ide-engine && stack ./install.hs hie-8.6.5
+# RUN ln -s /root/.local/bin/hie /usr/local/bin/hie && chmod 755 /root/.local/bin/hie
+RUN mkdir /opt/app/src
+RUN apt-get update && apt-get install -y zsh
+ENV SHELL /bin/zsh
+ENV PATH /root/.local/bin:$PATH
+# RUN cp /root/.local/bin/hie /usr/local/bin/hie
+# RUN cd haskell-ide-engine && stack ./install.hs build-doc
+
 # USER stack
 # ENV HOME /home/user
 # CMD ["bash"]

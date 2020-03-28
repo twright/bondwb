@@ -1,0 +1,35 @@
+species E = e(l) -> x@l -> E;
+
+species S = s(l) -> p@l -> P + d -> 0;
+
+species P = 0;
+
+affinity network M1(k1,m1,k2) = {
+  e || s at rate MA(k1);
+  x | r at rate MA(m1);
+  x | p at rate MA(k2);
+}
+
+affinity network M2(m1,k2) = {
+  x | r at rate MA(m1);
+  x | p at rate MA(k2);
+}
+
+affinity network M3(m1,k2) = {
+  e || s at rate MA([0.100000 .. 0.100000]);
+  x | r at rate MA(m1);
+  x | p at rate MA(k2);
+}
+
+affinity network M4(k1,m1,k2,d1) = {
+  e || s at rate MA(k1);
+  x | r at rate MA(m1);
+  x | p at rate MA(k2);
+  d at rate MA(d1);
+}
+
+process Pi1 = [0.1] E || [1.0] S with network M1(1.0, 0.1, 0.5);
+
+process Pi2 = [0.1] E || [1.0] S with network M2(0.1, 0.5);
+
+process Pi3 = [1.0] S with network M1(1.0, 0.1, 0.5);

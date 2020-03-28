@@ -7,7 +7,7 @@ species E = e -> E;
 kinetic law MichaelisMenten(k, K; C, S) = k*C*S/(K + S);
 
 affinity network M(v,k) = {
-  e, s at rate MichaelisMenten(v, k);
+  e || s at rate MichaelisMenten(v, k);
 }
 
 process Pi = [100] S || [10] E with network M(1.1, 2.0);

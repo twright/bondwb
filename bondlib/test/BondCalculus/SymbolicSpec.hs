@@ -148,6 +148,17 @@ spec = do
     xit "simplifies repressilator Cl expression" $
       sympyExpr (M.fromList [("x" ++ show i, "x" ++ show i) | i <- [0..5]]) (simplify (((val 10.0 * (var "x5" + var "x0" + var "x1")) * (var "x1" * val (-1.0))) / (var "x5" + var "x0" + var "x1") + (val 10.0 * (var "x3" + var "x4" + var "x2") * (var "x4")) / (var "x4" + var "x3" + var "x2")))
         `shouldBe` Just "x"
+    it "does not mess up Goldbeater-Koshland denominator" $
+        let expr = (var "a0" + var "a1"
+                    + (var "x1") * (val (-1))
+                    + (var "a2") * (var "x1")
+                    + ((val (-1)) * ((var "a3") * ((var "a4") * (var "x1")))
+                    + (val (-1)) * ((var "a5")
+                       * ((var "x1") * ((val 4.0) * ((var "x1") * (val (-1))))))
+                    + (var "a6" + var "a7"
+                       + (var "x1") * (val (-1))
+                       +  (var "a8") * (var "x1")) ** (val 2.0)) ** (val 0.5))
+        in simplify expr `shouldBe` expr
   describe "factors" $ do
     it "finds factors of a product" $
       factors (var "a" * var "b" * var "c") `shouldBe`
