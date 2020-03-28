@@ -96,7 +96,7 @@ instance ExprConstant a => Num (SymbolicExpr a) where
     | x == y = val (a + b) * x
     | otherwise = Sum l r
   l@(x `Prod` Atom (Const a)) + r@(Atom (Const b) `Prod` y)
-    | x == y = val (a + b) * x
+    | x == y = x * val (a + b)
     | otherwise = Sum l r
   l@(Atom (Const a) `Prod` x) + r@(y `Prod` Atom (Const b))
     | x == y = val (a + b) * x
@@ -379,10 +379,10 @@ simps = [simpAtom, simpProd, simpFrac, simpSum, simpPow, simpElem]
     simpAtom x = x
 
     simpFrac (Atom (Const a) `Frac` Atom (Const b)) = val (a/b)
-    simpFrac (a@(Atom (Const (SingleValue 0.0))) `Frac` b) = 1
+    simpFrac ((Atom (Const (SingleValue 0.0))) `Frac` _) = 1
     simpFrac (Frac a b `Frac` Frac c d) = (a * d) / (b * c)
     simpFrac (Frac a b `Frac` c) = a / (b * c)
-    simpFrac (a `Frac` b@(Atom (Const (SingleValue 1.0)))) = a
+    simpFrac (a `Frac` (Atom (Const (SingleValue 1.0)))) = a
     simpFrac (Frac (factors -> (a0, as)) (factors -> (b0, bs))) = simplify a' / simplify b'
       where as' = L.sort (val (a0/b0):as)
             bs' = L.sort bs
@@ -393,35 +393,35 @@ simps = [simpAtom, simpProd, simpFrac, simpSum, simpPow, simpElem]
     simpFrac x = x
 
     simpProd (Frac a b `Prod` Frac c d) = (a * c) / (b * d)
-    simpProd (b `Prod` (a `Frac` c)) = (a * b) / c
-    simpProd ((a `Frac` c) `Prod` b) = (b * a) / c
-    simpProd (a@(Atom(Const (SingleValue 1.0))) `Prod` b) = b
-    simpProd (a@(Atom(Const (SingleValue 0.0))) `Prod` b) = 0
-    simpProd (a `Prod` b@(Atom(Const (SingleValue 1.0)))) = b
-    simpProd (a `Prod` b@(Atom(Const (SingleValue 1.0)))) = 0
+    simpProd (b `Prod` (a `Frac` c)) = (b * a) / c
+    simpProd ((a `Frac` c) `Prod` b) = (a * b) / c
+    simpProd ((Atom(Const (SingleValue 1.0))) `Prod` a) = a
+    simpProd ((Atom(Const (SingleValue 0.0))) `Prod` _) = 0
+    simpProd (a `Prod` (Atom(Const (SingleValue 1.0)))) = a
+    simpProd (a `Prod` (Atom(Const (SingleValue 0.0)))) = 0
     simpProd (Atom(Const a) `Prod` Atom(Const b)) = val (a*b)
     simpProd (y `Prod` Log x) = Log (x**y)
     simpProd (Log x `Prod` y) = Log (x**y)
     simpProd (a `Prod` (b `Sum` c)) = (a*b) + (a*c)
     simpProd ((a `Sum` b) `Prod` c) = (a*c) + (b*c)
-    simpProd z@((x `Pow` a) `Prod` (y `Pow` b))
+    simpProd ((x `Pow` a) `Prod` (y `Pow` b))
       | x == y = x**(a + b)
-    simpProd z@(x `Prod` (y `Pow` b))
+    simpProd (x `Prod` (y `Pow` b))
       | x == y = x**(1 + b)
-    simpProd z@((x `Pow` a) `Prod` y)
+    simpProd ((x `Pow` a) `Prod` y)
       | x == y = x**(a + 1)
-    simpProd z@((a `Prod` (c `Pow` Atom(Const (SingleValue (-1.0))))) `Prod` b)
-        = simplify (b * a) / simplify c
-    simpProd z@(b `Prod` (a `Prod` (c `Pow` Atom(Const (SingleValue (-1.0))))))
-        = simplify (b * a) / simplify c
+    simpProd (a `Prod` (b `Pow` Atom(Const (SingleValue (-1.0)))))
+        = simplify a / simplify b
+    simpProd ((b `Pow` Atom(Const (SingleValue (-1.0)))) `Prod` a)
+        = simplify a / simplify b
     simpProd ((simplify -> a) `Prod` (simplify -> b))
       | a >  b = b * a
       | a == b = a ** 2
       | a <  b = a * b
     simpProd x = x
 
-    simpSum y@(Atom(Const (SingleValue 0.0)) `Sum` _) = 0
-    simpSum a@(Atom(Const (SingleValue 0.0)) `Sum` b) = b
+    simpSum (Atom(Const (SingleValue 0.0)) `Sum` a) = a
+    simpSum (a `Sum` Atom(Const (SingleValue 0.0))) = a
     simpSum (Atom(Const a) `Sum` Atom(Const b)) = val (a+b)
     simpSum (((e `Prod` a) `Frac` c) `Sum` ((f `Prod` b) `Frac` d))
         | c == d && e == f && simplify (a + b) == simplify c = e
@@ -446,11 +446,11 @@ simps = [simpAtom, simpProd, simpFrac, simpSum, simpPow, simpElem]
       | a <  b = a + b
     simpSum x = x
 
-    simpPow y@(a `Pow` Atom(Const (SingleValue 0))) = 1
-    simpPow y@(a `Pow` Atom(Const (SingleValue 1))) = a
-    simpPow y@(Atom(Const (SingleValue 0)) `Pow` _) = 0
-    simpPow y@(Atom(Const (SingleValue 1)) `Pow` _) = 1
-    simpPow (Atom (Const a) `Pow` Atom(Const b)) = val a ** val b
+    simpPow (a `Pow` Atom(Const (SingleValue 0))) = 1
+    simpPow (a `Pow` Atom(Const (SingleValue 1))) = a
+    simpPow (Atom(Const (SingleValue 0)) `Pow` _) = 0
+    simpPow (Atom(Const (SingleValue 1)) `Pow` _) = 1
+    simpPow (Atom (Const a) `Pow` Atom(Const b)) = val (a ** b)
     simpPow ((x `Prod` y) `Pow` a) = (x ** a) * (y ** a)
     simpPow ((x `Pow` a) `Pow` b) = x ** (a * b)
     simpPow ((simplify -> a) `Pow` (simplify -> b)) = a**b
