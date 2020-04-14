@@ -64,11 +64,12 @@ extra-deps:
  - Chart-gtk-1.9.1
  - Chart-1.9.1
  - cairo-0.13.6.0
- - gtk-0.15.2
- - gio-0.13.6.0
- - glib-0.13.7.0
+ - gtk-0.15.3
+ - gio-0.13.6.1
+ - glib-0.13.7.1
  - gtk2hs-buildtools-0.13.5.0
- - pango-0.13.6.0
+ - pango-0.13.6.1
+
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
