@@ -40,7 +40,6 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - base
-    - bondwb
     - sharedlib
     - bondlib
     - optparse-applicative
