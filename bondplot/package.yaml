@@ -1,0 +1,80 @@
+name:                bondplot
+version:             0.7.0.0
+github:              "githubuser/bondwb"
+license:             GPL-3
+author:              "Thomas Wright, Ian Stark"
+maintainer:          "tom.tdw@gmail.com"
+copyright:           "2016-2019 Thomas Wright, Ian Stark"
+# Metadata used when publishing your package
+synopsis:            "The bond-calculus: Haskell library"
+category:            SystemsBiology
+
+# extra-source-files:
+# - README.md
+# - ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/bondwb#readme>
+
+dependencies:
+- sharedlib
+- plotlib
+- bondlib
+- base >= 4.7 && < 5
+- containers
+- transformers
+- process
+- data-accessor
+- lens
+- data-default-class
+- unordered-containers
+- hashable
+- megaparsec
+- Chart
+- scientific
+- MissingH
+- QuickCheck
+- parser-combinators >= 1.0.0
+# Use interval representation
+- aern2-mp
+# Include testing dependencies here for code autocompletion
+- hspec-expectations
+- hspec-megaparsec
+- hashable
+- hspec
+
+default-extensions:
+- FlexibleContexts
+- ConstraintKinds
+- FlexibleInstances
+# - IncoherentInstances
+- MonoLocalBinds
+- ScopedTypeVariables
+- MultiParamTypeClasses
+- ViewPatterns
+- PatternSynonyms
+- ParallelListComp
+- TransformListComp
+- GADTs
+- GeneralizedNewtypeDeriving
+- DeriveGeneric
+- BangPatterns
+- RankNTypes
+- ExistentialQuantification
+- DeriveDataTypeable
+- FunctionalDependencies
+- DeriveFunctor
+- TypeSynonymInstances
+
+ghc-options:
+- -Wall
+- -fprint-potential-instances
+
+library:
+  source-dirs: .
