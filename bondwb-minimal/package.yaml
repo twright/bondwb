@@ -1,4 +1,4 @@
-name:                bondwb
+name:                bondwb-minimal
 version:             0.7.0.0
 github:              "githubuser/bondwb"
 license:             GPL-3
@@ -24,14 +24,13 @@ library:
     - base
     - sharedlib
     - bondlib
-    - bondplot
     - scientific
     - megaparsec
   # exposed-modules: BondCalculus.ArgListParser
   # exposed-modules: BondCalculus.ArgListParser
 
 executables:
-  bondwb:
+  bondwb-minimal:
     main:                bondwb.hs
     # source-dirs:         app
     other-modules: BondCalculus.ArgListParser
@@ -42,14 +41,11 @@ executables:
     dependencies:
     - base
     - bondwb
-    - bondplot
-    - plotlib
     - sharedlib
     - bondlib
     - optparse-applicative
     - haskeline
     - transformers
-    - Chart
     # - Chart-gtk
     - containers
     - scientific

@@ -29,7 +29,6 @@ dependencies:
 - transformers
 - process
 - data-accessor
-- Chart
 - lens
 - data-default-class
 - unordered-containers

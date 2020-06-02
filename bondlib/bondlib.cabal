@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ab2b4913e4bfcc85fb844c3af3d771161d9bd14996b09d321cafc4f6e2f702f4
+-- hash: 0d2c81b87da908a25b667d74c1f1dc01ed50546f163f282505fef4c5316a5989
 
 name:           bondlib
 version:        0.7.0.0
@@ -31,7 +31,6 @@ library
       BondCalculus.NumericalMethods
       BondCalculus.ODEExtraction
       BondCalculus.Parser
-      BondCalculus.Plot
       BondCalculus.Processes
       BondCalculus.Simulation
       BondCalculus.StochPyExtraction
@@ -45,8 +44,7 @@ library
   default-extensions: FlexibleContexts ConstraintKinds FlexibleInstances MonoLocalBinds ScopedTypeVariables MultiParamTypeClasses ViewPatterns PatternSynonyms ParallelListComp TransformListComp GADTs GeneralizedNewtypeDeriving DeriveGeneric BangPatterns RankNTypes ExistentialQuantification DeriveDataTypeable FunctionalDependencies DeriveFunctor TypeSynonymInstances
   ghc-options: -Wall -fprint-potential-instances
   build-depends:
-      Chart
-    , MissingH
+      MissingH
     , QuickCheck
     , aern2-mp
     , base >=4.7 && <5
@@ -86,8 +84,7 @@ test-suite bondlib-test
   default-extensions: FlexibleContexts ConstraintKinds FlexibleInstances MonoLocalBinds ScopedTypeVariables MultiParamTypeClasses ViewPatterns PatternSynonyms ParallelListComp TransformListComp GADTs GeneralizedNewtypeDeriving DeriveGeneric BangPatterns RankNTypes ExistentialQuantification DeriveDataTypeable FunctionalDependencies DeriveFunctor TypeSynonymInstances
   ghc-options: -Wall -fprint-potential-instances -Wall -O2 -fprof-auto -fwarn-tabs -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      Chart
-    , MissingH
+      MissingH
     , QuickCheck
     , aern2-mp
     , base >=4.7 && <5

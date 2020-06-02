@@ -1,17 +1,10 @@
-name:                cpilib
-version:             0.7.0.0
+name:                plotlib
+version:             0.1.0.0
 github:              "githubuser/bondwb"
 license:             GPL-3
-author:              "Chris Banks, Ian Stark, Thomas Wright"
+author:              "Thomas Wright"
 maintainer:          "tom.tdw@gmail.com"
-copyright:           Chris Banks, Ian Stark, Thomas Wright
-# Metadata used when publishing your package
-synopsis:            "The Continuous Pi Calculus: Haskell library"
-category:            SystemsBiology
-
-# extra-source-files:
-# - README.md
-# - ChangeLog.md
+copyright:           "2019 Author name here"
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
@@ -22,10 +15,16 @@ category:            SystemsBiology
 # common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/githubuser/bondwb#readme>
 
+# dependencies:
+# - base >= 4.7 && < 5
+# - bondlib
+
+# library:
+#   source-dirs: src
+
 dependencies:
-- sharedlib
-- plotlib
 - base >= 4.7 && < 5
+- sharedlib
 - parsec
 - containers
 - transformers
@@ -42,19 +41,13 @@ dependencies:
 - unordered-containers
 - cairo
 - hashable
+- megaparsec
 - scientific
 - MissingH
 - hmatrix-gsl
 - hmatrix
 - QuickCheck
+- parser-combinators >= 1.0.0
 
 library:
   source-dirs: .
-
-# benchmark signal-bench:
-#   type:             exitcode-stdio-1.0
-#   hs-source-dirs:   bench
-#   main-is:          Benchmark.hs
-#   build-depends:    base, criterion, cpilib, numeric-quest
-#   ghc-options: -Wall -O2 -fprof-auto -rtsopts -fwarn-tabs
-

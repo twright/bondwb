@@ -21,6 +21,7 @@ executables:
     dependencies:
     - base
     - sharedlib
+    - plotlib
     - cpilib
     - haskeline
     - transformers

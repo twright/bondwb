@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9a9b154ea906b7acfedbc06424dca0bb92bc145105a862e31012c1cda38ebcc2
+-- hash: 41af7854ea5f1ae8fa336bfaa3289adc58ec0df034ffa017618796c1e60fa7db
 
 name:           cpilib
 version:        0.7.0.0
@@ -57,6 +57,7 @@ library
     , hmatrix-gsl
     , lens
     , parsec
+    , plotlib
     , process
     , scientific
     , sharedlib

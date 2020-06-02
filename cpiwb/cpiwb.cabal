@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 33213a3bb039d821b497ce41bdee49d408c065c98d6fbd7872a12ae054055d7b
+-- hash: 8555e463ec9c486955f8ffdccf5589f9a9a301bad0fc470dd7cf66a2d94e753a
 
 name:           cpiwb
 version:        0.7.0.0
@@ -34,6 +34,7 @@ executable cpiwb
     , containers
     , cpilib
     , haskeline
+    , plotlib
     , sharedlib
     , transformers
   default-language: Haskell2010
